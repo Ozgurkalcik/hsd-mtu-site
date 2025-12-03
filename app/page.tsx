@@ -3,6 +3,7 @@ import AboutUs from "@/components/AboutUs";
 import Announcements from "@/components/Announcements";
 import Events from "@/components/Events";
 import Articles from "@/components/Articles";
+import Team from "@/components/Team";
 import ScrollBasedBlur from "@/components/ScrollBasedBlur";
 
 export default function Home() {
@@ -22,6 +23,9 @@ export default function Home() {
 
       {/* Articles Section */}
       <Articles />
+
+      {/* Team Section */}
+      <Team />
 
       {/* Contact Section */}
       <section id="iletisim" className="relative py-20 bg-gradient-to-b from-red-950 to-black">

@@ -2,7 +2,6 @@
 
 import ScrollReveal from "@/components/ScrollReveal/ScrollReveal";
 import Image from "next/image";
-import hsdLogo from "@/assets/image/hsd-logo-white.png";
 import { motion, useAnimationFrame, useMotionValue, useTransform, wrap, AnimatePresence } from "framer-motion";
 import { useRef, useState } from "react";
 import SplashCursor from "@/components/SplashCursor/SplashCursor";
@@ -219,7 +218,7 @@ export default function Announcements() {
                                     <div className="absolute inset-0 flex items-center justify-center p-8">
                                         <div className="relative w-full h-full opacity-100">
                                             <Image
-                                                src={hsdLogo}
+                                                src="/assets/image/hsd-logo-white.png"
                                                 alt="HSD Logo"
                                                 fill
                                                 className="object-contain"
@@ -335,7 +334,7 @@ function CarouselContent({ x, isHovered, isDragging, isModalOpen, onSelect }: { 
                         {/* Watermark Image (Huge Background) */}
                         <div className="absolute -right-12 -bottom-12 w-64 h-64 opacity-5 transform rotate-12 group-hover:rotate-0 group-hover:scale-110 group-hover:opacity-10 transition-all duration-700 ease-out pointer-events-none grayscale">
                             <Image
-                                src={hsdLogo}
+                                src="/assets/image/hsd-logo-white.png"
                                 alt="HSD Logo"
                                 fill
                                 className="object-contain"
