@@ -9,6 +9,7 @@
 		"lint": "eslint"
 	},
 	"dependencies": {
+		"@gsap/react": "^2.1.2",
 		"@types/three": "^0.181.0",
 		"gsap": "^3.13.0",
 		"mathjs": "^15.1.0",

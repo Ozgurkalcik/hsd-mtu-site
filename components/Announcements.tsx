@@ -5,6 +5,7 @@ import Image from "next/image";
 import hsdLogo from "@/assets/image/hsd-logo-white.png";
 import { motion, useAnimationFrame, useMotionValue, useTransform, wrap, AnimatePresence } from "framer-motion";
 import { useRef, useState } from "react";
+import SplashCursor from "@/components/SplashCursor/SplashCursor";
 
 const announcements = [
     {
@@ -105,6 +106,11 @@ export default function Announcements() {
 
     return (
         <section id="duyurular" className="relative py-24 bg-black overflow-hidden z-10">
+            {/* SplashCursor Effect - Scoped to Announcements Section */}
+            <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-5">
+                <SplashCursor />
+            </div>
+
             <div className="container mx-auto px-4 mb-16 relative z-20">
                 <div className="max-w-4xl mx-auto text-center">
                     <ScrollReveal
@@ -134,8 +140,8 @@ export default function Announcements() {
                 className="relative w-full overflow-hidden py-20 z-20 cursor-grab active:cursor-grabbing"
             >
                 {/* Gradient Masks */}
-                <div className="absolute left-0 top-0 bottom-0 w-20 md:w-40 bg-gradient-to-r from-black to-transparent z-30 pointer-events-none" />
-                <div className="absolute right-0 top-0 bottom-0 w-20 md:w-40 bg-gradient-to-l from-black to-transparent z-30 pointer-events-none" />
+                <div className="absolute left-0 top-20 bottom-20 w-8 md:w-16 bg-gradient-to-r from-black to-transparent z-30 pointer-events-none" />
+                <div className="absolute right-0 top-20 bottom-20 w-8 md:w-16 bg-gradient-to-l from-black to-transparent z-30 pointer-events-none" />
 
                 <motion.div
                     className="flex gap-8 w-max"

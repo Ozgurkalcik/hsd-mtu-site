@@ -1,6 +1,8 @@
 import Hero from "@/components/hero/Hero";
 import AboutUs from "@/components/AboutUs";
 import Announcements from "@/components/Announcements";
+import Events from "@/components/Events";
+import Articles from "@/components/Articles";
 import ScrollBasedBlur from "@/components/ScrollBasedBlur";
 
 export default function Home() {
@@ -15,37 +17,11 @@ export default function Home() {
       {/* Announcements Section */}
       <Announcements />
 
-      {/* Activities Section */}
-      <section id="etkinlikler" className="relative py-20 bg-gradient-to-b from-black to-red-950">
-        <h2 className="text-5xl font-bold text-center mb-12 bg-gradient-to-r from-white to-pink-400 bg-clip-text text-transparent">
-          Etkinliklerimiz
-        </h2>
-        <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            <div className="bg-gradient-to-br from-red-950/50 to-rose-950/50 backdrop-blur-xl rounded-2xl p-6 border border-rose-900/30 shadow-xl hover:shadow-2xl hover:border-rose-800/50 transition-all duration-300 hover:-translate-y-2">
-              <div className="text-5xl mb-4">🎯</div>
-              <h3 className="text-2xl font-bold text-pink-400 mb-3">Workshop</h3>
-              <p className="text-gray-300">
-                En son teknoloji trendleri hakkında pratik workshoplar
-              </p>
-            </div>
-            <div className="bg-gradient-to-br from-red-950/50 to-rose-950/50 backdrop-blur-xl rounded-2xl p-6 border border-rose-900/30 shadow-xl hover:shadow-2xl hover:border-rose-800/50 transition-all duration-300 hover:-translate-y-2">
-              <div className="text-5xl mb-4">💻</div>
-              <h3 className="text-2xl font-bold text-pink-400 mb-3">Hackathon</h3>
-              <p className="text-gray-300">
-                Takım çalışması ve inovasyon odaklı yarışmalar
-              </p>
-            </div>
-            <div className="bg-gradient-to-br from-red-950/50 to-rose-950/50 backdrop-blur-xl rounded-2xl p-6 border border-rose-900/30 shadow-xl hover:shadow-2xl hover:border-rose-800/50 transition-all duration-300 hover:-translate-y-2">
-              <div className="text-5xl mb-4">🤝</div>
-              <h3 className="text-2xl font-bold text-pink-400 mb-3">Tech Talks</h3>
-              <p className="text-gray-300">
-                Alanında uzman konuşmacılardan ilham verici konuşmalar
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Events Section */}
+      <Events />
+
+      {/* Articles Section */}
+      <Articles />
 
       {/* Contact Section */}
       <section id="iletisim" className="relative py-20 bg-gradient-to-b from-red-950 to-black">
