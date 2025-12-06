@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import LightPillar from './LightPillar/LightPillar';
 import Image from 'next/image';
 import TiltedCard from './TiltedCard';
+import CommitteeCard from './CommitteeCard';
+import SeeAllButton from './SeeAllButton';
 
 interface TeamMember {
     name: string;
@@ -135,6 +137,92 @@ export default function Team() {
                             />
                         </motion.div>
                     ))}
+                </div>
+            </div>
+
+            {/* Committee Chairs Section */}
+            <div className="relative z-10 w-full mt-32 py-24 overflow-hidden">
+                {/* Visual Separator */}
+                <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+
+                {/* Animated Background for Committees - Optimized (No Blur Filters) */}
+                <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none transform-gpu">
+                    {/* Purple Orb */}
+                    <div
+                        className="absolute top-[-20%] left-[-10%] w-[800px] h-[800px] animate-nebula will-change-transform"
+                        style={{
+                            background: 'radial-gradient(circle, rgba(88,28,135,0.3) 0%, rgba(88,28,135,0) 70%)',
+                            animationDelay: '0s'
+                        }}
+                    ></div>
+
+                    {/* Blue Orb */}
+                    <div
+                        className="absolute bottom-[-20%] right-[-10%] w-[700px] h-[700px] animate-nebula will-change-transform"
+                        style={{
+                            background: 'radial-gradient(circle, rgba(30,58,138,0.3) 0%, rgba(30,58,138,0) 70%)',
+                            animationDelay: '-5s'
+                        }}
+                    ></div>
+
+                    {/* Rose Orb */}
+                    <div
+                        className="absolute top-[40%] left-[60%] w-[600px] h-[600px] animate-nebula will-change-transform"
+                        style={{
+                            background: 'radial-gradient(circle, rgba(136,19,55,0.25) 0%, rgba(136,19,55,0) 70%)',
+                            animationDelay: '-10s'
+                        }}
+                    ></div>
+                </div>
+
+                <div className="container mx-auto px-4 relative z-10">
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        className="text-center mb-20"
+                    >
+                        <h2 className="text-4xl md:text-6xl font-bold text-white mb-6 tracking-tighter">
+                            Komite Başkanları
+                        </h2>
+                        {/* Custom Red/Purple Gradient Line to distinguish from Leadership */}
+                        <div className="h-0.5 w-24 mx-auto" style={{ background: 'linear-gradient(90deg, transparent, #FF3333, #9333ea, transparent)' }}></div>
+                    </motion.div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
+                        {[
+                            { name: 'İsim Soyisim', role: 'Proje Komitesi', image: '/assets/image/team/mustafa-zahter.png' }, // Placeholder
+                            { name: 'İsim Soyisim', role: 'Sosyal Medya Komitesi', image: '/assets/image/team/mustafa-zahter.png' }, // Placeholder
+                            { name: 'İsim Soyisim', role: 'Medium Komitesi', image: '/assets/image/team/mustafa-zahter.png' }, // Placeholder
+                            { name: 'İsim Soyisim', role: 'Etkinlik Komitesi', image: '/assets/image/team/mustafa-zahter.png' }, // Placeholder
+                        ].map((member, index) => (
+                            <motion.div
+                                key={index}
+                                initial={{ opacity: 0, y: 30 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true }}
+                                transition={{ delay: index * 0.1, duration: 0.8, ease: "easeOut" }}
+                                className="relative"
+                            >
+                                <CommitteeCard
+                                    name={member.name}
+                                    role={member.role}
+                                    imageSrc={member.image}
+                                />
+                            </motion.div>
+                        ))}
+                    </div>
+
+                    {/* Bottom Button */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: 0.6 }}
+                        className="flex justify-center mt-16"
+                    >
+                        <SeeAllButton />
+                    </motion.div>
                 </div>
             </div>
         </section>
