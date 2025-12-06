@@ -1,5 +1,4 @@
 import React from 'react';
-import TargetCursor from './TargetCursor/TargetCursor';
 
 export default function Contact() {
     return (
@@ -11,14 +10,6 @@ export default function Contact() {
             </div>
 
             <div className="container mx-auto px-4 relative z-10" id="contact-container">
-                {/* Scoped TargetCursor - only active for user interactions within #contact-container */}
-                <TargetCursor
-                    containerSelector="#contact-container"
-                    targetSelector=".cursor-target"
-                    spinDuration={4}
-                    hideDefaultCursor={true}
-                    parallaxOn={true}
-                />
 
                 <div className="max-w-4xl mx-auto">
                     <div className="text-center mb-16">
@@ -63,16 +54,15 @@ export default function Contact() {
                         {/* Form Side */}
                         <div className="md:col-span-3">
                             <form className="space-y-6 bg-white/5 backdrop-blur-xl p-8 rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden group">
-
-                                {/* Form gradient glow */}
-                                <div className="absolute -top-24 -right-24 w-48 h-48 bg-rose-500/20 rounded-full blur-[60px] pointer-events-none group-hover:bg-rose-500/30 transition-all duration-500" />
+                                {/* Form gradient glow - removed hover transition to prevent repaint */}
+                                <div className="absolute -top-24 -right-24 w-48 h-48 bg-rose-500/20 rounded-full blur-[60px] pointer-events-none" />
 
                                 <div className="grid md:grid-cols-2 gap-6">
                                     <div className="relative group/input">
                                         <label className="block text-sm font-medium text-gray-400 mb-2 ml-1 group-focus-within/input:text-rose-400 transition-colors">Ad Soyad</label>
                                         <input
                                             type="text"
-                                            className="w-full px-5 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/50 text-white placeholder-gray-600 transition-all cursor-target"
+                                            className="w-full px-5 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/50 text-white placeholder-gray-600 transition-colors"
                                             placeholder="Adınız Soyadınız"
                                         />
                                     </div>
@@ -80,7 +70,7 @@ export default function Contact() {
                                         <label className="block text-sm font-medium text-gray-400 mb-2 ml-1 group-focus-within/input:text-rose-400 transition-colors">E-posta</label>
                                         <input
                                             type="email"
-                                            className="w-full px-5 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/50 text-white placeholder-gray-600 transition-all cursor-target"
+                                            className="w-full px-5 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/50 text-white placeholder-gray-600 transition-colors"
                                             placeholder="ornek@email.com"
                                         />
                                     </div>
@@ -90,7 +80,7 @@ export default function Contact() {
                                     <label className="block text-sm font-medium text-gray-400 mb-2 ml-1 group-focus-within/input:text-rose-400 transition-colors">Konu</label>
                                     <input
                                         type="text"
-                                        className="w-full px-5 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/50 text-white placeholder-gray-600 transition-all cursor-target"
+                                        className="w-full px-5 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/50 text-white placeholder-gray-600 transition-colors"
                                         placeholder="Mesajınızın konusu"
                                     />
                                 </div>
@@ -99,14 +89,14 @@ export default function Contact() {
                                     <label className="block text-sm font-medium text-gray-400 mb-2 ml-1 group-focus-within/input:text-rose-400 transition-colors">Mesajınız</label>
                                     <textarea
                                         rows={5}
-                                        className="w-full px-5 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/50 text-white placeholder-gray-600 transition-all resize-none cursor-target"
+                                        className="w-full px-5 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/50 text-white placeholder-gray-600 transition-colors resize-none"
                                         placeholder="Bize iletmek istediklerinizi buraya yazın..."
                                     />
                                 </div>
 
                                 <button
-                                    type="button" // changed to button to prevent refresh for demo
-                                    className="w-full bg-gradient-to-r from-rose-700 to-pink-800 text-white font-semibold py-4 rounded-xl hover:from-rose-600 hover:to-pink-700 transition-all duration-300 shadow-lg shadow-rose-900/20 hover:shadow-rose-600/40 hover:-translate-y-1 cursor-target flex items-center justify-center gap-2 group/btn"
+                                    type="button"
+                                    className="w-full bg-gradient-to-r from-rose-700 to-pink-800 text-white font-semibold py-4 rounded-xl hover:from-rose-600 hover:to-pink-700 transition-colors duration-300 shadow-lg shadow-rose-900/20 hover:shadow-rose-600/40 flex items-center justify-center gap-2 group/btn"
                                 >
                                     <span>Mesajı Gönder</span>
                                     <svg className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">

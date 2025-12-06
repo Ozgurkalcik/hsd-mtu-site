@@ -107,7 +107,7 @@
 
 .flap-image {
     transform: rotate(var(--sticker-rotate));
-    filter: url(#expandAndFill);
+    /* filter: url(#expandAndFill); - Moved to inline style for unique ID support */
 }
 
 .draggable {

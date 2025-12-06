@@ -36,21 +36,13 @@ export default function Team() {
 
     return (
         <section id="ekibimiz" className="relative w-full min-h-screen bg-black overflow-hidden flex flex-col py-24">
-            {/* Background - Subtle and Professional */}
+            {/* Background - Subtle and Professional (Pure CSS, no more WebGL) */}
             <div className="absolute inset-0 w-full h-full z-0 pointer-events-none">
                 <LightPillar
                     topColor="#ff979e"
                     bottomColor="#bb33ff"
-                    intensity={1}
-                    rotationSpeed={0.3}
-                    glowAmount={0.002}
-                    pillarWidth={3.0}
-                    pillarHeight={0.4}
-                    noiseIntensity={0.5}
-                    pillarRotation={90}
-                    interactive={false}
+                    intensity={0.7}
                     mixBlendMode="screen"
-
                 />
             </div>
 
@@ -145,35 +137,8 @@ export default function Team() {
                 {/* Visual Separator */}
                 <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
 
-                {/* Animated Background for Committees - Optimized (No Blur Filters) */}
-                <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none transform-gpu">
-                    {/* Purple Orb */}
-                    <div
-                        className="absolute top-[-20%] left-[-10%] w-[800px] h-[800px] animate-nebula will-change-transform"
-                        style={{
-                            background: 'radial-gradient(circle, rgba(88,28,135,0.3) 0%, rgba(88,28,135,0) 70%)',
-                            animationDelay: '0s'
-                        }}
-                    ></div>
-
-                    {/* Blue Orb */}
-                    <div
-                        className="absolute bottom-[-20%] right-[-10%] w-[700px] h-[700px] animate-nebula will-change-transform"
-                        style={{
-                            background: 'radial-gradient(circle, rgba(30,58,138,0.3) 0%, rgba(30,58,138,0) 70%)',
-                            animationDelay: '-5s'
-                        }}
-                    ></div>
-
-                    {/* Rose Orb */}
-                    <div
-                        className="absolute top-[40%] left-[60%] w-[600px] h-[600px] animate-nebula will-change-transform"
-                        style={{
-                            background: 'radial-gradient(circle, rgba(136,19,55,0.25) 0%, rgba(136,19,55,0) 70%)',
-                            animationDelay: '-10s'
-                        }}
-                    ></div>
-                </div>
+                {/* Animated Background for Committees - REMOVED for unified look */}
+                {/* <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none transform-gpu">...</div> */}
 
                 <div className="container mx-auto px-4 relative z-10">
                     <motion.div

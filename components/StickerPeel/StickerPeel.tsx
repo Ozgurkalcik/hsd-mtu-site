@@ -144,38 +144,47 @@ const StickerPeel: React.FC<StickerPeelProps> = ({
     }, []);
 
     useEffect(() => {
+        let frameId: number;
         const updateLight = (e: Event) => {
-            const mouseEvent = e as MouseEvent;
-            const rect = containerRef.current?.getBoundingClientRect();
-            if (!rect) return;
+            if (frameId) return; // processing already scheduled for this frame
 
-            const x = mouseEvent.clientX - rect.left;
-            const y = mouseEvent.clientY - rect.top;
+            frameId = requestAnimationFrame(() => {
+                frameId = 0;
+                const mouseEvent = e as MouseEvent;
+                const rect = containerRef.current?.getBoundingClientRect();
+                if (!rect) return;
 
-            if (pointLightRef.current) {
-                gsap.set(pointLightRef.current, { attr: { x, y } });
-            }
+                const x = mouseEvent.clientX - rect.left;
+                const y = mouseEvent.clientY - rect.top;
 
-            const normalizedAngle = Math.abs(peelDirection % 360);
-            if (pointLightFlippedRef.current) {
-                if (normalizedAngle !== 180) {
-                    gsap.set(pointLightFlippedRef.current, {
-                        attr: { x, y: rect.height - y }
-                    });
-                } else {
-                    gsap.set(pointLightFlippedRef.current, {
-                        attr: { x: -1000, y: -1000 }
-                    });
+                if (pointLightRef.current) {
+                    gsap.set(pointLightRef.current, { attr: { x, y } });
                 }
-            }
+
+                const normalizedAngle = Math.abs(peelDirection % 360);
+                if (pointLightFlippedRef.current) {
+                    if (normalizedAngle !== 180) {
+                        gsap.set(pointLightFlippedRef.current, {
+                            attr: { x, y: rect.height - y }
+                        });
+                    } else {
+                        gsap.set(pointLightFlippedRef.current, {
+                            attr: { x: -1000, y: -1000 }
+                        });
+                    }
+                }
+            });
         };
 
         const container = containerRef.current;
         const eventType = 'mousemove';
 
         if (container) {
-            container.addEventListener(eventType, updateLight);
-            return () => container.removeEventListener(eventType, updateLight);
+            container.addEventListener(eventType, updateLight, { passive: true });
+            return () => {
+                container.removeEventListener(eventType, updateLight);
+                if (frameId) cancelAnimationFrame(frameId);
+            };
         }
     }, [peelDirection]);
 
@@ -228,11 +237,13 @@ const StickerPeel: React.FC<StickerPeelProps> = ({
         ]
     );
 
+    const uniqueId = useMemo(() => Math.random().toString(36).substr(2, 9), []);
+
     return (
         <div className={`draggable ${className}`} ref={dragTargetRef} style={cssVars}>
-            <svg width="0" height="0">
+            <svg width="0" height="0" className="absolute pointer-events-none">
                 <defs>
-                    <filter id="pointLight">
+                    <filter id={`pointLight-${uniqueId}`}>
                         <feGaussianBlur stdDeviation="1" result="blur" />
                         <feSpecularLighting
                             result="spec"
@@ -247,7 +258,7 @@ const StickerPeel: React.FC<StickerPeelProps> = ({
                         <feComposite in="lit" in2="SourceAlpha" operator="in" />
                     </filter>
 
-                    <filter id="pointLightFlipped">
+                    <filter id={`pointLightFlipped-${uniqueId}`}>
                         <feGaussianBlur stdDeviation="10" result="blur" />
                         <feSpecularLighting
                             result="spec"
@@ -262,7 +273,7 @@ const StickerPeel: React.FC<StickerPeelProps> = ({
                         <feComposite in="lit" in2="SourceAlpha" operator="in" />
                     </filter>
 
-                    <filter id="dropShadow">
+                    <filter id={`dropShadow-${uniqueId}`}>
                         <feDropShadow
                             dx="2"
                             dy="4"
@@ -272,7 +283,7 @@ const StickerPeel: React.FC<StickerPeelProps> = ({
                         />
                     </filter>
 
-                    <filter id="expandAndFill">
+                    <filter id={`expandAndFill-${uniqueId}`}>
                         <feOffset dx="0" dy="0" in="SourceAlpha" result="shape" />
                         <feFlood floodColor="rgb(179,179,179)" result="flood" />
                         <feComposite operator="in" in="flood" in2="shape" />
@@ -281,8 +292,8 @@ const StickerPeel: React.FC<StickerPeelProps> = ({
             </svg>
 
             <div className="sticker-container" ref={containerRef}>
-                <div className="sticker-main">
-                    <div className="sticker-lighting">
+                <div className="sticker-main" style={{ filter: `url(#dropShadow-${uniqueId})` }}>
+                    <div className="sticker-lighting" style={{ filter: `url(#pointLight-${uniqueId})` }}>
                         <img
                             src={imageSrc}
                             alt=""
@@ -294,11 +305,12 @@ const StickerPeel: React.FC<StickerPeelProps> = ({
                 </div>
 
                 <div className="flap">
-                    <div className="flap-lighting">
+                    <div className="flap-lighting" style={{ filter: `url(#pointLightFlipped-${uniqueId})` }}>
                         <img
                             src={imageSrc}
                             alt=""
                             className="flap-image"
+                            style={{ filter: `url(#expandAndFill-${uniqueId})` }}
                             draggable="false"
                             onContextMenu={e => e.preventDefault()}
                         />

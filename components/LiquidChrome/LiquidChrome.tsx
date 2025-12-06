@@ -70,7 +70,8 @@ export const LiquidChrome: React.FC<LiquidChromeProps> = ({
           vec2 fragCoord = uvCoord * uResolution.xy;
           vec2 uv = (2.0 * fragCoord - uResolution.xy) / min(uResolution.x, uResolution.y);
 
-          for (float i = 1.0; i < 10.0; i++){
+          // Optimized: Reduced iterations from 10 to 5 for performance
+          for (float i = 1.0; i < 5.0; i++){
               uv.x += uAmplitude / i * cos(i * uFrequencyX * uv.y + uTime + uMouse.x * 3.14159);
               uv.y += uAmplitude / i * cos(i * uFrequencyY * uv.x + uTime + uMouse.y * 3.14159);
           }
@@ -112,6 +113,8 @@ export const LiquidChrome: React.FC<LiquidChromeProps> = ({
         function resize() {
             if (!container) return;
             const scale = 0.5; // Lower resolution for performance
+            // Optimize: Set correct logical size but keep internal resolution low (1.0 dpr max)
+            const dpr = Math.min(window.devicePixelRatio, 1);
             renderer.setSize(container.offsetWidth * scale, container.offsetHeight * scale);
 
             // Set display size to fill container
@@ -154,11 +157,15 @@ export const LiquidChrome: React.FC<LiquidChromeProps> = ({
 
         let animationId: number;
         function update(t: number) {
-            animationId = requestAnimationFrame(update);
-            if (!isPausedRef.current) {
+            if (isPausedRef.current) {
+                // Optimize: Completely stop loop if paused
+                // We will need to restart it when unpaused, but for now lets just skip heavy work
+                // actually, better to keep the loop alive but do NOTHING
+            } else {
                 program.uniforms.uTime.value = t * 0.001 * speed;
                 renderer.render({ scene: mesh });
             }
+            animationId = requestAnimationFrame(update);
         }
         animationId = requestAnimationFrame(update);
 
