@@ -5,8 +5,8 @@ export default function Contact() {
         <section id="iletisim" className="relative py-24 bg-gradient-to-b from-red-950/20 to-black overflow-hidden">
             {/* Background Decorative Elements */}
             <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-rose-600/10 rounded-full blur-[100px] animate-pulse" />
-                <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-purple-600/10 rounded-full blur-[80px] animate-pulse delay-1000" />
+                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-rose-600/10 rounded-full blur-[80px]" />
+                <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-purple-600/10 rounded-full blur-[60px]" />
             </div>
 
             <div className="container mx-auto px-4 relative z-10" id="contact-container">
@@ -54,8 +54,8 @@ export default function Contact() {
                         {/* Form Side */}
                         <div className="md:col-span-3">
                             <form className="space-y-6 bg-white/5 backdrop-blur-xl p-8 rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden group">
-                                {/* Form gradient glow - removed hover transition to prevent repaint */}
-                                <div className="absolute -top-24 -right-24 w-48 h-48 bg-rose-500/20 rounded-full blur-[60px] pointer-events-none" />
+                                {/* Form gradient glow - removed for performance */}
+                                {/* <div className="absolute -top-24 -right-24 w-48 h-48 bg-rose-500/20 rounded-full blur-[60px] pointer-events-none" /> */}
 
                                 <div className="grid md:grid-cols-2 gap-6">
                                     <div className="relative group/input">

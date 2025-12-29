@@ -1,6 +1,7 @@
 'use client';
 import React, { useRef, useEffect } from 'react';
 import { Renderer, Program, Mesh, Triangle } from 'ogl';
+import { useFrozen } from '../FrozenSection';
 
 import './LiquidChrome.css';
 
@@ -24,6 +25,7 @@ export const LiquidChrome: React.FC<LiquidChromeProps> = ({
 }) => {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const isPausedRef = useRef<boolean>(true);
+    const isFrozen = useFrozen(); // Correct placement: Top level
 
     useEffect(() => {
         if (!containerRef.current) return;
@@ -126,8 +128,16 @@ export const LiquidChrome: React.FC<LiquidChromeProps> = ({
             resUniform[1] = gl.canvas.height;
             resUniform[2] = gl.canvas.width / gl.canvas.height;
         }
-        window.addEventListener('resize', resize);
-        resize();
+        let resizeTimeout: ReturnType<typeof setTimeout>;
+        const handleResize = () => {
+            // Debounce resize
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                resize();
+            }, 200);
+        };
+        window.addEventListener('resize', handleResize);
+        resize(); // Initial call
 
         function handleMouseMove(event: MouseEvent) {
             const rect = container.getBoundingClientRect();
@@ -157,10 +167,9 @@ export const LiquidChrome: React.FC<LiquidChromeProps> = ({
 
         let animationId: number;
         function update(t: number) {
-            if (isPausedRef.current) {
-                // Optimize: Completely stop loop if paused
-                // We will need to restart it when unpaused, but for now lets just skip heavy work
-                // actually, better to keep the loop alive but do NOTHING
+            // Stop loop if document is hidden, paused by intersection, OR frozen by viewport optimization
+            if (document.hidden || isPausedRef.current || isFrozen) {
+                // do nothing
             } else {
                 program.uniforms.uTime.value = t * 0.001 * speed;
                 renderer.render({ scene: mesh });
@@ -174,7 +183,8 @@ export const LiquidChrome: React.FC<LiquidChromeProps> = ({
         return () => {
             cancelAnimationFrame(animationId);
             observer.disconnect();
-            window.removeEventListener('resize', resize);
+            window.removeEventListener('resize', handleResize);
+            clearTimeout(resizeTimeout);
             if (interactive) {
                 container.removeEventListener('mousemove', handleMouseMove);
                 container.removeEventListener('touchmove', handleTouchMove);
@@ -184,7 +194,7 @@ export const LiquidChrome: React.FC<LiquidChromeProps> = ({
             }
             gl.getExtension('WEBGL_lose_context')?.loseContext();
         };
-    }, [baseColor, speed, amplitude, frequencyX, frequencyY, interactive]);
+    }, [baseColor, speed, amplitude, frequencyX, frequencyY, interactive, isFrozen]);
 
     return <div ref={containerRef} className="liquidChrome-container" {...props} />;
 };

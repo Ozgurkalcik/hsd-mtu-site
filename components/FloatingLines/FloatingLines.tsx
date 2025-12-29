@@ -12,6 +12,7 @@ import {
   Vector2,
   Clock
 } from 'three';
+import { useFrozen } from '../FrozenSection';
 
 import './FloatingLines.css';
 
@@ -302,6 +303,8 @@ export default function FloatingLines({
   const middleLineDistance = enabledWaves.includes('middle') ? getLineDistance('middle') * 0.01 : 0.01;
   const bottomLineDistance = enabledWaves.includes('bottom') ? getLineDistance('bottom') * 0.01 : 0.01;
 
+  const isFrozen = useFrozen(); // Correct placement: Top level
+
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -438,6 +441,12 @@ export default function FloatingLines({
 
     let raf = 0;
     const renderLoop = () => {
+      // Pause if hidden OR frozen
+      if (document.hidden || isFrozen) {
+        raf = requestAnimationFrame(renderLoop);
+        return;
+      }
+
       uniforms.iTime.value = clock.getElapsedTime();
 
       if (interactive) {
@@ -490,7 +499,8 @@ export default function FloatingLines({
     bendStrength,
     mouseDamping,
     parallax,
-    parallaxStrength
+    parallaxStrength,
+    isFrozen
   ]);
 
   return (

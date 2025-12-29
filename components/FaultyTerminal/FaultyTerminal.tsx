@@ -1,5 +1,6 @@
 import { Renderer, Program, Mesh, Color, Triangle } from 'ogl';
 import React, { useEffect, useRef, useMemo, useCallback } from 'react';
+import { useFrozen } from '../FrozenSection';
 import './FaultyTerminal.css';
 
 type Vec2 = [number, number];
@@ -275,6 +276,8 @@ export default function FaultyTerminal({
     const loadAnimationStartRef = useRef<number>(0);
     const timeOffsetRef = useRef<number>(Math.random() * 100);
 
+    const isFrozen = useFrozen();
+
     const tintVec = useMemo(() => hexToRgb(tint), [tint]);
 
     const ditherValue = useMemo(() => (typeof dither === 'boolean' ? (dither ? 1 : 0) : dither), [dither]);
@@ -350,6 +353,9 @@ export default function FaultyTerminal({
         const update = (t: number) => {
             rafRef.current = requestAnimationFrame(update);
 
+            // Check frozen state from parent section
+            if (isFrozen) return;
+
             if (pageLoadAnimation && loadAnimationStartRef.current === 0) {
                 loadAnimationStartRef.current = t;
             }
@@ -416,7 +422,10 @@ export default function FaultyTerminal({
         mouseStrength,
         pageLoadAnimation,
         brightness,
-        handleMouseMove
+        pageLoadAnimation,
+        brightness,
+        handleMouseMove,
+        isFrozen
     ]);
 
     return <div ref={containerRef} className={`faulty-terminal-container ${className}`} style={style} {...rest} />;

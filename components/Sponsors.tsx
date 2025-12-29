@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import { motion } from 'framer-motion';
-import LogoLoop from './LogoLoop/LogoLoop';
+import SimpleMarquee from './SimpleMarquee';
 import { SiGoogle, SiReact, SiGithub, SiVercel, SiSpotify, SiNetflix, SiAmazon, SiMeta } from 'react-icons/si';
 import StickerPeel from './StickerPeel/StickerPeel';
 
@@ -19,7 +19,7 @@ const techLogos = [
 export default function Sponsors() {
     return (
         <section className="relative w-full py-48 bg-black overflow-hidden flex flex-col items-center">
-            {/* Decorative Stickers - Full section area for dragging */}
+            {/* Decorative Stickers - Reduced to 2 instances */}
             <div className="absolute inset-0 z-20 pointer-events-none">
                 <div className="relative w-full h-full pointer-events-auto">
                     {/* Sticker 1 - Top Left */}
@@ -33,29 +33,7 @@ export default function Sponsors() {
                         lightingIntensity={0.2}
                         initialPosition={{ x: 50, y: 50 }}
                     />
-                    {/* Sticker 2 - Top Right */}
-                    <StickerPeel
-                        imageSrc="/assets/image/hsd-logo-white.png"
-                        width={100}
-                        rotate={-20}
-                        peelBackHoverPct={35}
-                        peelBackActivePct={55}
-                        shadowIntensity={0.7}
-                        lightingIntensity={0.15}
-                        initialPosition={{ x: 1100, y: 80 }}
-                    />
-                    {/* Sticker 3 - Bottom Left */}
-                    <StickerPeel
-                        imageSrc="/assets/image/hsd-logo-white.png"
-                        width={90}
-                        rotate={25}
-                        peelBackHoverPct={30}
-                        peelBackActivePct={50}
-                        shadowIntensity={0.6}
-                        lightingIntensity={0.1}
-                        initialPosition={{ x: 100, y: 550 }}
-                    />
-                    {/* Sticker 4 - Bottom Right */}
+                    {/* Sticker 4 - Bottom Right -> Now Sticker 2 */}
                     <StickerPeel
                         imageSrc="/assets/image/hsd-logo-white.png"
                         width={110}
@@ -83,18 +61,18 @@ export default function Sponsors() {
                 </motion.div>
 
                 <div className="w-full relative">
-                    <LogoLoop
-                        logos={techLogos}
-                        speed={40}
-                        direction="left"
-                        logoHeight={64}
-                        gap={60}
-                        hoverSpeed={0}
-                        scaleOnHover
-                        fadeOut
-                        fadeOutColor="#000000"
-                        ariaLabel="Sponsorlarımız"
-                    />
+                    <SimpleMarquee speed={40}>
+                        <div className="flex gap-16 px-8 items-center">
+                            {techLogos.map((logo, index) => (
+                                <div key={index} className="flex flex-col items-center gap-4 group cursor-pointer transition-transform hover:scale-110">
+                                    {logo.node}
+                                    <span className="text-gray-400 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {logo.title}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </SimpleMarquee>
                 </div>
             </div>
             <div className="h-24 w-full"></div>

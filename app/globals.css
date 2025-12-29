@@ -71,6 +71,14 @@ body {
   }
 }
 
-.animate-spin-slow {
-  animation: spin-slow 4s linear infinite;
+
+body.is-hidden,
+body.is-hidden * {
+  animation-play-state: paused !important;
+  transition: none !important;
+}
+
+/* Frozen Section: Far off-screen */
+.is-frozen-section * {
+  animation-play-state: paused !important;
 }

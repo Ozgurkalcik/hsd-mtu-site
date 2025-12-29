@@ -8,38 +8,48 @@ import Sponsors from "@/components/Sponsors";
 import Gallery from "@/components/Gallery";
 import Contact from "@/components/Contact";
 import ScrollBasedBlur from "@/components/ScrollBasedBlur";
+import FrozenSection from "@/components/FrozenSection";
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-black">
-      {/* Hero Section */}
-      <Hero />
+      <FrozenSection id="hero" className="min-h-screen">
+        <Hero />
+      </FrozenSection>
 
-      {/* About Section */}
-      <AboutUs />
+      <FrozenSection id="hakkimizda">
+        <AboutUs />
+      </FrozenSection>
 
-      {/* Announcements Section */}
-      <Announcements />
+      <FrozenSection id="duyurular">
+        <Announcements />
+      </FrozenSection>
 
-      {/* Events Section */}
-      <Events />
+      <FrozenSection id="etkinlikler">
+        <Events />
+      </FrozenSection>
 
-      {/* Articles Section */}
-      <Articles />
+      <FrozenSection id="yazilar">
+        <Articles />
+      </FrozenSection>
 
-      {/* Team Section */}
-      <Team />
+      <FrozenSection id="ekip">
+        <Team />
+      </FrozenSection>
 
-      {/* Sponsors Section */}
-      <Sponsors />
+      <FrozenSection id="sponsorlar">
+        <Sponsors />
+      </FrozenSection>
 
-      {/* Gallery Section */}
-      <Gallery />
+      <FrozenSection id="galeri">
+        <Gallery />
+      </FrozenSection>
 
-      {/* Contact Section */}
-      <Contact />
+      <FrozenSection id="iletisim">
+        <Contact />
+      </FrozenSection>
 
-      {/* Footer */}
+      {/* Footer is small, can stay */}
       <footer className="bg-black border-t border-rose-900/30 py-8">
         <div className="container mx-auto px-4 text-center">
           <p className="text-gray-400">
@@ -47,7 +57,9 @@ export default function Home() {
           </p>
         </div>
       </footer>
-      {/* Scroll Based Blur Effect */}
+
+      {/* Scroll Based Blur Effect - Global effect, maybe keep outside or wrap? It listens to scroll anyway. */}
+      {/* It's lightweight now, so acceptable to keep global */}
       <ScrollBasedBlur />
     </main>
   );

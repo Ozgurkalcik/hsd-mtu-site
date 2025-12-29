@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import { motion } from 'framer-motion';
-import LightPillar from './LightPillar/LightPillar';
+
 import Image from 'next/image';
 import TiltedCard from './TiltedCard';
 import CommitteeCard from './CommitteeCard';
@@ -38,12 +38,7 @@ export default function Team() {
         <section id="ekibimiz" className="relative w-full min-h-screen bg-black overflow-hidden flex flex-col py-24">
             {/* Background - Subtle and Professional (Pure CSS, no more WebGL) */}
             <div className="absolute inset-0 w-full h-full z-0 pointer-events-none">
-                <LightPillar
-                    topColor="#ff979e"
-                    bottomColor="#bb33ff"
-                    intensity={0.7}
-                    mixBlendMode="screen"
-                />
+
             </div>
 
             <div className="relative z-10 container mx-auto px-4 flex-1 flex flex-col justify-center">
