@@ -1,8 +1,45 @@
-import React from 'react';
+'use client';
+import React, { useRef } from 'react';
+import { LuMapPin, LuMail, LuInstagram, LuLinkedin, LuTwitter, LuSend } from "react-icons/lu";
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 
 export default function Contact() {
+    const ref = useRef<HTMLDivElement>(null);
+
+    // Motion parameters for 3D Tilt
+    const x = useMotionValue(0);
+    const y = useMotionValue(0);
+
+    const mouseX = useSpring(x, { stiffness: 100, damping: 20 });
+    const mouseY = useSpring(y, { stiffness: 100, damping: 20 });
+
+    const rotateX = useTransform(mouseY, [-0.5, 0.5], ["2.5deg", "-2.5deg"]);
+    const rotateY = useTransform(mouseX, [-0.5, 0.5], ["-2.5deg", "2.5deg"]);
+
+    function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+        if (!ref.current) return;
+        const rect = ref.current.getBoundingClientRect();
+
+        const width = rect.width;
+        const height = rect.height;
+
+        const mouseXVal = e.clientX - rect.left;
+        const mouseYVal = e.clientY - rect.top;
+
+        const xPct = mouseXVal / width - 0.5;
+        const yPct = mouseYVal / height - 0.5;
+
+        x.set(xPct);
+        y.set(yPct);
+    }
+
+    function handleMouseLeave() {
+        x.set(0);
+        y.set(0);
+    }
+
     return (
-        <section id="iletisim" className="relative py-24 bg-gradient-to-b from-red-950/20 to-black overflow-hidden">
+        <section id="iletisim" className="relative py-24 bg-gradient-to-b from-red-950/20 to-black overflow-hidden flex items-center justify-center min-h-screen">
             {/* Background Decorative Elements */}
             <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
                 <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-rose-600/10 rounded-full blur-[80px]" />
@@ -11,7 +48,7 @@ export default function Contact() {
 
             <div className="container mx-auto px-4 relative z-10" id="contact-container">
 
-                <div className="max-w-4xl mx-auto">
+                <div className="max-w-6xl mx-auto">
                     <div className="text-center mb-16">
                         <h2 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-white via-rose-200 to-rose-400 bg-clip-text text-transparent tracking-tight">
                             İletişime Geçin
@@ -21,90 +58,134 @@ export default function Contact() {
                         </p>
                     </div>
 
-                    <div className="grid md:grid-cols-5 gap-8 items-start">
+                    {/* Unified Card Container Wrapper for Perspective */}
+                    <div className="perspective-[1000px] w-full min-h-[600px] flex justify-center">
+                        <motion.div
+                            ref={ref}
+                            onMouseMove={handleMouseMove}
+                            onMouseLeave={handleMouseLeave}
+                            style={{
+                                rotateX,
+                                rotateY,
+                                transformStyle: "preserve-3d",
+                            }}
+                            className="w-full bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row h-full transform-gpu"
+                        >
 
-                        {/* Contact Info Side */}
-                        <div className="md:col-span-2 space-y-6">
-                            <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:bg-white/10 transition-colors duration-300 group cursor-target">
-                                <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-rose-400 transition-colors">Adres</h3>
-                                <p className="text-gray-400">
-                                    Malatya Turgut Özal Üniversitesi,<br />
-                                    Battalgazi Kampüsü
-                                </p>
-                            </div>
+                            {/* Left Side: Info Panel */}
+                            <div className="w-full md:w-2/5 bg-gradient-to-br from-rose-950/50 to-black/50 p-12 flex flex-col justify-between relative overflow-hidden">
+                                {/* Decorative Circle */}
+                                <div className="absolute -top-24 -left-24 w-64 h-64 bg-rose-500/20 rounded-full blur-[60px] pointer-events-none" />
 
-                            <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:bg-white/10 transition-colors duration-300 group cursor-target">
-                                <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-rose-400 transition-colors">Email</h3>
-                                <a href="mailto:info@hsdmtu.com" className="text-gray-400 hover:text-white transition-colors">
-                                    info@hsdmtu.com
-                                </a>
-                            </div>
+                                <div>
+                                    <h3 className="text-3xl font-bold text-white mb-8">İletişim Bilgileri</h3>
+                                    <p className="text-gray-400 mb-12 leading-relaxed">
+                                        Size yardımcı olmaktan mutluluk duyarız. Aşağıdaki bilgilerden bize ulaşabilir veya formu doldurabilirsiniz.
+                                    </p>
 
-                            <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:bg-white/10 transition-colors duration-300 group cursor-target">
-                                <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-rose-400 transition-colors">Sosyal Medya</h3>
-                                <div className="flex gap-4">
-                                    {/* Social Icons would go here */}
-                                    <span className="text-gray-400">Instagram</span>
-                                    <span className="text-gray-400">LinkedIn</span>
-                                    <span className="text-gray-400">Twitter</span>
+                                    <div className="space-y-8">
+                                        <div className="flex items-start gap-4 group">
+                                            <div className="p-3 bg-white/5 rounded-xl border border-white/10 text-rose-400 group-hover:scale-110 group-hover:bg-rose-500/10 transition-all duration-300">
+                                                <LuMapPin size={24} />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-white font-semibold mb-1">Adres</h4>
+                                                <p className="text-gray-400 text-sm">
+                                                    Malatya Turgut Özal Üniversitesi,<br />
+                                                    Battalgazi Kampüsü
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-start gap-4 group">
+                                            <div className="p-3 bg-white/5 rounded-xl border border-white/10 text-rose-400 group-hover:scale-110 group-hover:bg-rose-500/10 transition-all duration-300">
+                                                <LuMail size={24} />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-white font-semibold mb-1">Email</h4>
+                                                <a href="mailto:info@hsdmtu.com" className="text-gray-400 text-sm hover:text-white transition-colors">
+                                                    info@hsdmtu.com
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Social Media - Bottom */}
+                                <div className="mt-12">
+                                    <h4 className="text-white font-semibold mb-4">Takip Edin</h4>
+                                    <div className="flex gap-4">
+                                        {[
+                                            { icon: <LuInstagram size={20} />, href: "#instagram" },
+                                            { icon: <LuLinkedin size={20} />, href: "#linkedin" },
+                                            { icon: <LuTwitter size={20} />, href: "#twitter" }
+                                        ].map((social, index) => (
+                                            <a
+                                                key={index}
+                                                href={social.href}
+                                                className="p-3 bg-white/5 rounded-full border border-white/10 text-gray-400 hover:text-rose-400 hover:bg-white/10 hover:scale-110 transition-all duration-300"
+                                            >
+                                                {social.icon}
+                                            </a>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Form Side */}
-                        <div className="md:col-span-3">
-                            <form className="space-y-6 bg-white/5 backdrop-blur-xl p-8 rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden group">
-                                {/* Form gradient glow - removed for performance */}
-                                {/* <div className="absolute -top-24 -right-24 w-48 h-48 bg-rose-500/20 rounded-full blur-[60px] pointer-events-none" /> */}
+                            {/* Right Side: Form Panel */}
+                            <div className="w-full md:w-3/5 p-12 bg-black/20">
+                                <form className="space-y-6">
+                                    <div className="grid md:grid-cols-2 gap-6">
+                                        <div className="group/input">
+                                            <label className="block text-sm font-medium text-gray-400 mb-2 ml-1 group-focus-within/input:text-rose-400 transition-colors">Ad Soyad</label>
+                                            <input
+                                                type="text"
+                                                className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-rose-500/50 focus:bg-white/10 text-white placeholder-gray-600 transition-all duration-300"
+                                                placeholder="Adınız Soyadınız"
+                                            />
+                                        </div>
+                                        <div className="group/input">
+                                            <label className="block text-sm font-medium text-gray-400 mb-2 ml-1 group-focus-within/input:text-rose-400 transition-colors">E-posta</label>
+                                            <input
+                                                type="email"
+                                                className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-rose-500/50 focus:bg-white/10 text-white placeholder-gray-600 transition-all duration-300"
+                                                placeholder="ornek@email.com"
+                                            />
+                                        </div>
+                                    </div>
 
-                                <div className="grid md:grid-cols-2 gap-6">
-                                    <div className="relative group/input">
-                                        <label className="block text-sm font-medium text-gray-400 mb-2 ml-1 group-focus-within/input:text-rose-400 transition-colors">Ad Soyad</label>
+                                    <div className="group/input">
+                                        <label className="block text-sm font-medium text-gray-400 mb-2 ml-1 group-focus-within/input:text-rose-400 transition-colors">Konu</label>
                                         <input
                                             type="text"
-                                            className="w-full px-5 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/50 text-white placeholder-gray-600 transition-colors"
-                                            placeholder="Adınız Soyadınız"
+                                            className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-rose-500/50 focus:bg-white/10 text-white placeholder-gray-600 transition-all duration-300"
+                                            placeholder="Mesajınızın konusu"
                                         />
                                     </div>
-                                    <div className="relative group/input">
-                                        <label className="block text-sm font-medium text-gray-400 mb-2 ml-1 group-focus-within/input:text-rose-400 transition-colors">E-posta</label>
-                                        <input
-                                            type="email"
-                                            className="w-full px-5 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/50 text-white placeholder-gray-600 transition-colors"
-                                            placeholder="ornek@email.com"
+
+                                    <div className="group/input">
+                                        <label className="block text-sm font-medium text-gray-400 mb-2 ml-1 group-focus-within/input:text-rose-400 transition-colors">Mesajınız</label>
+                                        <textarea
+                                            rows={5}
+                                            className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-rose-500/50 focus:bg-white/10 text-white placeholder-gray-600 transition-all duration-300 resize-none"
+                                            placeholder="Bize iletmek istediklerinizi buraya yazın..."
                                         />
                                     </div>
-                                </div>
 
-                                <div className="relative group/input">
-                                    <label className="block text-sm font-medium text-gray-400 mb-2 ml-1 group-focus-within/input:text-rose-400 transition-colors">Konu</label>
-                                    <input
-                                        type="text"
-                                        className="w-full px-5 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/50 text-white placeholder-gray-600 transition-colors"
-                                        placeholder="Mesajınızın konusu"
-                                    />
-                                </div>
+                                    <div className="pt-4">
+                                        <button
+                                            type="button"
+                                            className="w-full bg-gradient-to-r from-rose-700 to-pink-800 text-white font-semibold py-4 rounded-xl hover:from-rose-600 hover:to-pink-700 transition-all duration-300 shadow-lg shadow-rose-900/20 hover:shadow-rose-600/40 hover:-translate-y-1 flex items-center justify-center gap-2 group/btn"
+                                        >
+                                            <span>Mesajı Gönder</span>
+                                            <LuSend className="group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform duration-300" size={18} />
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
 
-                                <div className="relative group/input">
-                                    <label className="block text-sm font-medium text-gray-400 mb-2 ml-1 group-focus-within/input:text-rose-400 transition-colors">Mesajınız</label>
-                                    <textarea
-                                        rows={5}
-                                        className="w-full px-5 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/50 text-white placeholder-gray-600 transition-colors resize-none"
-                                        placeholder="Bize iletmek istediklerinizi buraya yazın..."
-                                    />
-                                </div>
+                        </motion.div>
 
-                                <button
-                                    type="button"
-                                    className="w-full bg-gradient-to-r from-rose-700 to-pink-800 text-white font-semibold py-4 rounded-xl hover:from-rose-600 hover:to-pink-700 transition-colors duration-300 shadow-lg shadow-rose-900/20 hover:shadow-rose-600/40 flex items-center justify-center gap-2 group/btn"
-                                >
-                                    <span>Mesajı Gönder</span>
-                                    <svg className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                    </svg>
-                                </button>
-                            </form>
-                        </div>
                     </div>
                 </div>
             </div>
