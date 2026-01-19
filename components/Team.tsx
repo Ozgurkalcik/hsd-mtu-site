@@ -6,6 +6,7 @@ import Image from 'next/image';
 import TiltedCard from './TiltedCard';
 import CommitteeCard from './CommitteeCard';
 import SeeAllButton from './SeeAllButton';
+import Galaxy from './Galaxy';
 
 interface TeamMember {
     name: string;
@@ -38,7 +39,19 @@ export default function Team() {
         <section id="ekibimiz" className="relative w-full min-h-screen bg-black overflow-hidden flex flex-col py-24">
             {/* Background - Subtle and Professional (Pure CSS, no more WebGL) */}
             <div className="absolute inset-0 w-full h-full z-0 pointer-events-none">
-
+                <Galaxy
+                    starSpeed={0.5}
+                    density={2}
+                    hueShift={140}
+                    speed={1}
+                    glowIntensity={0.3}
+                    saturation={0}
+                    mouseRepulsion
+                    repulsionStrength={2}
+                    twinkleIntensity={0.3}
+                    rotationSpeed={0.2}
+                    transparent
+                />
             </div>
 
             <div className="relative z-10 container mx-auto px-4 flex-1 flex flex-col justify-center">
@@ -128,7 +141,7 @@ export default function Team() {
             </div>
 
             {/* Committee Chairs Section */}
-            <div className="relative z-10 w-full mt-32 py-24 overflow-hidden">
+            <div className="relative z-10 w-full mt-16 py-12 overflow-hidden">
                 {/* Visual Separator */}
                 <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
 

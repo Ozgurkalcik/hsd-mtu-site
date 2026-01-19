@@ -3,8 +3,12 @@ import React, { useRef, useEffect, useMemo, CSSProperties, useId } from 'react';
 import { gsap } from 'gsap';
 import { Draggable } from 'gsap/Draggable';
 import './StickerPeel.css';
+import { useFrozen } from '../FrozenSection';
 
-gsap.registerPlugin(Draggable);
+// Register standard Draggable
+if (typeof window !== 'undefined') {
+    gsap.registerPlugin(Draggable);
+}
 
 interface StickerPeelProps {
     imageSrc: string;
@@ -50,13 +54,15 @@ const StickerPeel: React.FC<StickerPeelProps> = ({
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const dragTargetRef = useRef<HTMLDivElement>(null);
-    const pointLightRef = useRef<SVGFEPointLightElement>(null);
-    const pointLightFlippedRef = useRef<SVGFEPointLightElement>(null);
     const draggableInstanceRef = useRef<Draggable | null>(null);
+    const isFrozen = useFrozen(); // Consume context
 
     const defaultPadding = 10;
 
+    // 1. Initial Position Effect - Frozen Aware
     useEffect(() => {
+        if (isFrozen) return; // Skip if frozen
+
         const target = dragTargetRef.current;
         if (!target) return;
 
@@ -65,10 +71,6 @@ const StickerPeel: React.FC<StickerPeelProps> = ({
 
         if (initialPosition === 'center') {
             // Center logic handled by CSS or parent layout usually, but here we init at 0,0 relative
-            // If we want to center it within the bounds, we might need to calculate.
-            // For now, let's assume 0,0 is the starting point in the flow or relative container.
-            // If 'center' is meant to be center of screen, we need more logic.
-            // The original code passed in a position or used 0,0.
         }
 
         if (typeof initialPosition === 'object' && initialPosition.x !== undefined && initialPosition.y !== undefined) {
@@ -77,9 +79,15 @@ const StickerPeel: React.FC<StickerPeelProps> = ({
         }
 
         gsap.set(target, { x: startX, y: startY });
-    }, [initialPosition]);
+    }, [initialPosition, isFrozen]);
 
+    // 2. Draggable & Resize Logic - Frozen Aware
     useEffect(() => {
+        // FROZEN OPTIMIZATION:
+        // If frozen, do not create draggable, do not listen to resize.
+        // Cleanup function will kill existing instances.
+        if (isFrozen) return;
+
         const target = dragTargetRef.current;
         if (!target) return;
 
@@ -104,6 +112,8 @@ const StickerPeel: React.FC<StickerPeelProps> = ({
         draggableInstanceRef.current = draggable[0];
 
         const handleResize = () => {
+            if (isFrozen) return; // Double check inside logic
+
             if (draggableInstanceRef.current) {
                 draggableInstanceRef.current.update();
 
@@ -139,16 +149,15 @@ const StickerPeel: React.FC<StickerPeelProps> = ({
             if (draggableInstanceRef.current) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (draggableInstanceRef.current as any).kill();
+                draggableInstanceRef.current = null;
             }
         };
-    }, []);
+    }, [isFrozen]); // Depends on isFrozen
 
+    // 3. Touch Handling - Frozen Aware
     useEffect(() => {
-        let frameId: number;
-        // Lighting update logic removed for optimization
-    }, [peelDirection]);
+        if (isFrozen) return;
 
-    useEffect(() => {
         const container = containerRef.current;
         if (!container) return;
 
@@ -169,7 +178,7 @@ const StickerPeel: React.FC<StickerPeelProps> = ({
             container.removeEventListener('touchend', handleTouchEnd);
             container.removeEventListener('touchcancel', handleTouchEnd);
         };
-    }, []);
+    }, [isFrozen]);
 
     const cssVars: CSSVars = useMemo(
         () => ({
@@ -208,7 +217,7 @@ const StickerPeel: React.FC<StickerPeelProps> = ({
                         <feDropShadow
                             dx="2"
                             dy="4"
-                            stdDeviation={2 * shadowIntensity} // Reduced blur radius
+                            stdDeviation={2 * shadowIntensity}
                             floodColor="black"
                             floodOpacity={shadowIntensity}
                         />

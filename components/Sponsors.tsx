@@ -18,7 +18,7 @@ const techLogos = [
 
 export default function Sponsors() {
     return (
-        <section className="relative w-full py-48 bg-black overflow-hidden flex flex-col items-center">
+        <section className="relative w-full min-h-screen bg-black overflow-hidden flex flex-col justify-center items-center py-24">
             {/* Decorative Stickers - Reduced to 2 instances */}
             <div className="absolute inset-0 z-20 pointer-events-none">
                 <div className="relative w-full h-full pointer-events-auto">
@@ -31,7 +31,7 @@ export default function Sponsors() {
                         peelBackActivePct={60}
                         shadowIntensity={0.8}
                         lightingIntensity={0.2}
-                        initialPosition={{ x: 50, y: 50 }}
+                        initialPosition={{ x: 200, y: 150 }}
                     />
                     {/* Sticker 4 - Bottom Right -> Now Sticker 2 */}
                     <StickerPeel
@@ -42,7 +42,7 @@ export default function Sponsors() {
                         peelBackActivePct={65}
                         shadowIntensity={0.75}
                         lightingIntensity={0.2}
-                        initialPosition={{ x: 1050, y: 520 }}
+                        initialPosition={{ x: 1100, y: 700 }}
                     />
                 </div>
             </div>
@@ -75,7 +75,7 @@ export default function Sponsors() {
                     </SimpleMarquee>
                 </div>
             </div>
-            <div className="h-24 w-full"></div>
+            {/* <div className="h-24 w-full"></div> */}
         </section>
     );
 }

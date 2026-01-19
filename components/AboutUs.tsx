@@ -3,30 +3,31 @@
 
 import { motion } from "motion/react";
 import FloatingLines from "@/components/FloatingLines/FloatingLines";
+import { LuCode, LuTarget, LuEye, LuGem } from "react-icons/lu";
 
 export default function AboutUs() {
     const cards = [
         {
             title: "Biz Kimiz?",
-            icon: "🚀",
+            icon: <LuCode />,
             content: "HSD (High School Developers) Malatya Turgut Özal Topluluğu, teknolojinin sınırlarını zorlayan ve geleceği kodlayan lise öğrencilerinin buluşma noktasıdır. Sadece kod yazmuyoruz; fikirleri gerçeğe, hayalleri projelere dönüştürüyoruz.",
             delay: 0.2
         },
         {
             title: "Misyonumuz",
-            icon: "🎯",
+            icon: <LuTarget />,
             content: "Genç geliştiricilere ilham vermek, onlara modern teknolojileri öğretmek ve birlikte büyüyecekleri bir ekosistem sunmak. İnovasyon tutkusuyla bir araya gelen ekibimiz, yazılım dünyasında iz bırakmayı hedefliyor.",
             delay: 0.4
         },
         {
             title: "Vizyonumuz",
-            icon: "👁️",
+            icon: <LuEye />,
             content: "Türkiye'nin en aktif ve üretken lise yazılım topluluğu olmak. Teknolojiyi sadece tüketen değil, üreten bir nesil yetiştirmek ve global ölçekte projeler geliştirmek.",
             delay: 0.6
         },
         {
             title: "Değerlerimiz",
-            icon: "💎",
+            icon: <LuGem />,
             content: "Sürekli öğrenme, paylaşım kültürü, takım çalışması ve inovasyon. Her bir üyemizin gelişimine değer veriyor, 'birlikte daha güçlüyüz' ilkesiyle hareket ediyoruz.",
             delay: 0.8
         }
