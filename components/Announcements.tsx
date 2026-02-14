@@ -3,51 +3,55 @@
 import ScrollReveal from "@/components/ScrollReveal/ScrollReveal";
 import Image from "next/image";
 import { motion, useAnimationFrame, useMotionValue, useTransform, wrap, AnimatePresence } from "framer-motion";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import SplashCursor from "@/components/SplashCursor/SplashCursor";
+import { createClient } from "@/shared/api/supabase";
 
-const announcements = [
-    {
-        id: 1,
-        title: "Yeni Dönem Kayıtları",
-        date: "15 Eylül 2024",
-        content: "HSD Malatya Turgut Özal Topluluğu yeni dönem kayıtları başladı! Hemen başvurun.",
-        color: "from-rose-500 to-red-600"
-    },
-    {
-        id: 2,
-        title: "React Workshop",
-        date: "22 Eylül 2024",
-        content: "Modern web geliştirme dünyasına adım atın. React temelleri ve hook'lar üzerine workshop.",
-        color: "from-blue-500 to-cyan-600"
-    },
-    {
-        id: 3,
-        title: "Yapay Zeka Zirvesi",
-        date: "10 Ekim 2024",
-        content: "Geleceği şekillendiren teknolojiler hakkında uzman konuşmacılarla bir araya geliyoruz.",
-        color: "from-purple-500 to-indigo-600"
-    },
-    {
-        id: 4,
-        title: "Game Jam 2024",
-        date: "15 Kasım 2024",
-        content: "48 saatlik oyun geliştirme maratonu başlıyor. Takımını kur ve katıl!",
-        color: "from-green-500 to-emerald-600"
-    },
-    {
-        id: 5,
-        title: "Kariyer Günleri",
-        date: "1 Aralık 2024",
-        content: "Sektörün önde gelen firmalarıyla tanışma ve staj imkanları yakalama fırsatı.",
-        color: "from-orange-500 to-amber-600"
-    }
+const COLOR_PALETTE = [
+    "from-rose-500 to-red-600",
+    "from-blue-500 to-cyan-600",
+    "from-purple-500 to-indigo-600",
+    "from-green-500 to-emerald-600",
+    "from-orange-500 to-amber-600",
 ];
 
+interface Announcement {
+    id: string;
+    title: string;
+    content: string;
+    excerpt?: string;
+    image_url?: string;
+    is_pinned: boolean;
+    created_at: string;
+    color: string;
+    date: string;
+}
+
 export default function Announcements() {
+    const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [isHovered, setIsHovered] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
-    const [selectedAnnouncement, setSelectedAnnouncement] = useState<typeof announcements[0] | null>(null);
+    const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
+
+    useEffect(() => {
+        const supabase = createClient();
+        supabase
+            .from('announcements')
+            .select('id, title, content, excerpt, image_url, is_pinned, created_at')
+            .eq('is_active', true)
+            .order('is_pinned', { ascending: false })
+            .order('created_at', { ascending: false })
+            .limit(10)
+            .then(({ data }) => {
+                if (data && data.length > 0) {
+                    setAnnouncements(data.map((item, i) => ({
+                        ...item,
+                        color: COLOR_PALETTE[i % COLOR_PALETTE.length],
+                        date: new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(item.created_at)),
+                    })));
+                }
+            });
+    }, []);
 
     // We use a motion value for x position
     const x = useMotionValue(0);
@@ -181,6 +185,7 @@ export default function Announcements() {
                         isDragging={isDragging}
                         isModalOpen={!!selectedAnnouncement}
                         onSelect={setSelectedAnnouncement}
+                        items={announcements}
                     />
                 </motion.div>
             </div>
@@ -281,7 +286,7 @@ export default function Announcements() {
     );
 }
 
-function CarouselContent({ x, isHovered, isDragging, isModalOpen, onSelect }: { x: any, isHovered: boolean, isDragging: boolean, isModalOpen: boolean, onSelect: (item: any) => void }) {
+function CarouselContent({ x, isHovered, isDragging, isModalOpen, onSelect, items }: { x: any, isHovered: boolean, isDragging: boolean, isModalOpen: boolean, onSelect: (item: any) => void, items: Announcement[] }) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [contentWidth, setContentWidth] = useState(0);
 
@@ -314,7 +319,7 @@ function CarouselContent({ x, isHovered, isDragging, isModalOpen, onSelect }: { 
     return (
         <div ref={containerRef} className="flex gap-8">
             {/* 3 Sets of Items */}
-            {[...announcements, ...announcements, ...announcements].map((item, index) => (
+            {[...items, ...items, ...items].map((item, index) => (
                 <div
                     key={`${item.id}-${index}`}
                     className="relative w-[350px] md:w-[450px] h-[320px] group perspective-1000 flex-shrink-0 cursor-pointer"

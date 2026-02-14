@@ -20,7 +20,7 @@ export default function TeamPage() {
                     { key: 'role_title', label: 'Ünvan / Rol', type: 'text', required: true, placeholder: 'Başkan, Yazılım Ekibi Lideri...' },
                     { key: 'department', label: 'Departman', type: 'text', placeholder: 'Yazılım, Tasarım...' },
                     { key: 'bio', label: 'Biyografi', type: 'textarea', placeholder: 'Kısa biyografi...' },
-                    { key: 'image_url', label: 'Profil Fotoğrafı URL', type: 'url', placeholder: 'https://...' },
+                    { key: 'image_url', label: 'Profil Fotoğrafı', type: 'image', placeholder: 'Görsel yükleyin veya URL girin' },
                     { key: 'linkedin_url', label: 'LinkedIn', type: 'url', placeholder: 'https://linkedin.com/in/...' },
                     { key: 'github_url', label: 'GitHub', type: 'url', placeholder: 'https://github.com/...' },
                     { key: 'twitter_url', label: 'Twitter / X', type: 'url', placeholder: 'https://x.com/...' },

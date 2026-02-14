@@ -25,7 +25,7 @@ export default function EventsPage() {
                     { key: 'event_date', label: 'Başlangıç Tarihi', type: 'date', required: true },
                     { key: 'end_date', label: 'Bitiş Tarihi', type: 'date' },
                     { key: 'location', label: 'Konum', type: 'text', placeholder: 'Etkinlik konumu' },
-                    { key: 'image_url', label: 'Görsel URL', type: 'url', placeholder: 'https://...' },
+                    { key: 'image_url', label: 'Görsel', type: 'image', placeholder: 'Görsel yükleyin veya URL girin' },
                     { key: 'is_active', label: 'Aktif', type: 'checkbox', defaultValue: true },
                 ],
                 displayColumns: [

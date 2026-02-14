@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react'
 // GENERIC CRUD PAGE COMPONENT
 // ============================================
 
-type FieldType = 'text' | 'textarea' | 'date' | 'checkbox' | 'select' | 'number' | 'url'
+type FieldType = 'text' | 'textarea' | 'date' | 'checkbox' | 'select' | 'number' | 'url' | 'image'
 
 interface FieldConfig {
     key: string
@@ -134,13 +134,39 @@ export default function AdminCrudPage({ config }: { config: CrudPageConfig }) {
             if (f.type === 'date' && item[f.key]) {
                 // Tarihi input için formatla
                 data[f.key] = new Date(item[f.key] as string).toISOString().slice(0, 16)
+            } else if (f.type === 'checkbox') {
+                data[f.key] = item[f.key] ?? false
             } else {
-                data[f.key] = item[f.key] ?? (f.type === 'checkbox' ? false : '')
+                data[f.key] = item[f.key] ?? ''
             }
         })
         setFormData(data)
         setEditingItem(item)
         setView('form')
+    }
+
+    const handleFileUpload = async (file: File, key: string) => {
+        setMessage({ type: 'success', text: 'Görsel yükleniyor...' })
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`
+        const filePath = `${fileName}`
+
+        const { error: uploadError } = await supabase.storage
+            .from('uploads')
+            .upload(filePath, file)
+
+        if (uploadError) {
+            console.error(uploadError)
+            setMessage({ type: 'error', text: 'Görsel yüklenirken hata oluştu.' })
+            return
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('uploads')
+            .getPublicUrl(filePath)
+
+        setFormData((prev) => ({ ...prev, [key]: publicUrl }))
+        setMessage({ type: 'success', text: 'Görsel başarıyla yüklendi.' })
     }
 
     const handleSave = async () => {
@@ -151,7 +177,7 @@ export default function AdminCrudPage({ config }: { config: CrudPageConfig }) {
         const sanitized: Record<string, unknown> = {}
         config.fields.forEach((f) => {
             const val = formData[f.key]
-            if (f.type === 'text' || f.type === 'textarea' || f.type === 'url') {
+            if (f.type === 'text' || f.type === 'textarea' || f.type === 'url' || f.type === 'image') {
                 sanitized[f.key] = typeof val === 'string' ? val.trim() : val
             } else if (f.type === 'date' && val) {
                 sanitized[f.key] = new Date(val as string).toISOString()
@@ -412,6 +438,45 @@ export default function AdminCrudPage({ config }: { config: CrudPageConfig }) {
                                                 onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
                                                 required={field.required}
                                             />
+                                        ) : field.type === 'image' ? (
+                                            <div>
+                                                {!!formData[field.key] && (
+                                                    <div style={{ marginBottom: '1rem' }}>
+                                                        <img
+                                                            src={formData[field.key] as string}
+                                                            alt="Önizleme"
+                                                            style={{ maxHeight: '200px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}
+                                                        />
+                                                    </div>
+                                                )}
+                                                <input
+                                                    type="file"
+                                                    id={field.key}
+                                                    accept="image/*"
+                                                    className="admin-form-input"
+                                                    onChange={(e) => {
+                                                        if (e.target.files?.[0]) {
+                                                            handleFileUpload(e.target.files[0], field.key)
+                                                        }
+                                                    }}
+                                                />
+                                                <input
+                                                    type="hidden"
+                                                    value={(formData[field.key] as string) || ''}
+                                                    required={field.required}
+                                                />
+                                                <p style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.5rem' }}>
+                                                    veya URL girin:
+                                                </p>
+                                                <input
+                                                    type="url"
+                                                    className="admin-form-input"
+                                                    style={{ marginTop: '0.25rem' }}
+                                                    placeholder="https://..."
+                                                    value={(formData[field.key] as string) || ''}
+                                                    onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
+                                                />
+                                            </div>
                                         ) : (
                                             <input
                                                 id={field.key}

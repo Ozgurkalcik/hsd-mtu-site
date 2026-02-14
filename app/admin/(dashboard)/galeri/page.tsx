@@ -47,7 +47,7 @@ export default function GalleryPage() {
                 singular: 'Görsel',
                 fields: [
                     { key: 'title', label: 'Başlık', type: 'text', placeholder: 'Görsel başlığı' },
-                    { key: 'image_url', label: 'Görsel URL', type: 'url', required: true, placeholder: 'https://...' },
+                    { key: 'image_url', label: 'Görsel', type: 'image', required: true, placeholder: 'Görsel yükleyin veya URL girin' },
                     { key: 'alt_text', label: 'Alt Metin', type: 'text', placeholder: 'Görsel açıklaması' },
                     { key: 'category', label: 'Kategori', type: 'text', placeholder: 'Etkinlik, Toplantı...' },
                     { key: 'display_order', label: 'Sıralama', type: 'number', defaultValue: 0 },

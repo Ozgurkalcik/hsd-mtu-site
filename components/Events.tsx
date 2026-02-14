@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import LiquidChrome from './LiquidChrome/LiquidChrome';
 import SplitText from './SplitText';
 import { motion, AnimatePresence, useMotionTemplate, useMotionValue } from 'framer-motion';
+import { createClient } from '@/shared/api/supabase';
 
 // --- Icons ---
 const Icons = {
@@ -40,65 +41,42 @@ const Icons = {
     )
 };
 
-// --- Data ---
-const events = [
-    {
-        id: 1,
-        title: "Smart Cities Hackathon",
-        date: "20-22 Kasım",
-        time: "48 Saat",
-        location: "Teknopark",
-        description: "Şehrin geleceğini kodla. 48 saatlik kesintisiz inovasyon maratonu.",
-        category: "Hackathon",
-        color: "from-purple-500 via-fuchsia-500 to-pink-500",
-        span: "md:col-span-2 md:row-span-2", // Large card
-        image: "https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?q=80&w=2070&auto=format&fit=crop",
-        status: "Aktif",
-        statusColor: "bg-green-500"
-    },
-    {
-        id: 2,
-        title: "AI Workshop",
-        date: "15 Ekim",
-        time: "14:00",
-        location: "B-204",
-        description: "Yapay zeka modelleri geliştirme atölyesi.",
-        category: "Workshop",
-        color: "from-blue-500 to-cyan-400",
-        span: "md:col-span-1 md:row-span-1",
-        image: "https://images.unsplash.com/photo-1555255707-c07966088b7b?q=80&w=2032&auto=format&fit=crop",
-        status: "Geçmiş Etkinlik",
-        statusColor: "bg-red-500"
-    },
-    {
-        id: 3,
-        title: "Cloud Talks",
-        date: "5 Aralık",
-        time: "13:00",
-        location: "Online",
-        description: "Bulut bilişimin geleceği.",
-        category: "Tech Talk",
-        color: "from-orange-500 to-amber-400",
-        span: "md:col-span-1 md:row-span-1",
-        image: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop",
-        status: "Geçmiş Etkinlik",
-        statusColor: "bg-red-500"
-    },
-    {
-        id: 4,
-        title: "Game Jam",
-        date: "15 Aralık",
-        time: "24 Saat",
-        location: "Öğrenci Merkezi",
-        description: "24 saatte oyun geliştir.",
-        category: "Game Jam",
-        color: "from-green-500 to-emerald-400",
-        span: "md:col-span-2 md:row-span-1", // Wide card
-        image: "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?q=80&w=2070&auto=format&fit=crop",
-        status: "Geçmiş Etkinlik",
-        statusColor: "bg-red-500"
-    }
+// --- Color & Layout Helpers ---
+const COLOR_PALETTE = [
+    "from-purple-500 via-fuchsia-500 to-pink-500",
+    "from-blue-500 to-cyan-400",
+    "from-orange-500 to-amber-400",
+    "from-green-500 to-emerald-400",
 ];
+
+const SPAN_PATTERNS = [
+    "md:col-span-2 md:row-span-2",
+    "md:col-span-1 md:row-span-1",
+    "md:col-span-1 md:row-span-1",
+    "md:col-span-2 md:row-span-1",
+];
+
+const CATEGORY_NAMES = ["Hackathon", "Workshop", "Tech Talk", "Game Jam", "Seminer", "Etkinlik"];
+
+interface EventItem {
+    id: string;
+    title: string;
+    description: string;
+    event_date: string;
+    end_date?: string;
+    location?: string;
+    image_url?: string;
+    is_active: boolean;
+    // computed
+    date: string;
+    time: string;
+    category: string;
+    color: string;
+    span: string;
+    image: string;
+    status: string;
+    statusColor: string;
+}
 
 // --- Components ---
 
@@ -120,7 +98,38 @@ function SpotlightCard({ children, className = "", onClick, variants }: { childr
 const CHROME_BASE_COLOR: [number, number, number] = [0.1, 0.05, 0.05];
 
 export default function Events() {
-    const [selectedEvent, setSelectedEvent] = useState<typeof events[0] | null>(null);
+    const [events, setEvents] = useState<EventItem[]>([]);
+    const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
+
+    useEffect(() => {
+        const supabase = createClient();
+        supabase
+            .from('events')
+            .select('id, title, description, event_date, end_date, location, image_url, is_active')
+            .eq('is_active', true)
+            .order('event_date', { ascending: false })
+            .limit(4)
+            .then(({ data }) => {
+                if (data && data.length > 0) {
+                    const now = new Date();
+                    setEvents(data.map((item, i) => {
+                        const eventDate = new Date(item.event_date);
+                        const isPast = eventDate < now;
+                        return {
+                            ...item,
+                            date: new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long' }).format(eventDate),
+                            time: new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit' }).format(eventDate),
+                            category: CATEGORY_NAMES[i % CATEGORY_NAMES.length],
+                            color: COLOR_PALETTE[i % COLOR_PALETTE.length],
+                            span: SPAN_PATTERNS[i % SPAN_PATTERNS.length],
+                            image: item.image_url || `https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?q=80&w=2070&auto=format&fit=crop`,
+                            status: isPast ? "Geçmiş Etkinlik" : "Aktif",
+                            statusColor: isPast ? "bg-red-500" : "bg-green-500",
+                        };
+                    }));
+                }
+            });
+    }, []);
 
     return (
         <section id="etkinlikler" className="relative min-h-screen flex flex-col items-center justify-center py-24 overflow-hidden bg-black">

@@ -22,7 +22,7 @@ export default function AnnouncementsPage() {
                     { key: 'title', label: 'Başlık', type: 'text', required: true, placeholder: 'Duyuru başlığı' },
                     { key: 'content', label: 'İçerik', type: 'textarea', required: true, placeholder: 'Duyuru içeriği...' },
                     { key: 'excerpt', label: 'Özet', type: 'text', placeholder: 'Kısa açıklama' },
-                    { key: 'image_url', label: 'Görsel URL', type: 'url', placeholder: 'https://...' },
+                    { key: 'image_url', label: 'Görsel', type: 'image', placeholder: 'Görsel yükleyin veya URL girin' },
                     { key: 'is_active', label: 'Aktif', type: 'checkbox', defaultValue: true },
                     { key: 'is_pinned', label: 'Sabitlenmiş', type: 'checkbox', defaultValue: false },
                 ],

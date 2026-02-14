@@ -44,7 +44,7 @@ export default function SponsorsPage() {
                 singular: 'Sponsor',
                 fields: [
                     { key: 'name', label: 'Sponsor Adı', type: 'text', required: true, placeholder: 'Şirket adı' },
-                    { key: 'logo_url', label: 'Logo URL', type: 'url', placeholder: 'https://...' },
+                    { key: 'logo_url', label: 'Logo', type: 'image', placeholder: 'Logo yükleyin veya URL girin' },
                     { key: 'website_url', label: 'Web Sitesi', type: 'url', placeholder: 'https://...' },
                     {
                         key: 'tier',

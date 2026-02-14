@@ -23,7 +23,7 @@ export default function ArticlesPage() {
                     { key: 'content', label: 'İçerik', type: 'textarea', required: true, placeholder: 'Yazı içeriği...' },
                     { key: 'excerpt', label: 'Özet', type: 'text', placeholder: 'Kısa açıklama' },
                     { key: 'author_name', label: 'Yazar', type: 'text', placeholder: 'Yazar adı' },
-                    { key: 'image_url', label: 'Kapak Görseli URL', type: 'url', placeholder: 'https://...' },
+                    { key: 'image_url', label: 'Kapak Görseli', type: 'image', placeholder: 'Görsel yükleyin veya URL girin' },
                     { key: 'is_published', label: 'Yayında', type: 'checkbox', defaultValue: false },
                 ],
                 displayColumns: [

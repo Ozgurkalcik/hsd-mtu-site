@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 import Image from 'next/image';
@@ -7,8 +7,17 @@ import TiltedCard from './TiltedCard';
 import CommitteeCard from './CommitteeCard';
 import SeeAllButton from './SeeAllButton';
 import Galaxy from './Galaxy';
+import { createClient } from '@/shared/api/supabase';
 
 interface TeamMember {
+    id: string;
+    full_name: string;
+    role_title: string;
+    department?: string;
+    bio?: string;
+    image_url?: string;
+    display_order: number;
+    // mapped
     name: string;
     role: string;
     image: string;
@@ -16,24 +25,38 @@ interface TeamMember {
 }
 
 export default function Team() {
-    const teamMembers: TeamMember[] = [
-        {
-            name: 'Mustafa Zahter',
-            role: 'Başkan Yardımcısı',
-            image: '/assets/image/team/mustafa-zahter.png',
-        },
-        {
-            name: 'Sılanur Balbal',
-            role: 'Topluluk Başkanı',
-            image: '/assets/image/team/sila-balbal.png',
-            isPresident: true,
-        },
-        {
-            name: 'Eray Özcan',
-            role: 'Başkan Yardımcısı',
-            image: '/assets/image/team/eray-ozcan.png',
-        },
-    ];
+    const [leaders, setLeaders] = useState<TeamMember[]>([]);
+    const [committee, setCommittee] = useState<TeamMember[]>([]);
+
+    useEffect(() => {
+        const supabase = createClient();
+        supabase
+            .from('team_members')
+            .select('id, full_name, role_title, department, bio, image_url, display_order')
+            .eq('is_active', true)
+            .order('display_order', { ascending: true })
+            .then(({ data }) => {
+                if (data && data.length > 0) {
+                    const mapped = data.map(m => ({
+                        ...m,
+                        name: m.full_name,
+                        role: m.role_title,
+                        image: m.image_url || '/assets/image/hsd-logo-white.png',
+                        isPresident: m.role_title?.toLowerCase().includes('başkan') && !m.role_title?.toLowerCase().includes('yardımcı') && !m.role_title?.toLowerCase().includes('komite'),
+                    }));
+                    // İlk 3 kişi liderlik, geri kalan komite
+                    const leaderRoles = ['başkan', 'yardımcı'];
+                    const leaderList = mapped.filter(m =>
+                        leaderRoles.some(r => m.role_title?.toLowerCase().includes(r)) && !m.role_title?.toLowerCase().includes('komite')
+                    );
+                    const committeeList = mapped.filter(m =>
+                        !leaderList.includes(m)
+                    );
+                    setLeaders(leaderList.length > 0 ? leaderList : mapped.slice(0, 3));
+                    setCommittee(committeeList.length > 0 ? committeeList : []);
+                }
+            });
+    }, []);
 
     return (
         <section id="ekibimiz" className="relative w-full min-h-screen bg-black overflow-hidden flex flex-col py-24">
@@ -69,7 +92,7 @@ export default function Team() {
                 </motion.div>
 
                 <div className="flex flex-col md:flex-row justify-center items-center gap-6 md:gap-8 max-w-6xl mx-auto w-full">
-                    {teamMembers.map((member, index) => (
+                    {leaders.map((member, index) => (
                         <motion.div
                             key={member.name}
                             initial={{ opacity: 0, y: 30 }}
@@ -163,12 +186,7 @@ export default function Team() {
                     </motion.div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
-                        {[
-                            { name: 'İsim Soyisim', role: 'Proje Komitesi', image: '/assets/image/team/mustafa-zahter.png' }, // Placeholder
-                            { name: 'İsim Soyisim', role: 'Sosyal Medya Komitesi', image: '/assets/image/team/mustafa-zahter.png' }, // Placeholder
-                            { name: 'İsim Soyisim', role: 'Medium Komitesi', image: '/assets/image/team/mustafa-zahter.png' }, // Placeholder
-                            { name: 'İsim Soyisim', role: 'Etkinlik Komitesi', image: '/assets/image/team/mustafa-zahter.png' }, // Placeholder
-                        ].map((member, index) => (
+                        {committee.map((member, index) => (
                             <motion.div
                                 key={index}
                                 initial={{ opacity: 0, y: 30 }}
@@ -198,6 +216,6 @@ export default function Team() {
                     </motion.div>
                 </div>
             </div>
-        </section>
+        </section >
     );
 }
