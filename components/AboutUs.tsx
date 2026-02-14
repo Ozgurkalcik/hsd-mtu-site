@@ -90,7 +90,7 @@ export default function AboutUs() {
                                 {/* Icon with Glow */}
                                 <div className="relative w-16 h-16 mb-6">
                                     <div className="absolute inset-0 bg-rose-500/20 rounded-xl blur-xl group-hover:bg-rose-500/40 transition-colors duration-300" />
-                                    <div className="relative h-full w-full bg-gradient-to-br from-white/10 to-transparent border border-white/20 rounded-xl flex items-center justify-center text-4xl shadow-inner group-hover:scale-110 transition-transform duration-300">
+                                    <div className="relative h-full w-full bg-gradient-to-br from-white/10 to-transparent border border-white/20 rounded-xl flex items-center justify-center text-4xl shadow-inner group-hover:scale-110 transition-transform duration-300 text-white">
                                         {card.icon}
                                     </div>
                                 </div>
