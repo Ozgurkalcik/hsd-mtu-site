@@ -79,7 +79,9 @@ export default function Hero() {
           <span className={styles.titleMain}>Malatya Turgut Özal</span>
           <div className={styles.glassBox}>
             <span className={styles.titleSub}>
-              <span className={styles.brandName}>Huawei</span> <span className={styles.studentDev}>Student Developer</span> <span className={styles.community}>Topluluğu</span>
+              <span className={styles.brandName}>Huawei Student</span>
+              <br className="md:hidden" />
+              <span className={styles.studentDev}>Developer Topluluğu</span>
             </span>
           </div>
         </h1>

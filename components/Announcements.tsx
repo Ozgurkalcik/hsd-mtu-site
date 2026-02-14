@@ -105,8 +105,8 @@ export default function Announcements() {
 
     return (
         <section id="duyurular" className="relative py-24 bg-black overflow-hidden z-10">
-            {/* SplashCursor Effect - Scoped to Announcements Section */}
-            <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-5">
+            {/* SplashCursor Effect - Scoped to Announcements Section - Desktop Only */}
+            <div className="hidden md:block absolute top-0 left-0 w-full h-full pointer-events-none z-5">
                 <SplashCursor />
             </div>
 

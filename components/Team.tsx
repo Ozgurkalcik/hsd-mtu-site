@@ -76,7 +76,7 @@ export default function Team() {
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
                             transition={{ delay: index * 0.2, duration: 0.8, ease: "easeOut" }}
-                            className={`relative group ${member.isPresident ? 'z-20' : 'z-10'}`}
+                            className={`relative group ${member.isPresident ? 'z-20 w-[320px] h-[420px] md:w-[360px] md:h-[480px]' : 'z-10 w-[320px] h-[420px]'}`}
                         >
                             {/* Glow Effect Behind Card */}
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-[#FF3333]/20 blur-[80px] rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none -z-10" />
@@ -85,10 +85,10 @@ export default function Team() {
                                 imageSrc={member.image}
                                 altText={member.name}
                                 captionText={member.role}
-                                containerHeight={member.isPresident ? "480px" : "420px"}
-                                containerWidth={member.isPresident ? "360px" : "320px"}
-                                imageHeight={member.isPresident ? "480px" : "420px"}
-                                imageWidth={member.isPresident ? "360px" : "320px"}
+                                containerHeight="100%"
+                                containerWidth="100%"
+                                imageHeight="100%"
+                                imageWidth="100%"
                                 rotateAmplitude={10}
                                 scaleOnHover={1.05}
                                 showMobileWarning={false}
