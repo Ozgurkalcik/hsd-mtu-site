@@ -136,35 +136,36 @@ export default function Announcements() {
                 </div>
             </div>
 
-            {/* Draggable Carousel */}
-            <div
-                className="relative w-full overflow-hidden py-20 z-20 cursor-grab active:cursor-grabbing"
-            >
-                {/* Gradient Masks */}
-                <div className="absolute left-0 top-20 bottom-20 w-8 md:w-16 bg-gradient-to-r from-black to-transparent z-30 pointer-events-none" />
-                <div className="absolute right-0 top-20 bottom-20 w-8 md:w-16 bg-gradient-to-l from-black to-transparent z-30 pointer-events-none" />
-
-                <motion.div
-                    className="flex gap-8 w-max"
-                    onMouseEnter={() => setIsHovered(true)}
-                    onMouseLeave={() => setIsHovered(false)}
-                    style={{ x }}
-                    drag="x"
-                    dragConstraints={{ left: -10000, right: 10000 }} // Allow free dragging
-                    onDragStart={() => setIsDragging(true)}
-                    onDragEnd={() => setIsDragging(false)}
-                    onUpdate={(latest) => {
-                        // Logic to wrap the coordinates
-                        // We need the width of one set of items.
-                        // Let's approximate for now or use a ref in a real implementation.
-                        // 5 items * (450 + 32) = 2410px.
-                        const singleSetWidth = 2410;
-                        // Note: This hardcoded width is a risk if screen size changes (mobile vs desktop).
-                        // But for a quick "wow" factor it might work if we set min-width on cards.
-                        // Better: Use a ref to get the actual width.
-                    }}
+            {/* Draggable Carousel or Empty State */}
+            {announcements.length > 0 ? (
+                <div
+                    className="relative w-full overflow-hidden py-20 z-20 cursor-grab active:cursor-grabbing"
                 >
-                    {/* 
+                    {/* Gradient Masks */}
+                    <div className="absolute left-0 top-20 bottom-20 w-8 md:w-16 bg-gradient-to-r from-black to-transparent z-30 pointer-events-none" />
+                    <div className="absolute right-0 top-20 bottom-20 w-8 md:w-16 bg-gradient-to-l from-black to-transparent z-30 pointer-events-none" />
+
+                    <motion.div
+                        className="flex gap-8 w-max"
+                        onMouseEnter={() => setIsHovered(true)}
+                        onMouseLeave={() => setIsHovered(false)}
+                        style={{ x }}
+                        drag="x"
+                        dragConstraints={{ left: -10000, right: 10000 }} // Allow free dragging
+                        onDragStart={() => setIsDragging(true)}
+                        onDragEnd={() => setIsDragging(false)}
+                        onUpdate={(latest) => {
+                            // Logic to wrap the coordinates
+                            // We need the width of one set of items.
+                            // Let's approximate for now or use a ref in a real implementation.
+                            // 5 items * (450 + 32) = 2410px.
+                            const singleSetWidth = 2410;
+                            // Note: This hardcoded width is a risk if screen size changes (mobile vs desktop).
+                            // But for a quick "wow" factor it might work if we set min-width on cards.
+                            // Better: Use a ref to get the actual width.
+                        }}
+                    >
+                        {/* 
               We need a wrapper component to handle the measuring and wrapping logic properly.
               Since I can't easily create a new file and import it without breaking flow,
               I will implement a "dumb" wrap here:
@@ -177,16 +178,22 @@ export default function Announcements() {
               If we set the width of the container to be exactly 300% (for 3 sets),
               we can wrap at -33.33%.
            */}
-                    <CarouselContent
-                        x={x}
-                        isHovered={isHovered}
-                        isDragging={isDragging}
-                        isModalOpen={!!selectedAnnouncement}
-                        onSelect={setSelectedAnnouncement}
-                        items={announcements}
-                    />
-                </motion.div>
-            </div>
+                        <CarouselContent
+                            x={x}
+                            isHovered={isHovered}
+                            isDragging={isDragging}
+                            isModalOpen={!!selectedAnnouncement}
+                            onSelect={setSelectedAnnouncement}
+                            items={announcements}
+                        />
+                    </motion.div>
+                </div>
+            ) : (
+                <div className="flex flex-col items-center justify-center py-20 text-center relative z-20">
+                    <p className="text-gray-400 text-lg">Henüz duyuru eklenmemiştir.</p>
+                    <p className="text-gray-600 text-sm mt-2">Yeni duyurular eklendiğinde burada görünecek.</p>
+                </div>
+            )}
 
             {/* Detail Modal */}
             <AnimatePresence>

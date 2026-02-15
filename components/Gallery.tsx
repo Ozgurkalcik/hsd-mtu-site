@@ -32,16 +32,23 @@ export default function Gallery() {
             </div>
 
             <div className="w-full h-full">
-                <DomeGallery
-                    {...(images.length > 0 ? { images } : {})}
-                    overlayBlurColor="#000000"
-                    fit={0.8}
-                    minRadius={600}
-                    maxVerticalRotationDeg={0}
-                    segments={34}
-                    dragDampening={2}
-                    grayscale={true}
-                />
+                {images.length > 0 ? (
+                    <DomeGallery
+                        images={images}
+                        overlayBlurColor="#000000"
+                        fit={0.8}
+                        minRadius={600}
+                        maxVerticalRotationDeg={0}
+                        segments={34}
+                        dragDampening={2}
+                        grayscale={true}
+                    />
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-center">
+                        <p className="text-gray-400 text-lg">Henüz galeri görseli eklenmemiştir.</p>
+                        <p className="text-gray-600 text-sm mt-2">Görseller eklendiğinde burada görünecek.</p>
+                    </div>
+                )}
             </div>
         </section>
     );

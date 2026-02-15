@@ -28,8 +28,6 @@ export default function Sponsors() {
             });
     }, []);
 
-    if (sponsors.length === 0) return null;
-
     return (
         <section id="sponsorlar" className="relative w-full bg-black py-24 overflow-hidden">
             {/* Top Separator */}
@@ -43,33 +41,40 @@ export default function Sponsors() {
                 <div className="h-0.5 w-24 mx-auto" style={{ background: 'linear-gradient(90deg, transparent, #FF3333, transparent)' }}></div>
             </div>
 
-            {/* Marquee */}
-            <div className="relative">
-                <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-black to-transparent z-10"></div>
-                <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-black to-transparent z-10"></div>
-                <SimpleMarquee speed={40}>
-                    <div className="flex gap-16 px-8 items-center">
-                        {sponsors.map((sponsor) => (
-                            <a
-                                key={sponsor.id}
-                                href={sponsor.website_url || '#'}
-                                target={sponsor.website_url ? '_blank' : undefined}
-                                rel="noopener noreferrer"
-                                className="flex flex-col items-center gap-4 group cursor-pointer transition-transform hover:scale-110"
-                            >
-                                <img
-                                    src={sponsor.logo_url}
-                                    alt={sponsor.name}
-                                    className="max-h-16 max-w-[160px] object-contain opacity-70 group-hover:opacity-100 transition-opacity"
-                                />
-                                <span className="text-gray-400 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                                    {sponsor.name}
-                                </span>
-                            </a>
-                        ))}
-                    </div>
-                </SimpleMarquee>
-            </div>
+            {sponsors.length > 0 ? (
+                /* Marquee */
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-black to-transparent z-10"></div>
+                    <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-black to-transparent z-10"></div>
+                    <SimpleMarquee speed={40}>
+                        <div className="flex gap-16 px-8 items-center">
+                            {sponsors.map((sponsor) => (
+                                <a
+                                    key={sponsor.id}
+                                    href={sponsor.website_url || '#'}
+                                    target={sponsor.website_url ? '_blank' : undefined}
+                                    rel="noopener noreferrer"
+                                    className="flex flex-col items-center gap-4 group cursor-pointer transition-transform hover:scale-110"
+                                >
+                                    <img
+                                        src={sponsor.logo_url}
+                                        alt={sponsor.name}
+                                        className="max-h-16 max-w-[160px] object-contain opacity-70 group-hover:opacity-100 transition-opacity"
+                                    />
+                                    <span className="text-gray-400 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {sponsor.name}
+                                    </span>
+                                </a>
+                            ))}
+                        </div>
+                    </SimpleMarquee>
+                </div>
+            ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <p className="text-gray-400 text-lg">Henüz sponsor eklenmemiştir.</p>
+                    <p className="text-gray-600 text-sm mt-2">Sponsorlar eklendiğinde burada görünecek.</p>
+                </div>
+            )}
         </section>
     );
 }

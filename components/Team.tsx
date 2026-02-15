@@ -89,7 +89,7 @@ export default function Team() {
                 </motion.div>
 
                 <div className="flex flex-col md:flex-row justify-center items-center gap-6 md:gap-8 max-w-6xl mx-auto w-full">
-                    {leaders.map((member, index) => (
+                    {leaders.length > 0 ? leaders.map((member, index) => (
                         <motion.div
                             key={member.name}
                             initial={{ opacity: 0, y: 30 }}
@@ -156,7 +156,17 @@ export default function Team() {
                                 }
                             />
                         </motion.div>
-                    ))}
+                    )) : (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            className="flex flex-col items-center justify-center py-16 text-center"
+                        >
+                            <p className="text-gray-400 text-lg">Henüz liderlik ekibi eklenmemiştir.</p>
+                            <p className="text-gray-600 text-sm mt-2">Ekip üyeleri eklendiğinde burada görünecek.</p>
+                        </motion.div>
+                    )}
                 </div>
             </div>
 
@@ -183,7 +193,7 @@ export default function Team() {
                     </motion.div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
-                        {committee.map((member, index) => (
+                        {committee.length > 0 ? committee.map((member, index) => (
                             <motion.div
                                 key={index}
                                 initial={{ opacity: 0, y: 30 }}
@@ -198,7 +208,12 @@ export default function Team() {
                                     imageSrc={member.image}
                                 />
                             </motion.div>
-                        ))}
+                        )) : (
+                            <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
+                                <p className="text-gray-400 text-lg">Henüz komite başkanı eklenmemiştir.</p>
+                                <p className="text-gray-600 text-sm mt-2">Komite başkanları eklendiğinde burada görünecek.</p>
+                            </div>
+                        )}
                     </div>
 
                     {/* Bottom Button */}

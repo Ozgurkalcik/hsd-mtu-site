@@ -188,94 +188,106 @@ export default function Events() {
                 </div>
 
                 {/* Bento Grid */}
-                <motion.div
-                    key={events.length}
-                    initial="hidden"
-                    whileInView="visible"
-                    viewport={{ once: true, margin: "-100px" }}
-                    variants={{
-                        hidden: { opacity: 0 },
-                        visible: {
-                            opacity: 1,
-                            transition: {
-                                staggerChildren: 0.15
-                            }
-                        }
-                    }}
-                    className="grid grid-cols-1 md:grid-cols-4 md:grid-rows-2 gap-4 h-auto md:h-[600px]"
-                >
-                    {events.map((event, index) => (
-                        <SpotlightCard
-                            key={event.id}
-                            className={`cursor-pointer backdrop-blur-md ${event.span}`}
-                            onClick={() => setSelectedEvent(event)}
-                            variants={{
-                                hidden: { opacity: 0, y: 30 },
-                                visible: {
-                                    opacity: 1,
-                                    y: 0,
-                                    transition: {
-                                        type: "spring",
-                                        damping: 25,
-                                        stiffness: 100
-                                    }
+                {events.length > 0 ? (
+                    <motion.div
+                        key={events.length}
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, margin: "-100px" }}
+                        variants={{
+                            hidden: { opacity: 0 },
+                            visible: {
+                                opacity: 1,
+                                transition: {
+                                    staggerChildren: 0.15
                                 }
-                            }}
-                        >
-                            <div className="h-full flex flex-col p-6 justify-end relative">
-                                {/* Background Image for ALL cards */}
-                                <div
-                                    className="absolute inset-0 bg-cover bg-center opacity-60 transition-transform duration-700 group-hover:scale-110"
-                                    style={{ backgroundImage: `url(${event.image})` }}
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-[#0f0202]/90 via-[#0f0202]/40 to-transparent" />
+                            }
+                        }}
+                        className="grid grid-cols-1 md:grid-cols-4 md:grid-rows-2 gap-4 h-auto md:h-[600px]"
+                    >
+                        {events.map((event, index) => (
+                            <SpotlightCard
+                                key={event.id}
+                                className={`cursor-pointer backdrop-blur-md ${event.span}`}
+                                onClick={() => setSelectedEvent(event)}
+                                variants={{
+                                    hidden: { opacity: 0, y: 30 },
+                                    visible: {
+                                        opacity: 1,
+                                        y: 0,
+                                        transition: {
+                                            type: "spring",
+                                            damping: 25,
+                                            stiffness: 100
+                                        }
+                                    }
+                                }}
+                            >
+                                <div className="h-full flex flex-col p-6 justify-end relative">
+                                    {/* Background Image for ALL cards */}
+                                    <div
+                                        className="absolute inset-0 bg-cover bg-center opacity-60 transition-transform duration-700 group-hover:scale-110"
+                                        style={{ backgroundImage: `url(${event.image})` }}
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-[#0f0202]/90 via-[#0f0202]/40 to-transparent" />
 
-                                {/* Status Badge */}
-                                <div className="absolute top-4 right-4 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-md border border-white/10">
-                                    <span className={`w-2 h-2 rounded-full ${event.statusColor} ${event.status === 'Aktif' ? 'animate-pulse' : ''}`} />
-                                    <span className="text-xs font-bold text-white tracking-wide">{event.status}</span>
-                                </div>
-
-                                {/* Content */}
-                                <div className="relative z-10">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="text-4xl font-black text-white/10 font-mono select-none">
-                                            0{event.id}
-                                        </div>
+                                    {/* Status Badge */}
+                                    <div className="absolute top-4 right-4 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-md border border-white/10">
+                                        <span className={`w-2 h-2 rounded-full ${event.statusColor} ${event.status === 'Aktif' ? 'animate-pulse' : ''}`} />
+                                        <span className="text-xs font-bold text-white tracking-wide">{event.status}</span>
                                     </div>
 
-                                    <div>
-                                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase bg-white/10 text-white border border-white/10 backdrop-blur-sm mb-3`}>
-                                            {event.category}
-                                        </span>
-                                        <h3 className="text-2xl md:text-3xl font-bold text-white leading-tight mb-2">
-                                            {event.title}
-                                        </h3>
-                                        <div className="flex items-center gap-4 text-sm text-gray-300 font-medium">
-                                            <div className="flex items-center gap-1.5">
-                                                <Icons.Calendar />
-                                                {event.date}
+                                    {/* Content */}
+                                    <div className="relative z-10">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className="text-4xl font-black text-white/10 font-mono select-none">
+                                                0{event.id}
                                             </div>
-                                            {!event.span.includes('col-span-2') && (
+                                        </div>
+
+                                        <div>
+                                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase bg-white/10 text-white border border-white/10 backdrop-blur-sm mb-3`}>
+                                                {event.category}
+                                            </span>
+                                            <h3 className="text-2xl md:text-3xl font-bold text-white leading-tight mb-2">
+                                                {event.title}
+                                            </h3>
+                                            <div className="flex items-center gap-4 text-sm text-gray-300 font-medium">
                                                 <div className="flex items-center gap-1.5">
-                                                    <Icons.Clock />
-                                                    {event.time}
+                                                    <Icons.Calendar />
+                                                    {event.date}
                                                 </div>
-                                            )}
+                                                {!event.span.includes('col-span-2') && (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Icons.Clock />
+                                                        {event.time}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Hover Indicator */}
+                                    <div className="absolute bottom-6 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                        <div className="w-9 h-9 rounded-full bg-white text-black flex items-center justify-center">
+                                            <Icons.ArrowRight />
                                         </div>
                                     </div>
                                 </div>
-
-                                {/* Hover Indicator */}
-                                <div className="absolute bottom-6 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                    <div className="w-9 h-9 rounded-full bg-white text-black flex items-center justify-center">
-                                        <Icons.ArrowRight />
-                                    </div>
-                                </div>
-                            </div>
-                        </SpotlightCard>
-                    ))}
-                </motion.div>
+                            </SpotlightCard>
+                        ))}
+                    </motion.div>
+                ) : (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        className="flex flex-col items-center justify-center py-20 text-center"
+                    >
+                        <p className="text-gray-400 text-lg">Henüz etkinlik eklenmemiştir.</p>
+                        <p className="text-gray-600 text-sm mt-2">Yeni etkinlikler yakında burada görünecek.</p>
+                    </motion.div>
+                )}
             </div>
 
             {/* Modal */}
