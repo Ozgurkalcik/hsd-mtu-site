@@ -47,8 +47,7 @@ const Icons = {
     )
 };
 
-const RSS_URL = 'https://medium.com/feed/@huaweidevgroups44';
-const API_URL = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(RSS_URL)}`;
+const DEFAULT_RSS_URL = 'https://medium.com/feed/@huaweidevgroups44';
 
 export default function Articles() {
     const [articles, setArticles] = useState<MediumItem[]>([]);
@@ -58,7 +57,18 @@ export default function Articles() {
     useEffect(() => {
         const fetchArticles = async () => {
             try {
-                const response = await fetch(API_URL);
+                // Fetch Medium URL from site_settings
+                const supabase = (await import('@/shared/api/supabase')).createClient();
+                const { data: settingsData } = await supabase
+                    .from('site_settings')
+                    .select('value')
+                    .eq('key', 'medium_rss_url')
+                    .single();
+
+                const rssUrl = settingsData?.value || DEFAULT_RSS_URL;
+                const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+
+                const response = await fetch(apiUrl);
                 const data: MediumFeed = await response.json();
 
                 if (data.status === 'ok') {
@@ -197,7 +207,7 @@ export default function Articles() {
                 {/* Bottom CTA */}
                 <div className="mt-16 text-center">
                     <a
-                        href={RSS_URL.replace('/feed', '')}
+                        href={DEFAULT_RSS_URL.replace('/feed', '')}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-gray-300 text-gray-700 font-medium hover:border-black hover:text-black transition-all duration-300 text-sm"
