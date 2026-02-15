@@ -19,8 +19,6 @@ interface Announcement {
     id: string;
     title: string;
     content: string;
-    excerpt?: string;
-    image_url?: string;
     is_pinned: boolean;
     created_at: string;
     color: string;
@@ -37,7 +35,7 @@ export default function Announcements() {
         const supabase = createClient();
         supabase
             .from('announcements')
-            .select('id, title, content, excerpt, image_url, is_pinned, created_at')
+            .select('id, title, content, is_pinned, created_at')
             .eq('is_active', true)
             .order('is_pinned', { ascending: false })
             .order('created_at', { ascending: false })
@@ -266,9 +264,6 @@ export default function Announcements() {
                                     <div className="flex-grow overflow-y-auto custom-scrollbar pr-2">
                                         <p className="text-lg text-gray-300 leading-relaxed font-medium">
                                             {selectedAnnouncement.content}
-                                        </p>
-                                        <p className="mt-6 text-gray-400 leading-relaxed">
-                                            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
                                         </p>
                                     </div>
 

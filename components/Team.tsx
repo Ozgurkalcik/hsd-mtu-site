@@ -32,7 +32,7 @@ export default function Team() {
         const supabase = createClient();
         supabase
             .from('team_members')
-            .select('id, full_name, role_title, department, bio, image_url, display_order')
+            .select('id, full_name, role_title, department, bio, image_url, display_order, is_leadership')
             .eq('is_active', true)
             .order('display_order', { ascending: true })
             .then(({ data }) => {
@@ -44,16 +44,13 @@ export default function Team() {
                         image: m.image_url || '/assets/image/hsd-logo-white.png',
                         isPresident: m.role_title?.toLowerCase().includes('başkan') && !m.role_title?.toLowerCase().includes('yardımcı') && !m.role_title?.toLowerCase().includes('komite'),
                     }));
-                    // İlk 3 kişi liderlik, geri kalan komite
-                    const leaderRoles = ['başkan', 'yardımcı'];
-                    const leaderList = mapped.filter(m =>
-                        leaderRoles.some(r => m.role_title?.toLowerCase().includes(r)) && !m.role_title?.toLowerCase().includes('komite')
-                    );
-                    const committeeList = mapped.filter(m =>
-                        !leaderList.includes(m)
-                    );
-                    setLeaders(leaderList.length > 0 ? leaderList : mapped.slice(0, 3));
-                    setCommittee(committeeList.length > 0 ? committeeList : []);
+
+                    // Filter based on database flag
+                    const leaderList = mapped.filter(m => m.is_leadership);
+                    const committeeList = mapped.filter(m => !m.is_leadership);
+
+                    setLeaders(leaderList);
+                    setCommittee(committeeList);
                 }
             });
     }, []);

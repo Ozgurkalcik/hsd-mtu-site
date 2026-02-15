@@ -64,13 +64,13 @@ interface EventItem {
     description: string;
     event_date: string;
     end_date?: string;
+    category?: string;
     location?: string;
     image_url?: string;
     is_active: boolean;
     // computed
     date: string;
     time: string;
-    category: string;
     color: string;
     span: string;
     image: string;
@@ -105,11 +105,15 @@ export default function Events() {
         const supabase = createClient();
         supabase
             .from('events')
-            .select('id, title, description, event_date, end_date, location, image_url, is_active')
+            .select('id, title, description, event_date, end_date, category, location, image_url, is_active')
             .eq('is_active', true)
             .order('event_date', { ascending: false })
             .limit(4)
-            .then(({ data }) => {
+            .then(({ data, error }) => {
+                if (error) {
+                    console.error('[Events] Supabase fetch error:', error);
+                    return;
+                }
                 if (data && data.length > 0) {
                     const now = new Date();
                     setEvents(data.map((item, i) => {
@@ -117,9 +121,9 @@ export default function Events() {
                         const isPast = eventDate < now;
                         return {
                             ...item,
+                            category: item.category || 'Etkinlik',
                             date: new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long' }).format(eventDate),
                             time: new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit' }).format(eventDate),
-                            category: CATEGORY_NAMES[i % CATEGORY_NAMES.length],
                             color: COLOR_PALETTE[i % COLOR_PALETTE.length],
                             span: SPAN_PATTERNS[i % SPAN_PATTERNS.length],
                             image: item.image_url || `https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?q=80&w=2070&auto=format&fit=crop`,
@@ -185,6 +189,7 @@ export default function Events() {
 
                 {/* Bento Grid */}
                 <motion.div
+                    key={events.length}
                     initial="hidden"
                     whileInView="visible"
                     viewport={{ once: true, margin: "-100px" }}

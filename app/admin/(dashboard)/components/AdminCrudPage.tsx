@@ -178,9 +178,14 @@ export default function AdminCrudPage({ config }: { config: CrudPageConfig }) {
         config.fields.forEach((f) => {
             const val = formData[f.key]
             if (f.type === 'text' || f.type === 'textarea' || f.type === 'url' || f.type === 'image') {
-                sanitized[f.key] = typeof val === 'string' ? val.trim() : val
-            } else if (f.type === 'date' && val) {
-                sanitized[f.key] = new Date(val as string).toISOString()
+                const trimmed = typeof val === 'string' ? val.trim() : val
+                // Boş string'leri required olmayan alanlarda null yap
+                sanitized[f.key] = (trimmed === '' && !f.required) ? null : trimmed
+            } else if (f.type === 'date') {
+                // Boş tarih alanlarını null olarak gönder (PostgreSQL '' kabul etmez)
+                sanitized[f.key] = val ? new Date(val as string).toISOString() : null
+            } else if (f.type === 'number') {
+                sanitized[f.key] = val === '' || val === null || val === undefined ? (f.required ? 0 : null) : Number(val)
             } else {
                 sanitized[f.key] = val
             }
@@ -194,7 +199,8 @@ export default function AdminCrudPage({ config }: { config: CrudPageConfig }) {
                 .eq('id', editingItem.id)
 
             if (error) {
-                setMessage({ type: 'error', text: 'Güncelleme sırasında hata oluştu.' })
+                console.error('Update error:', error)
+                setMessage({ type: 'error', text: `Güncelleme hatası: ${error.message}` })
             } else {
                 setMessage({ type: 'success', text: `${config.singular} güncellendi.` })
                 setView('list')
@@ -207,7 +213,8 @@ export default function AdminCrudPage({ config }: { config: CrudPageConfig }) {
                 .insert(sanitized)
 
             if (error) {
-                setMessage({ type: 'error', text: 'Ekleme sırasında hata oluştu.' })
+                console.error('Insert error:', error)
+                setMessage({ type: 'error', text: `Ekleme hatası: ${error.message}` })
             } else {
                 setMessage({ type: 'success', text: `${config.singular} eklendi.` })
                 setView('list')
