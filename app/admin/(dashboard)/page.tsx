@@ -49,19 +49,40 @@ export default function AdminDashboard() {
                 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
             )
 
-            const [announcements, events, articles, teamMembers, sponsors, galleryImages] = await Promise.all([
+            // Fetch local stats
+            const [announcements, events, teamMembers, sponsors, galleryImages] = await Promise.all([
                 supabase.from('announcements').select('id', { count: 'exact', head: true }),
                 supabase.from('events').select('id', { count: 'exact', head: true }),
-                supabase.from('articles').select('id', { count: 'exact', head: true }),
                 supabase.from('team_members').select('id', { count: 'exact', head: true }),
                 supabase.from('sponsors').select('id', { count: 'exact', head: true }),
                 supabase.from('gallery_images').select('id', { count: 'exact', head: true }),
             ])
 
+            // Fetch Medium stats
+            let mediumCount = 0;
+            try {
+                const { data: settingsData } = await supabase
+                    .from('site_settings')
+                    .select('value')
+                    .eq('key', 'medium_rss_url')
+                    .single();
+
+                const rssUrl = settingsData?.value || 'https://medium.com/feed/@huaweidevgroups44';
+                const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+                if (data.status === 'ok') {
+                    mediumCount = data.items.length;
+                }
+            } catch (error) {
+                console.error('Medium stats error:', error);
+            }
+
             setStats({
                 announcements: announcements.count ?? 0,
                 events: events.count ?? 0,
-                articles: articles.count ?? 0,
+                articles: mediumCount,
                 teamMembers: teamMembers.count ?? 0,
                 sponsors: sponsors.count ?? 0,
                 galleryImages: galleryImages.count ?? 0,
@@ -123,9 +144,6 @@ export default function AdminDashboard() {
                     </a>
                     <a href="/admin/etkinlikler" className="admin-btn admin-btn--primary">
                         + Yeni Etkinlik
-                    </a>
-                    <a href="/admin/yazilar" className="admin-btn admin-btn--primary">
-                        + Yeni Yazı
                     </a>
                 </div>
             </motion.div>
