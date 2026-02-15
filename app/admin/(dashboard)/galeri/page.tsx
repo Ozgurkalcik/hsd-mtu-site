@@ -48,15 +48,12 @@ export default function GalleryPage() {
                 fields: [
                     { key: 'title', label: 'Başlık', type: 'text', placeholder: 'Görsel başlığı' },
                     { key: 'image_url', label: 'Görsel', type: 'image', required: true, placeholder: 'Görsel yükleyin veya URL girin' },
-                    { key: 'alt_text', label: 'Alt Metin', type: 'text', placeholder: 'Görsel açıklaması' },
-                    { key: 'category', label: 'Kategori', type: 'text', placeholder: 'Etkinlik, Toplantı...' },
                     { key: 'display_order', label: 'Sıralama', type: 'number', defaultValue: 0 },
                     { key: 'is_active', label: 'Aktif', type: 'checkbox', defaultValue: true },
                 ],
                 displayColumns: [
                     { key: 'image_url', label: 'Önizleme', render: IMAGE_PREVIEW },
                     { key: 'title', label: 'Başlık' },
-                    { key: 'category', label: 'Kategori' },
                     { key: 'is_active', label: 'Durum', render: STATUS_BADGE },
                 ],
             }}

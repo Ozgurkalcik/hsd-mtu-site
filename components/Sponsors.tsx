@@ -60,7 +60,7 @@ export default function Sponsors() {
                                 <img
                                     src={sponsor.logo_url}
                                     alt={sponsor.name}
-                                    className="w-12 h-12 object-contain filter brightness-0 invert opacity-70 group-hover:opacity-100 transition-opacity"
+                                    className="max-h-16 max-w-[160px] object-contain opacity-70 group-hover:opacity-100 transition-opacity"
                                 />
                                 <span className="text-gray-400 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
                                     {sponsor.name}
