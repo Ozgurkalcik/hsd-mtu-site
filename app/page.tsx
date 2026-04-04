@@ -9,6 +9,7 @@ import Gallery from "@/components/Gallery";
 import Contact from "@/components/Contact";
 import ScrollBasedBlur from "@/components/ScrollBasedBlur";
 import FrozenSection from "@/components/FrozenSection";
+import SitePopup from "@/components/SitePopup";
 
 export default function Home() {
   return (
@@ -61,6 +62,9 @@ export default function Home() {
       {/* Scroll Based Blur Effect - Global effect, maybe keep outside or wrap? It listens to scroll anyway. */}
       {/* It's lightweight now, so acceptable to keep global */}
       <ScrollBasedBlur />
+
+      {/* Site Popup - Supabase'den ayarları çeker */}
+      <SitePopup />
     </main>
   );
 }
