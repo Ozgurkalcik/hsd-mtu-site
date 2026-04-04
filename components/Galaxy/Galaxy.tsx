@@ -177,9 +177,12 @@ interface GalaxyProps extends React.HTMLAttributes<HTMLDivElement> {
   transparent?: boolean;
 }
 
+const DEFAULT_FOCAL: [number, number] = [1, 1];
+const DEFAULT_ROTATION: [number, number] = [1, 1];
+
 export default function Galaxy({
-  focal = [1, 1],
-  rotation = [1, 1],
+  focal = DEFAULT_FOCAL,
+  rotation = DEFAULT_ROTATION,
   starSpeed = 0.5,
   density = 1,
   hueShift = 0,
@@ -202,6 +205,11 @@ export default function Galaxy({
 
   // Smart Loop State
   const [isVisible, setIsVisible] = useState(true);
+  const isVisibleRef = useRef(isVisible);
+
+  useEffect(() => {
+    isVisibleRef.current = isVisible;
+  }, [isVisible]);
 
   useEffect(() => {
     const handleVisibility = () => setIsVisible(!document.hidden);
@@ -215,9 +223,6 @@ export default function Galaxy({
   }, [isFrozen]);
 
   useEffect(() => {
-    // Smart Loop Guard: If frozen or hidden, do not start WebGL/Loop at all.
-    if (isFrozen || !isVisible) return;
-
     const ctn = ctnDom.current;
     if (!ctn) return;
 
@@ -274,23 +279,24 @@ export default function Galaxy({
     resize();
 
     function update(t: number) {
+      if (!isFrozenRef.current && isVisibleRef.current) {
+        if (!disableAnimation) {
+          program.uniforms.uTime.value = t * 0.001 * speed;
+          program.uniforms.uStarSpeed.value = (t * 0.001 * starSpeed) / 10.0;
+        }
 
-      if (!disableAnimation) {
-        program.uniforms.uTime.value = t * 0.001 * speed;
-        program.uniforms.uStarSpeed.value = (t * 0.001 * starSpeed) / 10.0;
+        const lerpFactor = 0.05;
+        smoothMousePos.current.x += (targetMousePos.current.x - smoothMousePos.current.x) * lerpFactor;
+        smoothMousePos.current.y += (targetMousePos.current.y - smoothMousePos.current.y) * lerpFactor;
+
+        smoothMouseActive.current += (targetMouseActive.current - smoothMouseActive.current) * lerpFactor;
+
+        program.uniforms.uMouse.value[0] = smoothMousePos.current.x;
+        program.uniforms.uMouse.value[1] = smoothMousePos.current.y;
+        program.uniforms.uMouseActiveFactor.value = smoothMouseActive.current;
+
+        renderer.render({ scene: mesh });
       }
-
-      const lerpFactor = 0.05;
-      smoothMousePos.current.x += (targetMousePos.current.x - smoothMousePos.current.x) * lerpFactor;
-      smoothMousePos.current.y += (targetMousePos.current.y - smoothMousePos.current.y) * lerpFactor;
-
-      smoothMouseActive.current += (targetMouseActive.current - smoothMouseActive.current) * lerpFactor;
-
-      program.uniforms.uMouse.value[0] = smoothMousePos.current.x;
-      program.uniforms.uMouse.value[1] = smoothMousePos.current.y;
-      program.uniforms.uMouseActiveFactor.value = smoothMouseActive.current;
-
-      renderer.render({ scene: mesh });
       animateId = requestAnimationFrame(update);
     }
     animateId = requestAnimationFrame(update);
@@ -341,9 +347,7 @@ export default function Galaxy({
     rotationSpeed,
     repulsionStrength,
     autoCenterRepulsion,
-    transparent,
-    isFrozen,
-    isVisible
+    transparent
   ]);
 
   return <div ref={ctnDom} className="w-full h-full relative" {...rest} />;

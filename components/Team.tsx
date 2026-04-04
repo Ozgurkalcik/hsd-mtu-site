@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import TiltedCard from './TiltedCard';
 import CommitteeCard from './CommitteeCard';
 import SeeAllButton from './SeeAllButton';
@@ -32,7 +33,7 @@ export default function Team() {
         const supabase = createClient();
         supabase
             .from('team_members')
-            .select('id, full_name, role_title, department, bio, image_url, display_order, is_leadership')
+            .select('id, full_name, role_title, department, bio, image_url, display_order, is_leadership, is_showcase')
             .eq('is_active', true)
             .order('display_order', { ascending: true })
             .then(({ data }) => {
@@ -45,9 +46,12 @@ export default function Team() {
                         isPresident: m.role_title?.toLowerCase().includes('başkan') && !m.role_title?.toLowerCase().includes('yardımcı') && !m.role_title?.toLowerCase().includes('komite'),
                     }));
 
-                    // Filter based on database flag
-                    const leaderList = mapped.filter(m => m.is_leadership);
-                    const committeeList = mapped.filter(m => !m.is_leadership);
+                    // Filter based on database flag AND showcase flag for homepage
+                    // Only show members with is_showcase = true on the homepage
+                    const showcaseMembers = mapped.filter(m => m.is_showcase);
+
+                    const leaderList = showcaseMembers.filter(m => m.is_leadership);
+                    const committeeList = showcaseMembers.filter(m => !m.is_leadership);
 
                     setLeaders(leaderList);
                     setCommittee(committeeList);
@@ -224,7 +228,9 @@ export default function Team() {
                         transition={{ delay: 0.6 }}
                         className="flex justify-center mt-16"
                     >
-                        <SeeAllButton />
+                        <Link href="/ekip">
+                            <SeeAllButton />
+                        </Link>
                     </motion.div>
                 </div>
             </div>
