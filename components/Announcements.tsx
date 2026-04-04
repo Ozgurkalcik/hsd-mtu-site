@@ -19,7 +19,6 @@ interface Announcement {
     id: string;
     title: string;
     content: string;
-    is_pinned: boolean;
     created_at: string;
     color: string;
     date: string;
@@ -35,9 +34,8 @@ export default function Announcements() {
         const supabase = createClient();
         supabase
             .from('announcements')
-            .select('id, title, content, is_pinned, created_at')
+            .select('id, title, content, created_at')
             .eq('is_active', true)
-            .order('is_pinned', { ascending: false })
             .order('created_at', { ascending: false })
             .limit(10)
             .then(({ data }) => {
@@ -322,9 +320,9 @@ function CarouselContent({ x, isHovered, isDragging, isModalOpen, onSelect, item
         <div ref={containerRef} className="flex gap-8">
             {/* 3 Sets of Items */}
             {[...items, ...items, ...items].map((item, index) => (
-                <div
-                    key={`${item.id}-${index}`}
-                    className="relative w-[350px] md:w-[450px] h-[320px] group perspective-1000 flex-shrink-0 cursor-pointer"
+                    <div
+                        key={`${item.id}-${index}`}
+                        className="relative w-[350px] md:w-[450px] h-[360px] group perspective-1000 flex-shrink-0 cursor-pointer"
                     onPointerUp={() => {
                         if (!isDragging) onSelect(item);
                     }}
@@ -362,16 +360,16 @@ function CarouselContent({ x, isHovered, isDragging, isModalOpen, onSelect, item
 
                             {/* Main Text */}
                             <div className="flex-grow space-y-4">
-                                <h3 className={`text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 group-hover:from-white group-hover:to-gray-200 transition-all duration-300`}>
+                                <h3 className={`text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 group-hover:from-white group-hover:to-gray-200 transition-all duration-300 line-clamp-2`}>
                                     {item.title}
                                 </h3>
-                                <p className="text-gray-400 text-sm leading-relaxed font-medium line-clamp-3 group-hover:text-gray-300 transition-colors">
+                                <p className="text-gray-400 text-sm leading-relaxed font-medium line-clamp-2 group-hover:text-gray-300 transition-colors">
                                     {item.content}
                                 </p>
                             </div>
 
                             {/* Bottom Action */}
-                            <div className="mt-6 pt-6 border-t border-white/5 flex items-center justify-between group/btn">
+                            <div className="mt-auto pt-6 border-t border-white/5 flex items-center justify-between group/btn">
                                 <span className={`text-sm font-bold bg-clip-text text-transparent bg-gradient-to-r ${item.color} opacity-80 group-hover:opacity-100 transition-opacity`}>
                                     Detayları İncele
                                 </span>
