@@ -240,8 +240,8 @@ export default function Events() {
                                     {/* Content */}
                                     <div className="relative z-10">
                                         <div className="flex justify-between items-start mb-4">
-                                            <div className="text-4xl font-black text-white/10 font-mono select-none">
-                                                0{event.id}
+                                            <div className="text-6xl font-black text-white/25 font-mono select-none drop-shadow-2xl tracking-tighter mix-blend-overlay">
+                                                0{index + 1}
                                             </div>
                                         </div>
 

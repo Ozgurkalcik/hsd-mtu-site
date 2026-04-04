@@ -440,6 +440,7 @@ export default function AdminCrudPage({ config }: { config: CrudPageConfig }) {
                                             <input
                                                 id={field.key}
                                                 type="datetime-local"
+                                                max="9999-12-31T23:59"
                                                 className="admin-form-input"
                                                 value={(formData[field.key] as string) || ''}
                                                 onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
