@@ -22,7 +22,6 @@ export default function AnnouncementsPage() {
                     { key: 'title', label: 'Başlık', type: 'text', required: true, placeholder: 'Duyuru başlığı' },
                     { key: 'content', label: 'İçerik', type: 'textarea', required: true, placeholder: 'Duyuru içeriği...' },
                     { key: 'is_active', label: 'Aktif', type: 'checkbox', defaultValue: true },
-                    { key: 'is_pinned', label: 'Sabitlenmiş', type: 'checkbox', defaultValue: false },
                 ],
                 displayColumns: [
                     { key: 'title', label: 'Başlık' },

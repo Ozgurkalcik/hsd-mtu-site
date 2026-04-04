@@ -60,13 +60,32 @@ export default function AdminPopupPage() {
     }
 
     const handleImageUpload = async (file: File) => {
+        const { validateImageSize, compressImage } = await import('@/shared/utils/imageCompressor')
+
+        // Boyut kontrolü
+        const { valid, error: sizeError } = validateImageSize(file)
+        if (!valid) {
+            setMessage({ type: 'error', text: sizeError! })
+            return
+        }
+
         setIsUploading(true)
-        const fileExt = file.name.split('.').pop()
+        setMessage({ type: 'success', text: 'Görsel sıkıştırılıyor...' })
+
+        // Sıkıştır
+        let processedFile = file
+        try {
+            processedFile = await compressImage(file)
+        } catch {
+            // Sıkıştırma başarısız olursa orijinali kullan
+        }
+
+        const fileExt = processedFile.type === 'image/png' ? 'png' : 'jpg'
         const fileName = `popup_${Date.now()}.${fileExt}`
 
         const { error: uploadError } = await supabase.storage
             .from('uploads')
-            .upload(fileName, file, { upsert: true })
+            .upload(fileName, processedFile, { upsert: true })
 
         if (uploadError) {
             setMessage({ type: 'error', text: 'Görsel yüklenirken hata oluştu.' })

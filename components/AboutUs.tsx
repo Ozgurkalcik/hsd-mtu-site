@@ -10,25 +10,25 @@ export default function AboutUs() {
         {
             title: "Biz Kimiz?",
             icon: <LuCode />,
-            content: "HSD (High School Developers) Malatya Turgut Özal Topluluğu, teknolojinin sınırlarını zorlayan ve geleceği kodlayan lise öğrencilerinin buluşma noktasıdır. Sadece kod yazmuyoruz; fikirleri gerçeğe, hayalleri projelere dönüştürüyoruz.",
+            content: "HSD (Huawei Student Developers) Malatya Turgut Özal Topluluğu, Huawei tarafından desteklenen küresel bir üniversite topluluğu programının Malatya'daki yerel koludur. Bulut teknolojileri, yapay zeka ve yazılım geliştirme alanlarında tutkulu üniversite öğrencilerini bir araya getiriyoruz.",
             delay: 0.2
         },
         {
             title: "Misyonumuz",
             icon: <LuTarget />,
-            content: "Genç geliştiricilere ilham vermek, onlara modern teknolojileri öğretmek ve birlikte büyüyecekleri bir ekosistem sunmak. İnovasyon tutkusuyla bir araya gelen ekibimiz, yazılım dünyasında iz bırakmayı hedefliyor.",
+            content: "Öğrencilere güncel teknolojiler (Cloud, AI, HMS Core) konusunda uygulamalı deneyim kazandırmak; eğitimler, workshoplar ve hackathonlar aracılığıyla teknik bilgi düzeylerini artırarak onları sektöre hazırlamak ve geleceğin teknoloji liderlerini yetiştirmek.",
             delay: 0.4
         },
         {
             title: "Vizyonumuz",
             icon: <LuEye />,
-            content: "Türkiye'nin en aktif ve üretken lise yazılım topluluğu olmak. Teknolojiyi sadece tüketen değil, üreten bir nesil yetiştirmek ve global ölçekte projeler geliştirmek.",
+            content: "Öğrencilerin Huawei ekosistemi ve global teknoloji trendleriyle iç içe geçerek dünya genelinde rekabet edebilen yetkin bireyler haline gelmesini sağlamak. Akran öğrenimi ve iş birliğiyle büyüyen, fikir üreten bir topluluk platformu olmak.",
             delay: 0.6
         },
         {
             title: "Değerlerimiz",
             icon: <LuGem />,
-            content: "Sürekli öğrenme, paylaşım kültürü, takım çalışması ve inovasyon. Her bir üyemizin gelişimine değer veriyor, 'birlikte daha güçlüyüz' ilkesiyle hareket ediyoruz.",
+            content: "Sürekli öğrenme, topluluk odaklılık, liderlik ve inovasyon. HSD Ambassador programıyla öğrencilere sorumluluk, ekip yönetimi ve kariyer fırsatları sunuyoruz. Huawei uzmanlarıyla etkileşim ve sertifika programlarıyla her üyemizin gelişimine değer katıyoruz.",
             delay: 0.8
         }
     ];

@@ -146,14 +146,34 @@ export default function AdminCrudPage({ config }: { config: CrudPageConfig }) {
     }
 
     const handleFileUpload = async (file: File, key: string) => {
+        const { validateImageSize, compressImage } = await import('@/shared/utils/imageCompressor')
+
+        // Boyut kontrolü — 6MB limit
+        const { valid, error: sizeError } = validateImageSize(file)
+        if (!valid) {
+            setMessage({ type: 'error', text: sizeError! })
+            return
+        }
+
+        setMessage({ type: 'success', text: 'Görsel sıkıştırılıyor...' })
+
+        // Canvas sıkıştırma
+        let processedFile = file
+        try {
+            processedFile = await compressImage(file)
+        } catch {
+            // Sıkıştırma başarısız olursa orijinali kullan
+        }
+
         setMessage({ type: 'success', text: 'Görsel yükleniyor...' })
-        const fileExt = file.name.split('.').pop()
+
+        const fileExt = processedFile.type === 'image/png' ? 'png' : 'jpg'
         const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`
         const filePath = `${fileName}`
 
         const { error: uploadError } = await supabase.storage
             .from('uploads')
-            .upload(filePath, file)
+            .upload(filePath, processedFile)
 
         if (uploadError) {
             console.error(uploadError)
@@ -477,7 +497,7 @@ export default function AdminCrudPage({ config }: { config: CrudPageConfig }) {
                                                     required={field.required}
                                                 />
                                                 <p style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.5rem' }}>
-                                                    veya URL girin:
+                                                    Maksimum 6MB yüklenebilir. Görseller otomatik olarak sıkıştırılır. veya URL girin:
                                                 </p>
                                                 <input
                                                     type="url"

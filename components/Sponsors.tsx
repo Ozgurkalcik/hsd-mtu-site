@@ -30,13 +30,14 @@ export default function Sponsors() {
     }, []);
 
     return (
-        <section id="sponsorlar" className="relative w-full bg-black py-24 overflow-hidden">
+        <section id="sponsorlar" className="relative w-full min-h-screen bg-black flex flex-col justify-center overflow-hidden">
             {/* Top Separator */}
             <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
 
             {/* Decorative Stickers */}
             <div className="absolute inset-0 z-20 pointer-events-none">
                 <div className="relative w-full h-full pointer-events-auto">
+                    {/* Sol üst */}
                     <StickerPeel
                         imageSrc="/assets/image/hsd-logo-white.png"
                         width={120}
@@ -45,8 +46,9 @@ export default function Sponsors() {
                         peelBackActivePct={60}
                         shadowIntensity={0.8}
                         lightingIntensity={0.2}
-                        initialPosition={{ x: 50, y: 50 }}
+                        initialPosition={{ x: 50, y: 150 }}
                     />
+                    {/* Sağ üst */}
                     <StickerPeel
                         imageSrc="/assets/image/hsd-logo-white.png"
                         width={100}
@@ -55,8 +57,9 @@ export default function Sponsors() {
                         peelBackActivePct={55}
                         shadowIntensity={0.7}
                         lightingIntensity={0.15}
-                        initialPosition={{ x: 1100, y: 80 }}
+                        initialPosition={{ x: 1200, y: 140 }}
                     />
+                    {/* Sol alt */}
                     <StickerPeel
                         imageSrc="/assets/image/hsd-logo-white.png"
                         width={90}
@@ -65,8 +68,9 @@ export default function Sponsors() {
                         peelBackActivePct={50}
                         shadowIntensity={0.6}
                         lightingIntensity={0.1}
-                        initialPosition={{ x: 100, y: 550 }}
+                        initialPosition={{ x: 100, y: 680 }}
                     />
+                    {/* Sağ alt */}
                     <StickerPeel
                         imageSrc="/assets/image/hsd-logo-white.png"
                         width={110}
@@ -75,7 +79,7 @@ export default function Sponsors() {
                         peelBackActivePct={65}
                         shadowIntensity={0.75}
                         lightingIntensity={0.2}
-                        initialPosition={{ x: 1050, y: 520 }}
+                        initialPosition={{ x: 1180, y: 660 }}
                     />
                 </div>
             </div>

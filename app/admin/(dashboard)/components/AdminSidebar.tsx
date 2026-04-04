@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { motion, AnimatePresence } from 'motion/react'
@@ -16,12 +16,15 @@ const NAV_ITEMS = [
     { href: '/admin/popup', label: 'Popup', icon: 'popup' },
 ]
 
-function NavIcon({ icon, size = 20 }: { icon: string; size?: number }) {
-    const props = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round" as const, strokeLinejoin: "round" as const }
-
+function NavIcon({ icon, size = 18 }: { icon: string; size?: number }) {
+    const props = {
+        width: size, height: size, viewBox: "0 0 24 24",
+        fill: "none", stroke: "currentColor", strokeWidth: 1.6,
+        strokeLinecap: "round" as const, strokeLinejoin: "round" as const,
+    }
     switch (icon) {
         case 'dashboard':
-            return <svg {...props}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>
+            return <svg {...props}><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>
         case 'megaphone':
             return <svg {...props}><path d="m3 11 18-5v12L3 13v-2z" /><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" /></svg>
         case 'calendar':
@@ -45,7 +48,13 @@ export default function AdminSidebar() {
     const router = useRouter()
     const pathname = usePathname()
     const [isCollapsed, setIsCollapsed] = useState(false)
+    const [isMobileOpen, setIsMobileOpen] = useState(false)
     const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+    // Sayfa değişince mobil menüyü kapat
+    useEffect(() => {
+        setIsMobileOpen(false)
+    }, [pathname])
 
     const handleLogout = async () => {
         setIsLoggingOut(true)
@@ -63,100 +72,138 @@ export default function AdminSidebar() {
     }
 
     return (
-        <motion.aside
-            className={`admin-sidebar ${isCollapsed ? 'admin-sidebar--collapsed' : ''}`}
-            initial={{ x: -20, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        >
-            {/* Header */}
-            <div className="admin-sidebar-header">
-                <AnimatePresence mode="wait">
-                    {!isCollapsed && (
-                        <motion.div
-                            className="admin-sidebar-brand"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                        >
-                            <div className="admin-sidebar-logo">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                                </svg>
-                            </div>
-                            <div>
-                                <p className="admin-sidebar-title">HSDMTU</p>
-                                <p className="admin-sidebar-subtitle">Admin Panel</p>
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-
+        <>
+            {/* ── Mobil Topbar ── */}
+            <header className="admin-topbar">
+                <div className="admin-topbar-brand">
+                    <div className="admin-sidebar-logo">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        </svg>
+                    </div>
+                    <p className="admin-topbar-title">HSDMTU Admin</p>
+                </div>
                 <button
-                    className="admin-sidebar-toggle"
-                    onClick={() => setIsCollapsed(!isCollapsed)}
-                    title={isCollapsed ? 'Genişlet' : 'Daralt'}
+                    className="admin-topbar-menu-btn"
+                    onClick={() => setIsMobileOpen(!isMobileOpen)}
+                    aria-label="Menüyü aç/kapat"
                 >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        {isCollapsed ? (
-                            <><line x1="3" x2="21" y1="12" y2="12" /><line x1="3" x2="21" y1="6" y2="6" /><line x1="3" x2="21" y1="18" y2="18" /></>
-                        ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                        {isMobileOpen ? (
                             <><line x1="18" x2="6" y1="6" y2="18" /><line x1="6" x2="18" y1="6" y2="18" /></>
+                        ) : (
+                            <><line x1="3" x2="21" y1="6" y2="6" /><line x1="3" x2="21" y1="12" y2="12" /><line x1="3" x2="21" y1="18" y2="18" /></>
                         )}
                     </svg>
                 </button>
-            </div>
+            </header>
 
-            {/* Navigation */}
-            <nav className="admin-sidebar-nav">
-                {NAV_ITEMS.map((item) => (
-                    <button
-                        key={item.href}
-                        className={`admin-sidebar-link ${isActive(item.href) ? 'admin-sidebar-link--active' : ''}`}
-                        onClick={() => router.push(item.href)}
-                        title={isCollapsed ? item.label : undefined}
-                    >
-                        <NavIcon icon={item.icon} />
-                        <AnimatePresence mode="wait">
-                            {!isCollapsed && (
-                                <motion.span
-                                    initial={{ opacity: 0, width: 0 }}
-                                    animate={{ opacity: 1, width: 'auto' }}
-                                    exit={{ opacity: 0, width: 0 }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    {item.label}
-                                </motion.span>
-                            )}
-                        </AnimatePresence>
-                        {isActive(item.href) && (
+            {/* ── Mobil Overlay ── */}
+            <AnimatePresence>
+                {isMobileOpen && (
+                    <motion.div
+                        className="admin-sidebar-overlay"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setIsMobileOpen(false)}
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* ── Sidebar ── */}
+            <aside
+                className={`admin-sidebar ${isCollapsed ? 'admin-sidebar--collapsed' : ''} ${isMobileOpen ? 'admin-sidebar--open' : ''}`}
+            >
+                {/* Header */}
+                <div className="admin-sidebar-header">
+                    <AnimatePresence mode="wait">
+                        {!isCollapsed && (
                             <motion.div
-                                className="admin-sidebar-indicator"
-                                layoutId="sidebar-indicator"
-                                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                            />
+                                className="admin-sidebar-brand"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                            >
+                                <div className="admin-sidebar-logo">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p className="admin-sidebar-title">HSDMTU</p>
+                                    <p className="admin-sidebar-subtitle">Admin Panel</p>
+                                </div>
+                            </motion.div>
                         )}
-                    </button>
-                ))}
-            </nav>
+                    </AnimatePresence>
 
-            {/* Logout */}
-            <div className="admin-sidebar-footer">
-                <button
-                    className="admin-sidebar-logout"
-                    onClick={handleLogout}
-                    disabled={isLoggingOut}
-                    title={isCollapsed ? 'Çıkış Yap' : undefined}
-                >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                        <polyline points="16 17 21 12 16 7" />
-                        <line x1="21" x2="9" y1="12" y2="12" />
-                    </svg>
-                    {!isCollapsed && <span>{isLoggingOut ? 'Çıkılıyor...' : 'Çıkış Yap'}</span>}
-                </button>
-            </div>
-        </motion.aside>
+                    <button
+                        className="admin-sidebar-toggle"
+                        onClick={() => setIsCollapsed(!isCollapsed)}
+                        title={isCollapsed ? 'Genişlet' : 'Daralt'}
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                            {isCollapsed ? (
+                                <><line x1="3" x2="21" y1="12" y2="12" /><line x1="3" x2="21" y1="6" y2="6" /><line x1="3" x2="21" y1="18" y2="18" /></>
+                            ) : (
+                                <><line x1="18" x2="6" y1="6" y2="18" /><line x1="6" x2="18" y1="6" y2="18" /></>
+                            )}
+                        </svg>
+                    </button>
+                </div>
+
+                {/* Navigation */}
+                <nav className="admin-sidebar-nav">
+                    {NAV_ITEMS.map((item) => (
+                        <button
+                            key={item.href}
+                            className={`admin-sidebar-link ${isActive(item.href) ? 'admin-sidebar-link--active' : ''}`}
+                            onClick={() => router.push(item.href)}
+                            title={isCollapsed ? item.label : undefined}
+                        >
+                            <NavIcon icon={item.icon} />
+                            <AnimatePresence mode="wait">
+                                {!isCollapsed && (
+                                    <motion.span
+                                        initial={{ opacity: 0, width: 0 }}
+                                        animate={{ opacity: 1, width: 'auto' }}
+                                        exit={{ opacity: 0, width: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                    >
+                                        {item.label}
+                                    </motion.span>
+                                )}
+                            </AnimatePresence>
+                            {isActive(item.href) && (
+                                <motion.div
+                                    className="admin-sidebar-indicator"
+                                    layoutId="sidebar-indicator"
+                                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                                />
+                            )}
+                        </button>
+                    ))}
+                </nav>
+
+                {/* Logout */}
+                <div className="admin-sidebar-footer">
+                    <button
+                        className="admin-sidebar-logout"
+                        onClick={handleLogout}
+                        disabled={isLoggingOut}
+                        title={isCollapsed ? 'Çıkış Yap' : undefined}
+                    >
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <polyline points="16 17 21 12 16 7" />
+                            <line x1="21" x2="9" y1="12" y2="12" />
+                        </svg>
+                        {!isCollapsed && <span>{isLoggingOut ? 'Çıkılıyor...' : 'Çıkış Yap'}</span>}
+                    </button>
+                </div>
+            </aside>
+        </>
     )
 }

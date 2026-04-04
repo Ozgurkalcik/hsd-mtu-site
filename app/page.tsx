@@ -38,7 +38,7 @@ export default function Home() {
         <Team />
       </FrozenSection>
 
-      <FrozenSection id="sponsorlar">
+      <FrozenSection id="sponsorlar" className="min-h-screen">
         <Sponsors />
       </FrozenSection>
 
