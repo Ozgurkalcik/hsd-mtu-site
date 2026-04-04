@@ -50,7 +50,7 @@ export default function Contact() {
 
                 <div className="max-w-6xl mx-auto">
                     <div className="text-center mb-16">
-                        <h2 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-white via-rose-200 to-rose-400 bg-clip-text text-transparent tracking-tight">
+                        <h2 className="text-5xl md:text-6xl font-bold mb-6 py-2 bg-gradient-to-r from-white via-rose-200 to-rose-400 bg-clip-text text-transparent tracking-tight">
                             İletişime Geçin
                         </h2>
                         <p className="text-xl text-gray-400 max-w-2xl mx-auto">
@@ -92,7 +92,7 @@ export default function Contact() {
                                                 <h4 className="text-white font-semibold mb-1">Adres</h4>
                                                 <p className="text-gray-400 text-sm">
                                                     Malatya Turgut Özal Üniversitesi,<br />
-                                                    Battalgazi Kampüsü
+                                                    Yeşilyurt Yerleşkesi
                                                 </p>
                                             </div>
                                         </div>
@@ -103,8 +103,8 @@ export default function Contact() {
                                             </div>
                                             <div>
                                                 <h4 className="text-white font-semibold mb-1">Email</h4>
-                                                <a href="mailto:info@hsdmtu.com" className="text-gray-400 text-sm hover:text-white transition-colors">
-                                                    info@hsdmtu.com
+                                                <a href="mailto:huaweidevgroups44@gmail.com" className="text-gray-400 text-sm hover:text-white transition-colors">
+                                                    huaweidevgroups44@gmail.com
                                                 </a>
                                             </div>
                                         </div>
@@ -116,13 +116,14 @@ export default function Contact() {
                                     <h4 className="text-white font-semibold mb-4">Takip Edin</h4>
                                     <div className="flex gap-4">
                                         {[
-                                            { icon: <LuInstagram size={20} />, href: "#instagram" },
-                                            { icon: <LuLinkedin size={20} />, href: "#linkedin" },
-                                            { icon: <LuTwitter size={20} />, href: "#twitter" }
+                                            { icon: <LuInstagram size={20} />, href: "https://www.instagram.com/hsdmtu/" },
+                                            { icon: <LuLinkedin size={20} />, href: "https://www.linkedin.com/in/hsd-malatya-turgut-ozal-university-2a997a385" }
                                         ].map((social, index) => (
                                             <a
                                                 key={index}
                                                 href={social.href}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
                                                 className="p-3 bg-white/5 rounded-full border border-white/10 text-gray-400 hover:text-rose-400 hover:bg-white/10 hover:scale-110 transition-all duration-300"
                                             >
                                                 {social.icon}
