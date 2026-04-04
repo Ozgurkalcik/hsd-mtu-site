@@ -10,6 +10,8 @@
     --sticker-shadow-opacity: 0.6;
     --sticker-lighting-constant: 0.1;
     --peel-direction: 0deg;
+    --sticker-peel-initial: 14%;
+    /* Increased for a more pronounced 'lifted' effect */
 }
 
 .sticker-container {
@@ -26,8 +28,8 @@
 }
 
 .sticker-main {
-    clip-path: polygon(0% 0%,
-            100% 0%,
+    clip-path: polygon(0% var(--sticker-peel-initial),
+            100% var(--sticker-peel-initial),
             100% 100%,
             0% 100%);
     transition: clip-path 0.6s ease-out;
@@ -73,9 +75,10 @@
     top: -100%;
     clip-path: polygon(0% 0%,
             100% 0%,
-            100% 0%,
-            0% 0%);
+            100% var(--sticker-peel-initial),
+            0% var(--sticker-peel-initial));
     transform: scaleY(-1);
+    top: calc(-100% + 2 * var(--sticker-peel-initial) - 1px);
     transition: all 0.6s ease-out;
 }
 
@@ -135,6 +138,9 @@
 .sticker-image,
 .flap-image {
     width: var(--sticker-width, 200px);
+    padding: 8%;
+    /* Reduced from 15% to keep stickers large while preventing clipping */
+    box-sizing: border-box;
 }
 
 .sticker-main,

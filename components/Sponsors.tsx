@@ -39,8 +39,8 @@ export default function Sponsors() {
                 <div className="relative w-full h-full pointer-events-auto">
                     {/* Sol üst */}
                     <StickerPeel
-                        imageSrc="/assets/image/hsd-logo-white.png"
-                        width={120}
+                        imageSrc="/images/hsd-logo-white-1.png"
+                        width={280}
                         rotate={15}
                         peelBackHoverPct={40}
                         peelBackActivePct={60}
@@ -50,8 +50,8 @@ export default function Sponsors() {
                     />
                     {/* Sağ üst */}
                     <StickerPeel
-                        imageSrc="/assets/image/hsd-logo-white.png"
-                        width={100}
+                        imageSrc="/images/hsd-logo.png"
+                        width={250}
                         rotate={-20}
                         peelBackHoverPct={35}
                         peelBackActivePct={55}
@@ -61,8 +61,8 @@ export default function Sponsors() {
                     />
                     {/* Sol alt */}
                     <StickerPeel
-                        imageSrc="/assets/image/hsd-logo-white.png"
-                        width={90}
+                        imageSrc="/images/hsd-logo.png"
+                        width={220}
                         rotate={25}
                         peelBackHoverPct={30}
                         peelBackActivePct={50}
@@ -72,8 +72,8 @@ export default function Sponsors() {
                     />
                     {/* Sağ alt */}
                     <StickerPeel
-                        imageSrc="/assets/image/hsd-logo-white.png"
-                        width={110}
+                        imageSrc="/images/hsd-logo-white-1.png"
+                        width={240}
                         rotate={-10}
                         peelBackHoverPct={45}
                         peelBackActivePct={65}
