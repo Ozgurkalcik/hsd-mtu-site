@@ -67,6 +67,7 @@ interface EventItem {
     category?: string;
     location?: string;
     image_url?: string;
+    join_link?: string;
     is_active: boolean;
     // computed
     date: string;
@@ -105,7 +106,7 @@ export default function Events() {
         const supabase = createClient();
         supabase
             .from('events')
-            .select('id, title, description, event_date, end_date, category, location, image_url, is_active')
+            .select('id, title, description, event_date, end_date, category, location, image_url, join_link, is_active')
             .eq('is_active', true)
             .order('event_date', { ascending: false })
             .limit(4)
@@ -240,7 +241,7 @@ export default function Events() {
                                     {/* Content */}
                                     <div className="relative z-10">
                                         <div className="flex justify-between items-start mb-4">
-                                            <div className="text-6xl font-black text-white/25 font-mono select-none drop-shadow-2xl tracking-tighter mix-blend-overlay">
+                                            <div className="text-4xl font-black text-white/40 font-mono select-none drop-shadow-md">
                                                 0{index + 1}
                                             </div>
                                         </div>
@@ -354,9 +355,20 @@ export default function Events() {
                                         {selectedEvent.description}
                                     </p>
 
-                                    <button className={`w-full py-4 rounded-xl font-bold text-lg text-white bg-gradient-to-r ${selectedEvent.color} hover:opacity-90 transition-all shadow-lg shadow-white/5 hover:scale-[1.02] active:scale-[0.98]`}>
-                                        Etkinliğe Katıl
-                                    </button>
+                                    {selectedEvent.join_link ? (
+                                        <a 
+                                            href={selectedEvent.join_link} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer" 
+                                            className={`block text-center w-full py-4 rounded-xl font-bold text-lg text-white bg-gradient-to-r ${selectedEvent.color} hover:opacity-90 transition-all shadow-lg shadow-white/5 hover:scale-[1.02] active:scale-[0.98]`}
+                                        >
+                                            Etkinliğe Katıl
+                                        </a>
+                                    ) : (
+                                        <button disabled className="w-full py-4 rounded-xl font-bold text-lg text-white/50 bg-white/5 border border-white/10 cursor-not-allowed transition-all shadow-lg shadow-white/5">
+                                            Kayıtlar Yakında
+                                        </button>
+                                    )}
                                 </div>
                             </motion.div>
                         </motion.div>

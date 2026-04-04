@@ -37,6 +37,7 @@ export default function EventsPage() {
                     },
                     { key: 'location', label: 'Konum', type: 'text', placeholder: 'Etkinlik konumu' },
                     { key: 'image_url', label: 'Görsel', type: 'image', placeholder: 'Görsel yükleyin veya URL girin' },
+                    { key: 'join_link', label: 'Katılım Linki', type: 'url', placeholder: 'https://...' },
                     { key: 'is_active', label: 'Aktif', type: 'checkbox', defaultValue: true },
                 ],
                 displayColumns: [

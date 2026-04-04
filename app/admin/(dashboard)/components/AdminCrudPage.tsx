@@ -271,9 +271,12 @@ export default function AdminCrudPage({ config }: { config: CrudPageConfig }) {
                             borderRadius: '10px',
                             fontSize: '0.78rem',
                             fontFamily: "'JetBrains Mono', monospace",
-                            background: message.type === 'success' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(220, 38, 38, 0.12)',
-                            border: `1px solid ${message.type === 'success' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(220, 38, 38, 0.25)'}`,
-                            color: message.type === 'success' ? '#4ade80' : '#fca5a5',
+                            background: message.type === 'success' ? 'rgba(16, 185, 129, 0.95)' : 'rgba(220, 38, 38, 0.95)',
+                            border: `1px solid ${message.type === 'success' ? '#34d399' : '#f87171'}`,
+                            color: '#ffffff',
+                            fontWeight: '500',
+                            boxShadow: '0 10px 25px -5px rgba(0,0,0,0.5)',
+                            backdropFilter: 'blur(8px)',
                         }}
                     >
                         {message.text}
