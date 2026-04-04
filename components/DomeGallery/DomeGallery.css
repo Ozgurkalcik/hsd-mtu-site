@@ -169,11 +169,11 @@ main.sphere-main {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    filter: var(--image-filter, none);
+    filter: none;
 }
 
 .sphere-root .enlarge-closing img {
-    filter: var(--image-filter, none);
+    filter: none;
 }
 
 .edge-fade {
