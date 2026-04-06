@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import SimpleMarquee from './SimpleMarquee';
 import StickerPeel from './StickerPeel/StickerPeel';
 import { createClient } from '@/shared/api/supabase';
 
@@ -40,29 +39,29 @@ export default function Sponsors() {
                     {/* Sol üst */}
                     <StickerPeel
                         imageSrc="/images/hsd-logo-white-1.png"
-                        width={280}
+                        width={240}
                         rotate={15}
                         peelBackHoverPct={40}
                         peelBackActivePct={60}
                         shadowIntensity={0.8}
                         lightingIntensity={0.2}
-                        initialPosition={{ x: 50, y: 150 }}
+                        initialPosition={{ x: 50, y: 60 }}
                     />
                     {/* Sağ üst */}
                     <StickerPeel
                         imageSrc="/images/hsd-logo.png"
-                        width={250}
+                        width={215}
                         rotate={-20}
                         peelBackHoverPct={35}
                         peelBackActivePct={55}
                         shadowIntensity={0.7}
                         lightingIntensity={0.15}
-                        initialPosition={{ x: 1200, y: 140 }}
+                        initialPosition={{ x: 1200, y: 50 }}
                     />
                     {/* Sol alt */}
                     <StickerPeel
                         imageSrc="/images/hsd-logo.png"
-                        width={220}
+                        width={190}
                         rotate={25}
                         peelBackHoverPct={30}
                         peelBackActivePct={50}
@@ -73,7 +72,7 @@ export default function Sponsors() {
                     {/* Sağ alt */}
                     <StickerPeel
                         imageSrc="/images/hsd-logo-white-1.png"
-                        width={240}
+                        width={205}
                         rotate={-10}
                         peelBackHoverPct={45}
                         peelBackActivePct={65}
@@ -93,32 +92,39 @@ export default function Sponsors() {
             </div>
 
             {sponsors.length > 0 ? (
-                /* Marquee */
-                <div className="relative z-10">
-                    <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-black to-transparent z-10"></div>
-                    <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-black to-transparent z-10"></div>
-                    <SimpleMarquee speed={40}>
-                        <div className="flex gap-16 px-8 items-center">
+                /* Scrollable Sponsor List */
+                <div className="relative w-full z-10 max-w-[1400px] mx-auto">
+                    {/* CSS for hiding scrollbar */}
+                    <style dangerouslySetInnerHTML={{__html: `
+                        .hide-scrollbar::-webkit-scrollbar { display: none; }
+                        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+                    `}} />
+
+                    <div className="absolute inset-y-0 left-0 w-16 md:w-40 bg-gradient-to-r from-black via-black/80 to-transparent z-20 pointer-events-none"></div>
+                    <div className="absolute inset-y-0 right-0 w-16 md:w-40 bg-gradient-to-l from-black via-black/80 to-transparent z-20 pointer-events-none"></div>
+                    
+                    <div className="flex overflow-x-auto hide-scrollbar snap-x snap-mandatory py-12 px-16 md:px-44 items-center">
+                        <div className="flex gap-16 md:gap-32 items-center justify-center min-w-full w-max mx-auto">
                             {sponsors.map((sponsor) => (
                                 <a
                                     key={sponsor.id}
                                     href={sponsor.website_url || '#'}
                                     target={sponsor.website_url ? '_blank' : undefined}
                                     rel="noopener noreferrer"
-                                    className="flex flex-col items-center gap-4 group cursor-pointer transition-transform hover:scale-110"
+                                    className="flex flex-col items-center gap-6 group cursor-pointer transition-transform hover:scale-105 shrink-0 snap-center"
                                 >
                                     <img
                                         src={sponsor.logo_url}
                                         alt={sponsor.name}
-                                        className="max-h-16 max-w-[160px] object-contain opacity-70 group-hover:opacity-100 transition-opacity"
+                                        className="h-20 md:h-32 w-auto max-w-[200px] md:max-w-[280px] object-contain opacity-50 group-hover:opacity-100 transition-all duration-500 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)] group-hover:drop-shadow-[0_0_30px_rgba(255,255,255,0.3)] filter grayscale hover:grayscale-0"
                                     />
-                                    <span className="text-gray-400 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <span className="text-gray-400 text-sm md:text-xl font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300 tracking-widest uppercase">
                                         {sponsor.name}
                                     </span>
                                 </a>
                             ))}
                         </div>
-                    </SimpleMarquee>
+                    </div>
                 </div>
             ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-center relative z-10">

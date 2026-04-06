@@ -63,4 +63,4 @@ Site şu bölümleri içermektedir:
 
 ## Lisans
 
-© 2024 HSD Malatya Turgut Özal Topluluğu
+© 2026 HSD Malatya Turgut Özal Topluluğu

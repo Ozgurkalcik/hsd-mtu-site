@@ -54,7 +54,7 @@ export default function Home() {
       <footer className="bg-black border-t border-rose-900/30 py-8">
         <div className="container mx-auto px-4 text-center">
           <p className="text-gray-400">
-            © 2024 HSD Malatya Turgut Özal Topluluğu. Tüm hakları saklıdır.
+            © 2026 HSD Malatya Turgut Özal Topluluğu. Tüm hakları saklıdır. - MZ
           </p>
         </div>
       </footer>
