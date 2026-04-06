@@ -97,16 +97,16 @@ export default function AllTeamPage() {
             {/* Background */}
             <div className="fixed inset-0 w-full h-full z-0 pointer-events-none">
                 <Galaxy
-                    starSpeed={0.5}
-                    density={2}
+                    starSpeed={0.1}
+                    density={1.2}
                     hueShift={140}
-                    speed={1}
+                    speed={0.2}
                     glowIntensity={0.3}
                     saturation={0}
                     mouseRepulsion
                     repulsionStrength={2}
                     twinkleIntensity={0.3}
-                    rotationSpeed={0.2}
+                    rotationSpeed={0.05}
                     transparent
                 />
             </div>
