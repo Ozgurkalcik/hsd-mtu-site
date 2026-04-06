@@ -38,9 +38,9 @@ export default function AllTeamPage() {
             .select('id, full_name, role_title, committee, image_url, display_order, is_leadership')
             .eq('is_active', true)
             .order('display_order', { ascending: true })
-            .then(({ data }) => {
+            .then(({ data }: { data: any }) => {
                 if (data) {
-                    const mappedData = data.map(m => ({
+                    const mappedData = data.map((m: any) => ({
                         ...m,
                         name: m.full_name,
                         role: m.role_title,
@@ -48,14 +48,14 @@ export default function AllTeamPage() {
                     }));
 
                     // Separate Leaders
-                    const leaderList = mappedData.filter(m => m.is_leadership);
+                    const leaderList = mappedData.filter((m: any) => m.is_leadership);
                     setLeaders(leaderList);
 
                     // Group Non-Leaders by Committee
-                    const nonLeaders = mappedData.filter(m => !m.is_leadership);
+                    const nonLeaders = mappedData.filter((m: any) => !m.is_leadership);
                     const groups: GroupedMembers = {};
 
-                    nonLeaders.forEach(member => {
+                    nonLeaders.forEach((member: any) => {
                         // Normalize committee name or use 'Genel'
                         let committeeName = member.committee ? member.committee.trim() : 'Komite Üyeleri';
                         if (!committeeName) committeeName = 'Komite Üyeleri';
@@ -97,14 +97,16 @@ export default function AllTeamPage() {
             {/* Background */}
             <div className="fixed inset-0 w-full h-full z-0 pointer-events-none">
                 <Galaxy
-                    starSpeed={0.2}
-                    density={1.5}
-                    hueShift={280} // Different hue for this page (Purple/Pink vibe)
-                    speed={0.5}
-                    glowIntensity={0.2}
+                    starSpeed={0.5}
+                    density={2}
+                    hueShift={140}
+                    speed={1}
+                    glowIntensity={0.3}
+                    saturation={0}
                     mouseRepulsion
-                    repulsionStrength={1}
-                    twinkleIntensity={0.2}
+                    repulsionStrength={2}
+                    twinkleIntensity={0.3}
+                    rotationSpeed={0.2}
                     transparent
                 />
             </div>

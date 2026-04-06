@@ -7,7 +7,7 @@ import Link from 'next/link';
 import TiltedCard from './TiltedCard';
 import CommitteeCard from './CommitteeCard';
 import SeeAllButton from './SeeAllButton';
-import Galaxy from './Galaxy';
+import LineWaves from './LineWaves';
 import { createClient } from '@/shared/api/supabase';
 
 interface TeamMember {
@@ -36,9 +36,9 @@ export default function Team() {
             .select('id, full_name, role_title, department, bio, image_url, display_order, is_leadership, is_showcase')
             .eq('is_active', true)
             .order('display_order', { ascending: true })
-            .then(({ data }) => {
+            .then(({ data }: { data: any }) => {
                 if (data && data.length > 0) {
-                    const mapped = data.map(m => ({
+                    const mapped = data.map((m: any) => ({
                         ...m,
                         name: m.full_name,
                         role: m.role_title,
@@ -48,10 +48,10 @@ export default function Team() {
 
                     // Filter based on database flag AND showcase flag for homepage
                     // Only show members with is_showcase = true on the homepage
-                    const showcaseMembers = mapped.filter(m => m.is_showcase);
+                    const showcaseMembers = mapped.filter((m: any) => m.is_showcase);
 
-                    const leaderList = showcaseMembers.filter(m => m.is_leadership);
-                    const committeeList = showcaseMembers.filter(m => !m.is_leadership);
+                    const leaderList = showcaseMembers.filter((m: any) => m.is_leadership);
+                    const committeeList = showcaseMembers.filter((m: any) => !m.is_leadership);
 
                     setLeaders(leaderList);
                     setCommittee(committeeList);
@@ -61,20 +61,22 @@ export default function Team() {
 
     return (
         <section id="ekibimiz" className="relative w-full min-h-screen bg-black overflow-hidden flex flex-col py-24">
-            {/* Background - Subtle and Professional (Pure CSS, no more WebGL) */}
-            <div className="absolute inset-0 w-full h-full z-0 pointer-events-none">
-                <Galaxy
-                    starSpeed={0.5}
-                    density={2}
-                    hueShift={140}
-                    speed={1}
-                    glowIntensity={0.3}
-                    saturation={0}
-                    mouseRepulsion
-                    repulsionStrength={2}
-                    twinkleIntensity={0.3}
-                    rotationSpeed={0.2}
-                    transparent
+            {/* Background - WebGL Line Waves with Interaction */}
+            <div className="absolute inset-0 w-full h-full z-0 pointer-events-auto">
+                <LineWaves
+                    speed={0.1}
+                    innerLineCount={2}
+                    outerLineCount={8}
+                    warpIntensity={1}
+                    rotation={0}
+                    edgeFadeWidth={0.3}
+                    colorCycleSpeed={0.1}
+                    brightness={0.12}
+                    color1="#4c00ff"
+                    color2="#ff0000"
+                    color3="#ffffff"
+                    enableMouseInteraction={true}
+                    mouseInfluence={2}
                 />
             </div>
 
