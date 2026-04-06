@@ -4,11 +4,24 @@ import { createServerClient as createSSRServerClient, type CookieOptions } from 
 // ============================================
 // Browser Client (Client Components)
 // ============================================
+let supabaseBrowserClient: ReturnType<typeof createBrowserClient> | undefined;
+
 export function createClient() {
+    if (typeof window !== 'undefined') {
+        if (!supabaseBrowserClient) {
+            supabaseBrowserClient = createBrowserClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+            );
+        }
+        return supabaseBrowserClient;
+    }
+    
+    // Server-side fallback (hızlı oluşturulabilir çünkü stateless)
     return createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
+    );
 }
 
 // ============================================

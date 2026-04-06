@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@/shared/api/supabase'
 import { motion, AnimatePresence } from 'motion/react'
 
 // ============================================
@@ -88,10 +88,7 @@ export default function AdminCrudPage({ config }: { config: CrudPageConfig }) {
     const [isDeleting, setIsDeleting] = useState(false)
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-    const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
+    const supabase = createClient()
 
     const fetchItems = useCallback(async () => {
         setIsLoading(true)
@@ -173,7 +170,10 @@ export default function AdminCrudPage({ config }: { config: CrudPageConfig }) {
 
         const { error: uploadError } = await supabase.storage
             .from('uploads')
-            .upload(filePath, processedFile)
+            .upload(filePath, processedFile, {
+                contentType: processedFile.type,
+                upsert: true
+            })
 
         if (uploadError) {
             console.error(uploadError)

@@ -21,7 +21,7 @@ export default function Sponsors() {
             .select('id, name, logo_url, website_url')
             .eq('is_active', true)
             .order('display_order', { ascending: true })
-            .then(({ data }) => {
+            .then(({ data }: { data: any }) => {
                 if (data && data.length > 0) {
                     setSponsors(data);
                 }

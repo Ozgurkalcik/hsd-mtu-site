@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@/shared/api/supabase'
 import { motion, AnimatePresence } from 'motion/react'
 
 interface PopupSettings {
@@ -23,10 +23,7 @@ export default function AdminPopupPage() {
     const [isUploading, setIsUploading] = useState(false)
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-    const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
+    const supabase = createClient()
 
     const fetchSettings = useCallback(async () => {
         setIsLoading(true)
@@ -85,7 +82,10 @@ export default function AdminPopupPage() {
 
         const { error: uploadError } = await supabase.storage
             .from('uploads')
-            .upload(fileName, processedFile, { upsert: true })
+            .upload(fileName, processedFile, { 
+                contentType: processedFile.type,
+                upsert: true 
+            })
 
         if (uploadError) {
             setMessage({ type: 'error', text: 'Görsel yüklenirken hata oluştu.' })
