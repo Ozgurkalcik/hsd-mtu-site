@@ -14,6 +14,8 @@ const NAV_ITEMS = [
     { href: '/admin/sponsorlar', label: 'Sponsorlar', icon: 'sponsor' },
     { href: '/admin/galeri', label: 'Galeri', icon: 'gallery' },
     { href: '/admin/popup', label: 'Popup', icon: 'popup' },
+    { href: '/admin/mailler', label: 'İletişim Mailleri', icon: 'mail_list' },
+    { href: '/admin/sayfalar', label: 'Özel Sayfalar', icon: 'custom_page' },
 ]
 
 function NavIcon({ icon, size = 18 }: { icon: string; size?: number }) {
@@ -38,7 +40,11 @@ function NavIcon({ icon, size = 18 }: { icon: string; size?: number }) {
         case 'gallery':
             return <svg {...props}><rect width="18" height="18" x="3" y="3" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
         case 'popup':
-            return <svg {...props}><rect x="2" y="4" width="20" height="16" rx="3" /><path d="M9 9h6" /><path d="M9 12h4" /><path d="M17 15l3 3" /></svg>
+            return <svg {...props}><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M3 9h18" /><circle cx="7" cy="6" r="1" /><circle cx="11" cy="6" r="1" /></svg>
+        case 'mail_list':
+            return <svg {...props}><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /><path d="M7 16h10" /><path d="M7 19h5" /></svg>
+        case 'custom_page':
+            return <svg {...props}><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z" /><path d="M14 3v5h5M16 13H8M16 17H8M10 9H8" /></svg>
         default:
             return null
     }

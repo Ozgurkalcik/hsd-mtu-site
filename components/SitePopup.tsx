@@ -16,7 +16,7 @@ interface PopupSettings {
     delay_seconds: number
 }
 
-const STORAGE_KEY = 'hsdmtu_popup_closed'
+const STORAGE_KEY = 'hsdmtu_popup_v3'
 
 /* ── Gürültü (SVG tabanlı) overlay ── */
 function NoiseLayer() {
@@ -86,8 +86,14 @@ export default function SitePopup() {
                 if (!data || !data.is_active) return
                 const s = data as PopupSettings
                 setSettings(s)
+                
+                // Popup içeriğine göre benzersiz bir imza (signature) oluşturuyoruz.
+                // Eğer adminden başlık, açıklama, resim veya buton değişirse imza da değişir!
+                const contentSignature = btoa(encodeURIComponent(`${s.title}|${s.description}|${s.image_url}|${s.button_url}`));
+                
                 if (s.display_mode === 'once') {
-                    if (localStorage.getItem(STORAGE_KEY)) return
+                    const uniqueKey = `${STORAGE_KEY}_${contentSignature}`;
+                    if (localStorage.getItem(uniqueKey)) return
                 }
                 const timer = setTimeout(() => {
                     setIsVisible(true)
@@ -100,7 +106,9 @@ export default function SitePopup() {
     const handleClose = () => {
         setIsVisible(false)
         if (settings?.display_mode === 'once') {
-            localStorage.setItem(STORAGE_KEY, Date.now().toString())
+            const contentSignature = btoa(encodeURIComponent(`${settings.title}|${settings.description}|${settings.image_url}|${settings.button_url}`));
+            const uniqueKey = `${STORAGE_KEY}_${contentSignature}`;
+            localStorage.setItem(uniqueKey, Date.now().toString())
         }
     }
 

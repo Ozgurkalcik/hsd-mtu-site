@@ -6,6 +6,7 @@ import Link from 'next/link';
 import TiltedCard from '@/components/TiltedCard';
 import Galaxy from '@/components/Galaxy';
 import { createClient } from '@/shared/api/supabase';
+import HomeButton from '@/components/HomeButton';
 
 interface TeamMember {
     id: string;
@@ -109,15 +110,7 @@ export default function AllTeamPage() {
             </div>
 
             {/* Navigation / Back Button */}
-            <div className="fixed top-6 left-6 z-50">
-                <Link href="/" className="group flex items-center gap-2 px-5 py-3 rounded-full bg-black/50 backdrop-blur-md border border-white/10 hover:border-white/30 transition-all duration-300 hover:scale-105">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-white group-hover:-translate-x-1 transition-transform">
-                        <line x1="19" y1="12" x2="5" y2="12"></line>
-                        <polyline points="12 19 5 12 12 5"></polyline>
-                    </svg>
-                    <span className="text-white font-medium">Ana Sayfa</span>
-                </Link>
-            </div>
+            <HomeButton />
 
             <div className="relative z-10 container mx-auto px-4 py-24">
                 {/* Header */}
