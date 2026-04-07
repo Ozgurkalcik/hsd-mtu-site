@@ -1,7 +1,7 @@
 'use client'
 
 import './login.css'
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'motion/react'
 
@@ -14,8 +14,19 @@ export default function AdminLoginPage() {
     const [showPassword, setShowPassword] = useState(false)
     const [attempts, setAttempts] = useState(0)
     const honeypotRef = useRef<HTMLInputElement>(null)
+    const emailRef = useRef<HTMLInputElement>(null)
+    const passwordRef = useRef<HTMLInputElement>(null)
+
+    // Autofill ve paste sonrası DOM'dan değeri oku
+    const syncFromDOM = useCallback(() => {
+        if (emailRef.current) setEmail(emailRef.current.value)
+        if (passwordRef.current) setPassword(passwordRef.current.value)
+    }, [])
 
     const handleSubmit = async (e: React.FormEvent) => {
+        // Gönderim anında DOM'dan güncel değerleri al (autofill için kritik)
+        const currentEmail = emailRef.current?.value || email
+        const currentPassword = passwordRef.current?.value || password
         e.preventDefault()
         setError('')
         setIsLoading(true)
@@ -31,8 +42,8 @@ export default function AdminLoginPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    email,
-                    password,
+                    email: currentEmail,
+                    password: currentPassword,
                     website: honeypotRef.current?.value || '', // honeypot
                 }),
             })
@@ -120,10 +131,13 @@ export default function AdminLoginPage() {
                                 <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                             </svg>
                             <input
+                                ref={emailRef}
                                 id="admin-email"
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
+                                onPaste={(e) => { setTimeout(() => setEmail(e.target instanceof HTMLInputElement ? e.target.value : email), 0) }}
+                                onBlur={syncFromDOM}
                                 placeholder="admin@hsdmtu.com"
                                 required
                                 autoComplete="email"
@@ -144,10 +158,13 @@ export default function AdminLoginPage() {
                                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                             </svg>
                             <input
+                                ref={passwordRef}
                                 id="admin-password"
                                 type={showPassword ? 'text' : 'password'}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
+                                onPaste={(e) => { setTimeout(() => setPassword(e.target instanceof HTMLInputElement ? e.target.value : password), 0) }}
+                                onBlur={syncFromDOM}
                                 placeholder="••••••••"
                                 required
                                 autoComplete="current-password"
@@ -207,7 +224,8 @@ export default function AdminLoginPage() {
                     <button
                         type="submit"
                         className="admin-login-submit"
-                        disabled={isLoading || !email || !password}
+                        disabled={isLoading}
+                        onClick={syncFromDOM}
                     >
                         {isLoading ? (
                             <div className="admin-login-spinner" />
