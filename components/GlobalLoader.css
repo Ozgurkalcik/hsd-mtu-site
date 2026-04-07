@@ -1,0 +1,137 @@
+.global-loader-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background-color: #0c0d12;
+    /* İnce ızgara ve ortadan gelen kırmızımsı ışık (kırılma/bükülme efektini devasa göstermek için) */
+    background-image:
+        radial-gradient(ellipse at center, rgba(220, 38, 38, 0.08) 0%, transparent 60%),
+        linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+    background-size: 100% 100%, 40px 40px, 40px 40px;
+    background-position: center center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.global-loader-center {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ============================================
+   LOGO ATIMI (SENKRONİZE LUB-DUB)
+   ============================================ */
+.global-loader-logo-wrapper {
+    position: relative;
+    z-index: 10;
+    /* Döngü süresi 8 saniyeye çıkartıldı (Aşırı ağır ve asil) */
+    animation: logo-heartbeat 8s cubic-bezier(0.2, 0.4, 0.3, 1) infinite;
+}
+
+.global-loader-logo {
+    width: 220px;
+    height: auto;
+    object-fit: contain;
+}
+
+@keyframes logo-heartbeat {
+    0% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 10px rgba(220,38,38,0.2));
+    }
+    5% {
+        /* Birinci kalp atışı zirvesi (Lub) - 0.4s */
+        transform: scale(1.10);
+        filter: drop-shadow(0 0 40px rgba(220,38,38,0.9));
+    }
+    10% {
+        /* İki atış arası ağır dinlenme / gevşeme - 0.8s */
+        transform: scale(1.02);
+        filter: drop-shadow(0 0 20px rgba(220,38,38,0.5));
+    }
+    20% {
+        /* İkinci güçlü atış (Dub) zirvesi - 1.6s */
+        transform: scale(1.15);
+        filter: drop-shadow(0 0 60px rgba(220,38,38,1));
+    }
+    35% {
+        /* Yavaşça normale dönme - 2.8s */
+        transform: scale(1);
+        filter: drop-shadow(0 0 10px rgba(220,38,38,0.2));
+    }
+    100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 10px rgba(220,38,38,0.2));
+    }
+}
+
+/* ============================================
+   HEARTBEAT RIPPLES (HACİMLİ BÜKÜLME DALGALARI)
+   ============================================ */
+.ripple-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 2px;
+    z-index: 1;
+}
+
+.ripple {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    opacity: 0;
+
+    /* Dalganın gerçekçi ve hacimli görünmesi için gölgeler */
+    border: 2px solid rgba(220, 38, 38, 0.6);
+    box-shadow: 
+        0 0 40px rgba(220, 38, 38, 0.5),
+        inset 0 0 60px rgba(220, 38, 38, 0.3),
+        inset 0 0 120px rgba(220, 38, 38, 0.1);
+        
+    /* ARKA PLANI VE EKRANIN İÇİNİ BÜKEN EFEKT
+       (Izgarayı devasa bir su damlası gibi kırar) */
+    backdrop-filter: blur(12px) brightness(1.3) contrast(1.6) saturate(1.5);
+    -webkit-backdrop-filter: blur(12px) brightness(1.3) contrast(1.6) saturate(1.5);
+}
+
+.ripple-1 {
+    /* Birinci Dalga - Çok yavaş yayılan eğri */
+    animation: ripple-volume 8s cubic-bezier(0.15, 0.6, 0.35, 1) infinite;
+}
+
+.ripple-2 {
+    /* İkinci Dalga - Tam 1.2s bekleyip (Dub ile birlikte) çıkıyor */
+    animation: ripple-volume 8s cubic-bezier(0.15, 0.6, 0.35, 1) infinite;
+    animation-delay: 1.2s; 
+}
+
+@keyframes ripple-volume {
+    0% {
+        width: 150px; 
+        height: 150px;
+        opacity: 0.8;
+        border-width: 8px;
+    }
+    60% {
+        /* Ekranı kaplaması tam 4.8 saniye sürüyor! (Muazzam bir yavaşlık) */
+        width: 200vmax;
+        height: 200vmax;
+        opacity: 0;
+        border-width: 0px;
+    }
+    100% {
+        width: 200vmax;
+        height: 200vmax;
+        opacity: 0;
+    }
+}
