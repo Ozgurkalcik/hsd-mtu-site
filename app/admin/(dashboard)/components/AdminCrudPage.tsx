@@ -249,6 +249,9 @@ export default function AdminCrudPage({ config }: { config: CrudPageConfig }) {
         if (!deleteTarget) return
         setIsDeleting(true)
 
+        // Silinecek öğeyi bul
+        const itemToDelete = items.find(item => item.id === deleteTarget)
+
         const { error } = await supabase
             .from(config.tableName)
             .delete()
@@ -257,7 +260,28 @@ export default function AdminCrudPage({ config }: { config: CrudPageConfig }) {
         if (error) {
             setMessage({ type: 'error', text: 'Silme sırasında hata oluştu.' })
         } else {
-            setMessage({ type: 'success', text: `${config.singular} silindi.` })
+            // Veri başarıyla silindikten sonra, o verinin resimlerini storage'dan da sil.
+            if (itemToDelete) {
+                const imageFields = config.fields.filter(f => f.type === 'image')
+                for (const field of imageFields) {
+                    const imageUrl = itemToDelete[field.key] as string
+                    if (imageUrl && imageUrl.includes('/uploads/')) {
+                        // "https://[project].supabase.co/storage/v1/object/public/uploads/my-image.jpg" gibi bir URL bekliyoruz.
+                        const filePath = imageUrl.split('/uploads/')[1]
+                        if (filePath) {
+                            const { error: storageError } = await supabase.storage
+                                .from('uploads')
+                                .remove([filePath])
+                            
+                            if (storageError) {
+                                console.error('Storage deletion error:', storageError)
+                            }
+                        }
+                    }
+                }
+            }
+
+            setMessage({ type: 'success', text: `${config.singular} ve bağlı dosyalar silindi.` })
             fetchItems()
         }
 

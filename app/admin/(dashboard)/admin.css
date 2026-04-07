@@ -51,7 +51,7 @@
    ============================================ */
 .admin-shell {
     display: flex;
-    min-height: 100vh;
+    height: 100vh;
     background: var(--admin-bg);
     font-family: var(--font-sans);
     color: var(--admin-text-primary);
