@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 
 // --- Types ---
 interface MediumItem {
@@ -162,10 +163,14 @@ export default function Articles() {
                                 >
                                     {/* Image */}
                                     <div className="aspect-[1.6/1] w-full overflow-hidden relative">
-                                        <img
+                                        <Image
                                             src={imageUrl}
                                             alt={article.title}
-                                            className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
+                                            fill
+                                            sizes="(max-width: 768px) 100vw, 33vw"
+                                            unoptimized
+                                            className="object-cover transform group-hover:scale-105 transition-transform duration-700"
+                                            style={{ objectFit: 'cover' }}
                                         />
                                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
                                     </div>
@@ -173,8 +178,8 @@ export default function Articles() {
                                     {/* Content */}
                                     <div className="flex flex-col flex-1 p-6">
                                         <div className="flex items-center gap-2 mb-4">
-                                            <div className="w-6 h-6 rounded-full bg-gray-100 overflow-hidden ring-1 ring-gray-100">
-                                                <img src="/images/hsd-white-logo.jpg" alt={article.author} className="w-full h-full object-cover" />
+                                            <div className="w-6 h-6 rounded-full bg-gray-100 overflow-hidden ring-1 ring-gray-100 relative">
+                                                <Image src="/images/hsd-white-logo.jpg" alt={article.author} fill sizes="24px" className="object-cover" style={{ objectFit: 'cover' }} />
                                             </div>
                                             <span className="text-xs font-semibold text-gray-900 uppercase tracking-wide">{article.author}</span>
                                         </div>

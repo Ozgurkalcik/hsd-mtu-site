@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { motion, useMotionValue, useSpring, SpringOptions } from 'framer-motion';
+import Image from 'next/image';
 
 interface TiltedCardProps {
     imageSrc: string;
@@ -17,6 +18,7 @@ interface TiltedCardProps {
     displayOverlayContent?: boolean;
     className?: string;
     containerClassName?: string;
+    priority?: boolean;
 }
 
 const springValues: SpringOptions = {
@@ -40,7 +42,8 @@ export default function TiltedCard({
     overlayContent = null,
     displayOverlayContent = false,
     className = '',
-    containerClassName = ''
+    containerClassName = '',
+    priority = false
 }: TiltedCardProps) {
     const ref = useRef<HTMLElement>(null);
     const x = useMotionValue(0);
@@ -119,10 +122,14 @@ export default function TiltedCard({
                     scale
                 }}
             >
-                <motion.img
+                <Image
                     src={imageSrc}
                     alt={altText}
+                    fill
+                    sizes="(max-width: 768px) 100vw, 360px"
+                    priority={priority}
                     className="absolute top-0 left-0 object-cover rounded-[15px] will-change-transform [transform:translateZ(0)] w-full h-full"
+                    style={{ objectFit: 'cover' }}
                 />
 
                 {displayOverlayContent && overlayContent && (

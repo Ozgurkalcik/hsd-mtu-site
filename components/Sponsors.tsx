@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import StickerPeel from './StickerPeel/StickerPeel';
 import { createClient } from '@/shared/api/supabase';
 
@@ -115,11 +116,16 @@ export default function Sponsors() {
                                     rel="noopener noreferrer"
                                     className="flex flex-col items-center gap-6 group cursor-pointer transition-transform hover:scale-105 shrink-0 snap-center"
                                 >
-                                    <img
-                                        src={sponsor.logo_url}
-                                        alt={sponsor.name}
-                                        className="h-20 md:h-32 w-auto max-w-[200px] md:max-w-[280px] object-contain opacity-50 group-hover:opacity-100 transition-all duration-500 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)] group-hover:drop-shadow-[0_0_30px_rgba(255,255,255,0.3)] filter grayscale hover:grayscale-0"
-                                    />
+                                    <div className="relative h-20 md:h-32 w-[200px] md:w-[280px]">
+                                        <Image
+                                            src={sponsor.logo_url}
+                                            alt={sponsor.name}
+                                            fill
+                                            sizes="(max-width: 768px) 200px, 280px"
+                                            className="object-contain opacity-50 group-hover:opacity-100 transition-all duration-500 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)] group-hover:drop-shadow-[0_0_30px_rgba(255,255,255,0.3)] filter grayscale hover:grayscale-0"
+                                            style={{ objectFit: 'contain' }}
+                                        />
+                                    </div>
                                     <span className="text-gray-400 text-sm md:text-xl font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300 tracking-widest uppercase">
                                         {sponsor.name}
                                     </span>

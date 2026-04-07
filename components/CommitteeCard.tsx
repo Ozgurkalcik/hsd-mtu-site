@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 
 interface CommitteeCardProps {
     name: string;
@@ -16,12 +17,15 @@ export default function CommitteeCard({ name, role, imageSrc }: CommitteeCardPro
             {/* 2. Main Container (Hollow Glass Effect) */}
             <div className="relative h-full w-full rounded-2xl overflow-hidden bg-[#050505] ring-1 ring-white/10 group-hover:ring-[#FF3333]/40 group-hover:shadow-[0_0_25px_rgba(255,51,51,0.15)] transition-all duration-500">
 
-                {/* Image Layer - Removed grayscale and opacity constraints */}
+                {/* Image Layer */}
                 <div className="absolute inset-0 w-full h-full">
-                    <img
+                    <Image
                         src={imageSrc}
                         alt={name}
+                        fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                         className="absolute w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                        style={{ objectFit: 'cover' }}
                     />
                 </div>
 

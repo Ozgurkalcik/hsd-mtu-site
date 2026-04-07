@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'motion/react'
+import Image from 'next/image'
 
 interface PopupSettings {
     id: string
@@ -215,14 +216,14 @@ export default function SitePopup() {
                                             overflow: 'hidden',
                                         }}
                                     >
-                                        <img
+                                        <Image
                                             src={settings.image_url}
                                             alt={settings.title}
+                                            fill
+                                            sizes="320px"
+                                            priority
                                             style={{
-                                                width: '100%',
-                                                height: '100%',
                                                 objectFit: 'cover',
-                                                display: 'block',
                                                 filter: 'brightness(0.85) contrast(1.08)',
                                             }}
                                         />

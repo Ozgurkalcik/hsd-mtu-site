@@ -60,7 +60,7 @@ export default function Team() {
     }, []);
 
     return (
-        <section id="ekibimiz" className="relative w-full min-h-screen bg-black overflow-hidden flex flex-col py-24">
+        <section id="ekibimiz" className="relative w-full min-h-screen bg-black flex flex-col py-24">
             {/* Background - WebGL Line Waves with Interaction */}
             <div className="absolute inset-0 w-full h-full z-0 pointer-events-auto">
                 <LineWaves
@@ -120,6 +120,7 @@ export default function Team() {
                                 showMobileWarning={false}
                                 showTooltip={false}
                                 displayOverlayContent={true}
+                                priority={index < 2}
                                 containerClassName="bg-neutral-900/30 backdrop-blur-sm border border-white/5 rounded-[15px]"
                                 overlayContent={
                                     <div className="absolute inset-0 w-full h-full flex flex-col justify-end p-6 bg-gradient-to-t from-black/90 via-black/40 to-transparent rounded-[15px] overflow-hidden">
@@ -177,7 +178,7 @@ export default function Team() {
             </div>
 
             {/* Committee Chairs Section */}
-            <div className="relative z-10 w-full mt-16 py-12 overflow-hidden">
+            <div className="relative z-10 w-full mt-16 py-12">
                 {/* Visual Separator */}
                 <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
 
@@ -228,7 +229,7 @@ export default function Team() {
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
                         transition={{ delay: 0.6 }}
-                        className="flex justify-center mt-16"
+                        className="flex justify-center mt-16 pb-4"
                     >
                         <Link href="/ekip">
                             <SeeAllButton />
