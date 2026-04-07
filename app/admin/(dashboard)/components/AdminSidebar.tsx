@@ -56,20 +56,39 @@ export default function AdminSidebar() {
     const [isCollapsed, setIsCollapsed] = useState(false)
     const [isMobileOpen, setIsMobileOpen] = useState(false)
     const [isLoggingOut, setIsLoggingOut] = useState(false)
+    const [isNavigating, setIsNavigating] = useState(false)
+    const [navigatingTo, setNavigatingTo] = useState<string | null>(null)
 
-    // Sayfa değişince mobil menüyü kapat
+    // Sayfa değişince yükleme durumunu sıfırla
     useEffect(() => {
         setIsMobileOpen(false)
+        setIsNavigating(false)
+        setNavigatingTo(null)
+        document.body.style.cursor = ''
     }, [pathname])
+
+    // Navigasyon sırasında cursor'u progress olarak değiştir
+    useEffect(() => {
+        document.body.style.cursor = isNavigating ? 'progress' : ''
+        return () => { document.body.style.cursor = '' }
+    }, [isNavigating])
 
     const handleLogout = async () => {
         setIsLoggingOut(true)
+        document.body.style.cursor = 'progress'
         const supabase = createBrowserClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
         )
         await supabase.auth.signOut()
         router.replace('/admin/login')
+    }
+
+    const handleNavigation = (href: string) => {
+        if (pathname === href) return
+        setIsNavigating(true)
+        setNavigatingTo(href)
+        router.push(href)
     }
 
     const isActive = (href: string) => {
@@ -79,6 +98,32 @@ export default function AdminSidebar() {
 
     return (
         <>
+            {/* ── Navigasyon Progress Bar ── */}
+            <AnimatePresence>
+                {isNavigating && (
+                    <motion.div
+                        initial={{ scaleX: 0, opacity: 1 }}
+                        animate={{ scaleX: 0.85 }}
+                        exit={{ scaleX: 1, opacity: 0 }}
+                        transition={{
+                            scaleX: { duration: 1.5, ease: [0.1, 0.4, 0.6, 1] },
+                            opacity: { duration: 0.3, delay: 0.1 }
+                        }}
+                        style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: '2px',
+                            background: 'linear-gradient(90deg, #dc2626, #ef4444, #f87171)',
+                            transformOrigin: 'left center',
+                            zIndex: 999999,
+                            boxShadow: '0 0 8px rgba(220, 38, 38, 0.6)',
+                        }}
+                    />
+                )}
+            </AnimatePresence>
+
             {/* ── Mobil Topbar ── */}
             <header className="admin-topbar">
                 <div className="admin-topbar-brand">
@@ -165,9 +210,10 @@ export default function AdminSidebar() {
                     {NAV_ITEMS.map((item) => (
                         <button
                             key={item.href}
-                            className={`admin-sidebar-link ${isActive(item.href) ? 'admin-sidebar-link--active' : ''}`}
-                            onClick={() => router.push(item.href)}
+                            className={`admin-sidebar-link ${isActive(item.href) ? 'admin-sidebar-link--active' : ''} ${navigatingTo === item.href ? 'admin-sidebar-link--loading' : ''}`}
+                            onClick={() => handleNavigation(item.href)}
                             title={isCollapsed ? item.label : undefined}
+                            disabled={isNavigating && navigatingTo !== item.href}
                         >
                             <NavIcon icon={item.icon} />
                             <AnimatePresence mode="wait">
