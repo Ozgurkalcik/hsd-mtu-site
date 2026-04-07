@@ -13,7 +13,7 @@ export default function Gallery() {
             .select('id, title, image_url, display_order')
             .eq('is_active', true)
             .order('display_order', { ascending: true })
-            .then(({ data }) => {
+            .then(({ data }: { data: any[] | null }) => {
                 if (data && data.length > 0) {
                     setImages(data.map(item => ({
                         src: item.image_url,

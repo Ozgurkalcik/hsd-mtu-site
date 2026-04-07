@@ -82,7 +82,7 @@ export default function SitePopup() {
             .select('*')
             .limit(1)
             .single()
-            .then(({ data }) => {
+            .then(({ data }: { data: any | null }) => {
                 if (!data || !data.is_active) return
                 const s = data as PopupSettings
                 setSettings(s)

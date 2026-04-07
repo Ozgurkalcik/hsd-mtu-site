@@ -38,7 +38,7 @@ export default function Announcements() {
             .eq('is_active', true)
             .order('created_at', { ascending: false })
             .limit(10)
-            .then(({ data }) => {
+            .then(({ data }: { data: any[] | null }) => {
                 if (data && data.length > 0) {
                     setAnnouncements(data.map((item, i) => ({
                         ...item,

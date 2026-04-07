@@ -110,7 +110,7 @@ export default function Events() {
             .eq('is_active', true)
             .order('event_date', { ascending: false })
             .limit(4)
-            .then(({ data, error }) => {
+            .then(({ data, error }: { data: any[] | null, error: any }) => {
                 if (error) {
                     console.error('[Events] Supabase fetch error:', error);
                     return;
