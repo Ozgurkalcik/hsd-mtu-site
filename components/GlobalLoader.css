@@ -5,16 +5,37 @@
     /* İlk SSR yüklemesinde arka sayfanın görünmesini engellemek için
        Shader'ın arka plan rengiyle aynı sabit renk (#030306) atandı */
     background-color: #030306;
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: -ms-flexbox;
     display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    -ms-flex-align: center;
     align-items: center;
+    -webkit-box-pack: center;
+    -webkit-justify-content: center;
+    -ms-flex-pack: center;
     justify-content: center;
     overflow: hidden;
+    /* Hardware acceleration */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
 }
 
 .global-loader-center {
     position: relative;
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: -ms-flexbox;
     display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    -ms-flex-align: center;
     align-items: center;
+    -webkit-box-pack: center;
+    -webkit-justify-content: center;
+    -ms-flex-pack: center;
     justify-content: center;
     /* Shader arkada, logo önde */
     z-index: 10; 
@@ -26,13 +47,59 @@
 .global-loader-logo-wrapper {
     position: relative;
     /* Döngü süresi 8 saniye (Aşırı ağır ve asil) */
+    -webkit-animation: logo-heartbeat 8s cubic-bezier(0.2, 0.4, 0.3, 1) infinite;
     animation: logo-heartbeat 8s cubic-bezier(0.2, 0.4, 0.3, 1) infinite;
+    /* Performans için GPU'ya devret */
+    will-change: transform, filter;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
 }
 
 .global-loader-logo {
     width: 220px;
     height: auto;
     object-fit: contain;
+    /* Mac Safari object-fit bug'ına karşı koruma */
+    font-family: 'object-fit: contain;';
+}
+
+/* Mobil için optimizasyon (Logo fazla büyük olmasın) */
+@media (max-width: 768px) {
+    .global-loader-logo {
+        width: 160px;
+    }
+}
+
+/* Animasyon Keyframes: Safari ve Standart */
+@-webkit-keyframes logo-heartbeat {
+    0% {
+        -webkit-transform: scale(1);
+        -webkit-filter: drop-shadow(0 0 10px rgba(220,38,38,0.2));
+    }
+    5% {
+        /* Birinci kalp atışı zirvesi (Lub) - 0.4s */
+        -webkit-transform: scale(1.10);
+        -webkit-filter: drop-shadow(0 0 40px rgba(220,38,38,0.9));
+    }
+    10% {
+        /* İki atış arası ağır dinlenme / gevşeme - 0.8s */
+        -webkit-transform: scale(1.02);
+        -webkit-filter: drop-shadow(0 0 20px rgba(220,38,38,0.5));
+    }
+    20% {
+        /* İkinci güçlü atış (Dub) zirvesi - 1.6s */
+        -webkit-transform: scale(1.15);
+        -webkit-filter: drop-shadow(0 0 60px rgba(220,38,38,1));
+    }
+    35% {
+        /* Yavaşça normale dönme - 2.8s */
+        -webkit-transform: scale(1);
+        -webkit-filter: drop-shadow(0 0 10px rgba(220,38,38,0.2));
+    }
+    100% {
+        -webkit-transform: scale(1);
+        -webkit-filter: drop-shadow(0 0 10px rgba(220,38,38,0.2));
+    }
 }
 
 @keyframes logo-heartbeat {
