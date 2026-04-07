@@ -57,6 +57,7 @@ export default function Sponsors() {
                         shadowIntensity={0.7}
                         lightingIntensity={0.15}
                         initialPosition={{ x: 1200, y: 50 }}
+                        className="hidden md:block" // Mobilde gizle
                     />
                     {/* Sol alt */}
                     <StickerPeel
@@ -79,6 +80,7 @@ export default function Sponsors() {
                         shadowIntensity={0.75}
                         lightingIntensity={0.2}
                         initialPosition={{ x: 1180, y: 660 }}
+                        className="hidden md:block" // Mobilde gizle
                     />
                 </div>
             </div>
