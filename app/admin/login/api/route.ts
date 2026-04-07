@@ -24,7 +24,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Geçersiz email formatı.' }, { status: 400 })
     }
 
-    let response = NextResponse.json({ success: true })
+    const response = NextResponse.json({ success: true })
 
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,

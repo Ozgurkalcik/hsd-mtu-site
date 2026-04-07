@@ -1,0 +1,161 @@
+/Users/mustafazahter/Desktop/hsd-mtu-site/app/admin/(dashboard)/components/AdminSidebar.tsx
+  62:9 react-hooks/set-state-in-effect - Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/mustafazahter/Desktop/hsd-mtu-site/app/admin/(dashboard)/components/AdminSidebar.tsx:62:9
+  60 |     // Sayfa değişince mobil menüyü kapat
+  61 |     useEffect(() => {
+> 62 |         setIsMobileOpen(false)
+     |         ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  63 |     }, [pathname])
+  64 |
+  65 |     const handleLogout = async () => {
+/Users/mustafazahter/Desktop/hsd-mtu-site/app/admin/(dashboard)/yazilar/page.tsx
+  38:9 react-hooks/set-state-in-effect - Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/mustafazahter/Desktop/hsd-mtu-site/app/admin/(dashboard)/yazilar/page.tsx:38:9
+  36 |
+  37 |     useEffect(() => {
+> 38 |         fetchSettings()
+     |         ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  39 |     }, [fetchSettings])
+  40 |
+  41 |     const handleSave = async () => {
+/Users/mustafazahter/Desktop/hsd-mtu-site/app/admin/login/api/route.ts
+  27:9 prefer-const - 'response' is never reassigned. Use 'const' instead.
+/Users/mustafazahter/Desktop/hsd-mtu-site/app/ekip/page.tsx
+  41:38 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  43:53 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  51:62 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  55:62 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  58:49 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+/Users/mustafazahter/Desktop/hsd-mtu-site/components/Announcements.tsx
+  41:38 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  289:91 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  289:176 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+/Users/mustafazahter/Desktop/hsd-mtu-site/components/DomeGallery/DomeGallery.tsx
+  378:26 prefer-const - 'vMagX' is never reassigned. Use 'const' instead.
+  378:33 prefer-const - 'vMagY' is never reassigned. Use 'const' instead.
+  454:22 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  573:30 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  650:34 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  702:40 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  703:40 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  704:48 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  705:41 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  706:44 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  707:42 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  725:58 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  726:58 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  727:61 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  728:61 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+/Users/mustafazahter/Desktop/hsd-mtu-site/components/Events.tsx
+  84:155 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  113:45 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  113:66 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+/Users/mustafazahter/Desktop/hsd-mtu-site/components/FaultyTerminal/FaultyTerminal.tsx
+  277:42 react-hooks/purity - Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+/Users/mustafazahter/Desktop/hsd-mtu-site/components/FaultyTerminal/FaultyTerminal.tsx:277:42
+  275 |     const rafRef = useRef<number>(0);
+  276 |     const loadAnimationStartRef = useRef<number>(0);
+> 277 |     const timeOffsetRef = useRef<number>(Math.random() * 100);
+      |                                          ^^^^^^^^^^^^^ Cannot call impure function
+  278 |
+  279 |     const isFrozen = useFrozen();
+  280 |
+/Users/mustafazahter/Desktop/hsd-mtu-site/components/Gallery.tsx
+  16:38 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+/Users/mustafazahter/Desktop/hsd-mtu-site/components/GradualBlur/GradualBlur.tsx
+  114:36 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  127:36 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  132:20 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  135:40 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  135:75 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  136:45 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  136:80 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  137:46 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  137:82 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  145:42 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  258:83 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  290:21 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  291:21 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+/Users/mustafazahter/Desktop/hsd-mtu-site/components/LineWaves.tsx
+  188:9 prefer-const - 'program' is never reassigned. Use 'const' instead.
+  189:9 prefer-const - 'currentMouse' is never reassigned. Use 'const' instead.
+/Users/mustafazahter/Desktop/hsd-mtu-site/components/LogoLoop/LogoLoop.tsx
+  76:31 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  80:35 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  81:35 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  82:37 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+/Users/mustafazahter/Desktop/hsd-mtu-site/components/SitePopup.tsx
+  85:38 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+/Users/mustafazahter/Desktop/hsd-mtu-site/components/SplashCursor/SplashCursor.tsx
+  91:13 prefer-const - 'pointers' is never reassigned. Use 'const' instead.
+  93:13 prefer-const - 'config' is never reassigned. Use 'const' instead.
+  156:47 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  158:29 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  159:27 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  160:26 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  287:17 prefer-const - 'uniforms' is never reassigned. Use 'const' instead.
+  864:17 prefer-const - 'aspect' is never reassigned. Use 'const' instead.
+/Users/mustafazahter/Desktop/hsd-mtu-site/components/SplitText.tsx
+  46:13 react-hooks/set-state-in-effect - Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/mustafazahter/Desktop/hsd-mtu-site/components/SplitText.tsx:46:13
+  44 |     useEffect(() => {
+  45 |         if (document.fonts.status === 'loaded') {
+> 46 |             setFontsLoaded(true);
+     |             ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  47 |         } else {
+  48 |             document.fonts.ready.then(() => {
+  49 |                 setFontsLoaded(true);
+/Users/mustafazahter/Desktop/hsd-mtu-site/components/Sponsors.tsx
+  24:38 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+/Users/mustafazahter/Desktop/hsd-mtu-site/components/TargetCursor/TargetCursor.tsx
+  41:81 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+/Users/mustafazahter/Desktop/hsd-mtu-site/components/Team.tsx
+  39:38 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  41:49 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  51:63 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  53:67 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+  54:70 @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type.
+/Users/mustafazahter/Desktop/hsd-mtu-site/components/hero/Hero.tsx
+  18:5 react-hooks/set-state-in-effect - Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/mustafazahter/Desktop/hsd-mtu-site/components/hero/Hero.tsx:18:5
+  16 |
+  17 |   useEffect(() => {
+> 18 |     setIsLoaded(true);
+     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  19 |
+  20 |     // Generate 20 particles scattered randomly across screen (optimized for performance)
+  21 |     const generatedParticles = Array.from({ length: 20 }).map((_, i) => {
+/Users/mustafazahter/Desktop/hsd-mtu-site/middleware.ts
+  75:13 prefer-const - 'response' is never reassigned. Use 'const' instead.
+  116:9 prefer-const - 'response' is never reassigned. Use 'const' instead.

@@ -71,7 +71,7 @@ export const LogoLoop = React.memo<LogoLoopProps>(
 
             const isNodeItem = 'node' in item;
             const content = isNodeItem ? (
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                 
                 <span className="logoloop__node" aria-hidden={!!item.href && !item.ariaLabel}>
                     {(item as any).node}
                 </span>

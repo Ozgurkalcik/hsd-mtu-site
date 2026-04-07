@@ -72,7 +72,7 @@ export async function middleware(request: NextRequest) {
         }
 
         // Login sayfasına auth'lu kullanıcı gelirse dashboard'a yönlendir
-        let response = NextResponse.next()
+        const response = NextResponse.next()
 
         const supabase = createServerClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -113,7 +113,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // /admin/* (login hariç) → Auth kontrolü
-    let response = NextResponse.next()
+    const response = NextResponse.next()
 
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
