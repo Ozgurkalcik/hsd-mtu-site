@@ -92,11 +92,17 @@ export default function Hero() {
         </p>
 
         <div className={styles.ctaContainer}>
-          <button className={`${styles.ctaButton} ${styles.primary}`}>
+          <button
+            className={`${styles.ctaButton} ${styles.primary}`}
+            onClick={() => document.getElementById('iletisim')?.scrollIntoView({ behavior: 'smooth' })}
+          >
             <span className={styles.buttonText}>Topluluğa Katıl</span>
             <span className={styles.buttonGlow} />
           </button>
-          <button className={`${styles.ctaButton} ${styles.secondary}`}>
+          <button
+            className={`${styles.ctaButton} ${styles.secondary}`}
+            onClick={() => document.getElementById('hakkimizda')?.scrollIntoView({ behavior: 'smooth' })}
+          >
             <span className={styles.buttonText}>Keşfet</span>
           </button>
         </div>

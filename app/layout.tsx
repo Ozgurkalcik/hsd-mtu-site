@@ -70,10 +70,6 @@ export const metadata: Metadata = {
     images: ["/images/hsd-logo.png"],
     creator: "@hsdmtu",
   },
-  icons: {
-    icon: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
-  },
   alternates: {
     canonical: "https://hsdmtu.vercel.app",
   },
