@@ -231,7 +231,7 @@ export default function AdminLoginPage() {
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.5 }}
                 >
-                    HSD Malatya Turgut Özal Topluluğu © 2024
+                    HSD Malatya Turgut Özal Topluluğu © 2026 - MZ
                 </motion.p>
             </motion.div>
         </div>
