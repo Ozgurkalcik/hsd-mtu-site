@@ -177,10 +177,11 @@ export default function GlobalLoader() {
                                 <Image
                                     src="/images/hsd-logo-white.png"
                                     alt="HSD Logo"
-                                    width={220}
-                                    height={220}
+                                    width={400}
+                                    height={200}
                                     priority
                                     className="global-loader-logo"
+                                    style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
                                 />
                             </div>
                         </div>

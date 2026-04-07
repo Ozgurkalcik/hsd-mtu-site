@@ -44,8 +44,12 @@
 /* ============================================
    LOGO ATIMI (SENKRONİZE LUB-DUB)
    ============================================ */
+/* Logonun sarmalayıcısı genişliği belirler */
 .global-loader-logo-wrapper {
     position: relative;
+    width: 220px;
+    display: flex;
+    justify-content: center;
     /* Döngü süresi 8 saniye (Aşırı ağır ve asil) */
     -webkit-animation: logo-heartbeat 8s cubic-bezier(0.2, 0.4, 0.3, 1) infinite;
     animation: logo-heartbeat 8s cubic-bezier(0.2, 0.4, 0.3, 1) infinite;
@@ -56,8 +60,9 @@
 }
 
 .global-loader-logo {
-    width: 220px;
-    height: auto;
+    /* Genişliği wrapper'a (100%) göre al, Next.js Image uyarılarını önler */
+    width: 100% !important;
+    height: auto !important;
     object-fit: contain;
     /* Mac Safari object-fit bug'ına karşı koruma */
     font-family: 'object-fit: contain;';
@@ -65,9 +70,8 @@
 
 /* Mobil için optimizasyon (Logo fazla büyük olmasın) */
 @media (max-width: 768px) {
-    .global-loader-logo {
+    .global-loader-logo-wrapper {
         width: 160px;
-        height: auto;
     }
 }
 
