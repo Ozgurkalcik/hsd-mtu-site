@@ -67,6 +67,7 @@
 @media (max-width: 768px) {
     .global-loader-logo {
         width: 160px;
+        height: auto;
     }
 }
 
