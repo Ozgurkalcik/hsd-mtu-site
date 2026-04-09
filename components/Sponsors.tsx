@@ -103,9 +103,9 @@ function SponsorPanel({ sponsor, index }: { sponsor: Sponsor; index: number }) {
                             style={{
                                 objectFit: 'contain',
                                 filter: hovered
-                                    ? 'brightness(2.2) drop-shadow(0 0 20px rgba(255,51,51,0.25))'
-                                    : 'brightness(1.3)',
-                                opacity: hovered ? 1 : 0.6,
+                                    ? 'brightness(2) drop-shadow(0 0 20px rgba(255,51,51,0.25))'
+                                    : 'brightness(1.8)',
+                                opacity: hovered ? 1 : 0.85,
                                 transition: 'filter 0.5s ease, opacity 0.5s ease',
                             }}
                         />
@@ -181,7 +181,7 @@ export default function Sponsors() {
     }, []);
 
     return (
-        <section id="sponsorlar" className="relative w-full min-h-screen bg-black flex flex-col justify-center overflow-hidden">
+        <section id="sponsorlar" className="relative w-full min-h-screen bg-black flex flex-col justify-center py-24 overflow-hidden">
             {/* Arka Plan Işıma Efekti (Radiation) */}
             <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
                 {/* Üst süzülme */}
@@ -192,21 +192,21 @@ export default function Sponsors() {
                 <div className="absolute left-0 inset-y-0 w-[30vw] bg-gradient-to-r from-[#FF0000]/10 to-transparent opacity-40" />
                 {/* Sağ süzülme */}
                 <div className="absolute right-0 inset-y-0 w-[30vw] bg-gradient-to-l from-[#FF0000]/10 to-transparent opacity-40" />
-                
+
                 {/* Dinamik parlamalar (radyal) */}
-                <div 
-                    className="absolute top-1/4 -left-1/4 w-[60vw] h-[60vw] blur-[120px] rounded-full animate-pulse opacity-30" 
-                    style={{ 
+                <div
+                    className="absolute top-1/4 -left-1/4 w-[60vw] h-[60vw] blur-[120px] rounded-full animate-pulse opacity-30"
+                    style={{
                         animationDuration: '8s',
                         background: 'radial-gradient(circle, rgba(255,0,0,0.05) 0%, transparent 70%)'
-                    }} 
+                    }}
                 />
-                <div 
-                    className="absolute bottom-1/4 -right-1/4 w-[60vw] h-[60vw] blur-[120px] rounded-full animate-pulse opacity-30" 
-                    style={{ 
+                <div
+                    className="absolute bottom-1/4 -right-1/4 w-[60vw] h-[60vw] blur-[120px] rounded-full animate-pulse opacity-30"
+                    style={{
                         animationDuration: '10s',
                         background: 'radial-gradient(circle, rgba(255,0,0,0.05) 0%, transparent 70%)'
-                    }} 
+                    }}
                 />
             </div>
 

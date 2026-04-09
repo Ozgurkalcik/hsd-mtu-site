@@ -232,20 +232,20 @@ export default function Announcements() {
 
                             {/* Left Side: Visuals (Mobile: Top) */}
                             <div className="relative h-48 md:h-auto md:w-2/5 overflow-hidden flex-shrink-0">
-                                    <div className={`absolute inset-0 bg-gradient-to-br ${selectedAnnouncement.color} opacity-20`} />
+                                    <div className={`absolute inset-0 bg-gradient-to-br ${selectedAnnouncement.color} opacity-40`} />
                                     <div className="absolute inset-0 flex items-center justify-center p-8">
                                         <div className="relative w-full h-full opacity-100">
                                             <Image
                                                 src="/assets/image/hsd-logo-white.png"
                                                 alt="HSD Logo"
                                                 fill
-                                                className="object-contain"
+                                                style={{ filter: 'brightness(1.2) contrast(1.1)' }}
                                             />
                                         </div>
                                     </div>
                                     {/* Decorative Circles */}
-                                    <div className={`absolute -top-10 -left-10 w-40 h-40 rounded-full bg-gradient-to-br ${selectedAnnouncement.color} blur-2xl opacity-40`} />
-                                    <div className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full bg-gradient-to-br ${selectedAnnouncement.color} blur-2xl opacity-40`} />
+                                    <div className={`absolute -top-10 -left-10 w-40 h-40 rounded-full bg-gradient-to-br ${selectedAnnouncement.color} blur-2xl opacity-60`} />
+                                    <div className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full bg-gradient-to-br ${selectedAnnouncement.color} blur-2xl opacity-60`} />
                                 </div>
 
                                 {/* Right Side: Content */}

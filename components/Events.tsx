@@ -239,7 +239,7 @@ export default function Events() {
                                 <div className="h-full flex flex-col p-6 justify-end relative">
                                     {/* Background Image for ALL cards */}
                                     <div
-                                        className="absolute inset-0 bg-cover bg-center opacity-60 transition-transform duration-700 group-hover:scale-110"
+                                        className="absolute inset-0 bg-cover bg-center opacity-80 transition-transform duration-700 group-hover:scale-110"
                                         style={{ backgroundImage: `url(${event.image})` }}
                                     />
                                     <div className="absolute inset-0 bg-gradient-to-t from-[#0f0202]/90 via-[#0f0202]/40 to-transparent" />

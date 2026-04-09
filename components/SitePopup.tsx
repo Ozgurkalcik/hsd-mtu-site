@@ -237,7 +237,7 @@ export default function SitePopup() {
                                             priority
                                             style={{
                                                 objectFit: 'cover',
-                                                filter: 'brightness(0.85) contrast(1.08)',
+                                                filter: 'brightness(1.15) contrast(1.1)',
                                             }}
                                         />
                                         {/* İç kenar gölgesi — sağa doğru yumuşak geçiş */}
