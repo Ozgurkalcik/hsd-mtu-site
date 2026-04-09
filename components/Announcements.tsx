@@ -6,6 +6,7 @@ import { motion, useAnimationFrame, useMotionValue, useTransform, wrap, AnimateP
 import { useRef, useState, useEffect } from "react";
 import SplashCursor from "@/components/SplashCursor/SplashCursor";
 import { createClient } from "@/shared/api/supabase";
+import { useFrozen } from "@/components/FrozenSection";
 
 const COLOR_PALETTE = [
     "from-rose-500 to-red-600",
@@ -289,9 +290,10 @@ export default function Announcements() {
 function CarouselContent({ x, isHovered, isDragging, isModalOpen, onSelect, items }: { x: any, isHovered: boolean, isDragging: boolean, isModalOpen: boolean, onSelect: (item: any) => void, items: Announcement[] }) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [contentWidth, setContentWidth] = useState(0);
+    const isFrozen = useFrozen();
 
     useAnimationFrame((t, delta) => {
-        if (!containerRef.current) return;
+        if (!containerRef.current || isFrozen) return;
 
         // Measure width once or if 0
         if (contentWidth === 0) {

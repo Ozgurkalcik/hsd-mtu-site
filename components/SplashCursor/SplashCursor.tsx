@@ -72,6 +72,7 @@ export default function SplashCursor({
     const containerRef = useRef<HTMLDivElement>(null);
     const animationFrameId = useRef<number | null>(null);
     const isPausedRef = useRef<boolean>(true);
+    const lastSplatTime = useRef<number>(0);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -82,7 +83,13 @@ export default function SplashCursor({
         const observer = new IntersectionObserver(
             (entries) => {
                 entries.forEach((entry) => {
+                    const wasPaused = isPausedRef.current;
                     isPausedRef.current = !entry.isIntersecting;
+                    if (wasPaused && !isPausedRef.current) {
+                        // Restart loop when becoming visible
+                        lastUpdateTime = Date.now();
+                        updateFrame();
+                    }
                 });
             },
             { threshold: 0.1 }
@@ -106,6 +113,17 @@ export default function SplashCursor({
             PAUSED: false,
             BACK_COLOR,
             TRANSPARENT
+        };
+
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const effectiveIterations = isMobile ? Math.min(config.PRESSURE_ITERATIONS, 8) : config.PRESSURE_ITERATIONS;
+
+        const splatThrottle = (callback: () => void) => {
+            const now = Date.now();
+            if (now - lastSplatTime.current > 32) { // Max ~30 splats per second
+                callback();
+                lastSplatTime.current = now;
+            }
         };
 
         const { gl, ext } = getWebGLContext(canvas);
@@ -882,14 +900,15 @@ export default function SplashCursor({
         let colorUpdateTimer = 0.0;
 
         function updateFrame() {
-            if (!isPausedRef.current) {
-                const dt = calcDeltaTime();
-                if (resizeCanvas()) initFramebuffers();
-                updateColors(dt);
-                applyInputs();
-                step(dt);
-                render(null);
-            }
+            if (isPausedRef.current) return;
+
+            const dt = calcDeltaTime();
+            if (resizeCanvas()) initFramebuffers();
+            updateColors(dt);
+            applyInputs();
+            step(dt);
+            render(null);
+            
             animationFrameId.current = requestAnimationFrame(updateFrame);
         }
 
@@ -989,7 +1008,7 @@ export default function SplashCursor({
             if (pressureProgram.uniforms.uDivergence) {
                 gl.uniform1i(pressureProgram.uniforms.uDivergence, divergence.attach(0));
             }
-            for (let i = 0; i < config.PRESSURE_ITERATIONS; i++) {
+            for (let i = 0; i < effectiveIterations; i++) {
                 if (pressureProgram.uniforms.uPressure) {
                     gl.uniform1i(pressureProgram.uniforms.uPressure, pressure.read.attach(1));
                 }
@@ -1238,7 +1257,7 @@ export default function SplashCursor({
             const pointer = pointers[0];
             const { x, y } = getMousePos(e);
             updatePointerDownData(pointer, -1, x, y);
-            clickSplat(pointer);
+            splatThrottle(() => clickSplat(pointer));
         }
         function handleMouseMove(e: MouseEvent) {
             const pointer = pointers[0];
@@ -1252,8 +1271,8 @@ export default function SplashCursor({
             const pointer = pointers[0];
             for (let i = 0; i < touches.length; i++) {
                 const { x, y } = getMousePos(touches[i]);
-                updateFrame();
                 updatePointerDownData(pointer, touches[i].identifier, x, y);
+                splatThrottle(() => clickSplat(pointer));
             }
         }
 
