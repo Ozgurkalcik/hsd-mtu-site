@@ -104,6 +104,18 @@ export default function SitePopup() {
             })
     }, [])
 
+    // Body scroll lock
+    useEffect(() => {
+        if (isVisible) {
+            document.body.style.overflow = 'hidden'
+        } else {
+            document.body.style.overflow = 'unset'
+        }
+        return () => {
+            document.body.style.overflow = 'unset'
+        }
+    }, [isVisible])
+
     const handleClose = () => {
         setIsVisible(false)
         if (settings?.display_mode === 'once') {
@@ -198,6 +210,7 @@ export default function SitePopup() {
                                     display: 'flex',
                                     flexDirection: hasImage ? 'row' : 'column',
                                     minHeight: hasImage ? '340px' : 'auto',
+                                    maxHeight: '90vh',
                                 }}
                             >
                                 <NoiseLayer />
@@ -247,7 +260,10 @@ export default function SitePopup() {
                                     gap: '0',
                                     position: 'relative',
                                     zIndex: 4,
-                                }}>
+                                    overflowY: 'auto',
+                                }}
+                                className="custom-scrollbar"
+                            >
 
                                     {/* Kapat */}
                                     <motion.button

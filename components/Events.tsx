@@ -136,6 +136,18 @@ export default function Events() {
             });
     }, []);
 
+    // Body scroll lock
+    useEffect(() => {
+        if (selectedEvent) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [selectedEvent]);
+
     return (
         <section id="etkinlikler" className="relative min-h-screen flex flex-col items-center justify-center py-24 overflow-hidden bg-black">
             {/* Background */}
@@ -300,14 +312,14 @@ export default function Events() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setSelectedEvent(null)}
-                            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+                            className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4"
                         >
                             <motion.div
                                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
                                 onClick={(e) => e.stopPropagation()}
-                                className="bg-[#0a0a0a] border border-white/10 rounded-[2rem] overflow-hidden max-w-3xl w-full shadow-2xl relative"
+                                className="bg-[#0a0a0a] border border-white/10 rounded-[2rem] overflow-y-auto max-w-3xl w-full max-h-[90vh] shadow-2xl relative custom-scrollbar"
                             >
                                 {/* Header Image/Gradient */}
                                 <div className="h-64 w-full relative overflow-hidden">

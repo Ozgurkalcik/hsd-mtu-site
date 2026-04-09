@@ -50,6 +50,18 @@ export default function Announcements() {
             });
     }, []);
 
+    // Body scroll lock
+    useEffect(() => {
+        if (selectedAnnouncement) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [selectedAnnouncement]);
+
     // We use a motion value for x position
     const x = useMotionValue(0);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -105,7 +117,7 @@ export default function Announcements() {
     // Let's try to use a percentage-based translation on the div.
 
     return (
-        <section id="duyurular" className="relative py-24 bg-black overflow-hidden z-10">
+        <section id="duyurular" className="relative py-24 bg-black overflow-hidden">
             {/* SplashCursor Effect - Scoped to Announcements Section */}
             <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-5">
                 <SplashCursor />
@@ -197,7 +209,7 @@ export default function Announcements() {
             {/* Detail Modal */}
             <AnimatePresence>
                 {selectedAnnouncement && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8">
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-8">
                         {/* Backdrop */}
                         <motion.div
                             initial={{ opacity: 0 }}
@@ -213,16 +225,13 @@ export default function Announcements() {
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.9, y: 20 }}
                             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                            className="relative w-full max-w-4xl bg-gray-900/80 border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl z-10"
+                            className="relative w-full max-w-4xl max-h-[90vh] bg-gray-900/80 border border-white/10 rounded-[2.5rem] overflow-y-auto custom-scrollbar shadow-2xl z-10 flex flex-col md:flex-row"
                         >
                             {/* Ambient Glow */}
-                            <div className={`absolute -inset-full bg-gradient-to-br ${selectedAnnouncement.color} opacity-20 blur-3xl pointer-events-none`} />
+                            <div className={`absolute inset-0 bg-gradient-to-br ${selectedAnnouncement.color} opacity-20 blur-3xl pointer-events-none`} />
 
-                            {/* Content Container */}
-                            <div className="relative flex flex-col md:flex-row h-full">
-
-                                {/* Left Side: Visuals (Mobile: Top) */}
-                                <div className="relative h-48 md:h-auto md:w-2/5 overflow-hidden">
+                            {/* Left Side: Visuals (Mobile: Top) */}
+                            <div className="relative h-48 md:h-auto md:w-2/5 overflow-hidden flex-shrink-0">
                                     <div className={`absolute inset-0 bg-gradient-to-br ${selectedAnnouncement.color} opacity-20`} />
                                     <div className="absolute inset-0 flex items-center justify-center p-8">
                                         <div className="relative w-full h-full opacity-100">
@@ -240,7 +249,7 @@ export default function Announcements() {
                                 </div>
 
                                 {/* Right Side: Content */}
-                                <div className="relative flex-1 p-8 md:p-12 flex flex-col bg-black/40 backdrop-blur-sm">
+                                <div className="relative md:flex-1 p-8 md:p-12 flex flex-col bg-black/40 backdrop-blur-sm">
 
                                     {/* Close Button */}
                                     <button
@@ -267,7 +276,7 @@ export default function Announcements() {
                                     </div>
 
                                     {/* Body */}
-                                    <div className="flex-grow overflow-y-auto custom-scrollbar pr-2">
+                                    <div className="flex-grow pr-2">
                                         <p className="text-lg text-gray-300 leading-relaxed font-medium">
                                             {selectedAnnouncement.content}
                                         </p>
@@ -278,7 +287,6 @@ export default function Announcements() {
                                         <span className="text-sm font-medium text-gray-500">HSD Malatya Turgut Özal</span>
                                     </div>
                                 </div>
-                            </div>
                         </motion.div>
                     </div>
                 )}
