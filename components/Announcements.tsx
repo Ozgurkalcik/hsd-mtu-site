@@ -239,6 +239,7 @@ export default function Announcements() {
                                                 src="/assets/image/hsd-logo-white.png"
                                                 alt="HSD Logo"
                                                 fill
+                                                className="object-contain"
                                                 style={{ filter: 'brightness(1.2) contrast(1.1)' }}
                                             />
                                         </div>
