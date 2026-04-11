@@ -154,7 +154,7 @@ const StickerPeel: React.FC<StickerPeelProps> = ({
         };
     }, [isFrozen]); // Depends on isFrozen
 
-    // 3. Touch Handling - Frozen Aware
+    // 3. Touch & Hover Handling - Frozen Aware
     useEffect(() => {
         if (isFrozen) return;
 
@@ -169,14 +169,27 @@ const StickerPeel: React.FC<StickerPeelProps> = ({
             container.classList.remove('touch-active');
         };
 
+        // JS-based hover: GSAP Draggable mousedown'ı CSS :hover'ı bozuyor
+        const handleMouseEnter = () => {
+            container.classList.add('hover-active');
+        };
+
+        const handleMouseLeave = () => {
+            container.classList.remove('hover-active');
+        };
+
         container.addEventListener('touchstart', handleTouchStart);
         container.addEventListener('touchend', handleTouchEnd);
         container.addEventListener('touchcancel', handleTouchEnd);
+        container.addEventListener('mouseenter', handleMouseEnter);
+        container.addEventListener('mouseleave', handleMouseLeave);
 
         return () => {
             container.removeEventListener('touchstart', handleTouchStart);
             container.removeEventListener('touchend', handleTouchEnd);
             container.removeEventListener('touchcancel', handleTouchEnd);
+            container.removeEventListener('mouseenter', handleMouseEnter);
+            container.removeEventListener('mouseleave', handleMouseLeave);
         };
     }, [isFrozen]);
 
@@ -209,7 +222,7 @@ const StickerPeel: React.FC<StickerPeelProps> = ({
     const uniqueId = useId().replace(/:/g, "");
 
     return (
-        <div className={`draggable ${className}`} ref={dragTargetRef} style={cssVars}>
+        <div className={`draggable ${className}`} ref={dragTargetRef} style={{...cssVars, pointerEvents: 'none' }}>
             <svg width="0" height="0" className="absolute pointer-events-none">
                 <defs>
                     {/* Optimized filters: Removed specular lighting for performance */}
@@ -231,7 +244,7 @@ const StickerPeel: React.FC<StickerPeelProps> = ({
                 </defs>
             </svg>
 
-            <div className="sticker-container" ref={containerRef}>
+            <div className="sticker-container" ref={containerRef} style={{ pointerEvents: 'auto' }}>
                 <div className="sticker-main" style={{ filter: `url(#dropShadow-${uniqueId})` }}>
                     <div className="sticker-lighting">
                         <img

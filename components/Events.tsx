@@ -367,7 +367,11 @@ export default function Events() {
                                         {selectedEvent.description}
                                     </p>
 
-                                    {selectedEvent.join_link ? (
+                                    {selectedEvent.status === 'Geçmiş Etkinlik' ? (
+                                        <button disabled className="w-full py-4 rounded-xl font-bold text-lg text-white/50 bg-white/5 border border-white/10 cursor-not-allowed transition-all shadow-lg shadow-white/5">
+                                            Geçmiş Etkinlik
+                                        </button>
+                                    ) : selectedEvent.join_link ? (
                                         <a 
                                             href={selectedEvent.join_link} 
                                             target="_blank" 

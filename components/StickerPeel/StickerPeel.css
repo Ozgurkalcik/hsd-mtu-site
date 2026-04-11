@@ -49,7 +49,8 @@
 }
 
 .sticker-container:hover .sticker-main,
-.sticker-container.touch-active .sticker-main {
+.sticker-container.touch-active .sticker-main,
+.sticker-container.hover-active .sticker-main {
     clip-path: polygon(0% var(--sticker-peelback-hover),
             100% var(--sticker-peelback-hover),
             100% 100%,
@@ -87,7 +88,8 @@
 }
 
 .sticker-container:hover .flap,
-.sticker-container.touch-active .flap {
+.sticker-container.touch-active .flap,
+.sticker-container.hover-active .flap {
     clip-path: polygon(0% 0%,
             100% 0%,
             100% var(--sticker-peelback-hover),
@@ -118,6 +120,8 @@
     cursor: grab;
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
+    width: max-content;
+    height: max-content;
 }
 
 .draggable:active {

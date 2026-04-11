@@ -67,8 +67,10 @@ function SponsorPanel({ sponsor, index }: { sponsor: Sponsor; index: number }) {
             <div
                 onMouseEnter={() => setHovered(true)}
                 onMouseLeave={() => setHovered(false)}
+                onTouchStart={() => setHovered(true)}
+                onTouchEnd={() => setTimeout(() => setHovered(false), 800)}
                 onClick={handleClick}
-                className="relative w-[200px] md:w-[280px] h-[130px] md:h-[170px] rounded-xl overflow-hidden"
+                className="relative w-[210px] sm:w-[260px] md:w-[320px] h-[130px] sm:h-[160px] md:h-[190px] rounded-xl overflow-hidden"
                 style={{
                     cursor: sponsor.website_url ? 'pointer' : 'default',
                     background: 'linear-gradient(160deg, rgba(18,18,18,0.7), rgba(8,8,8,0.9))',
@@ -99,7 +101,7 @@ function SponsorPanel({ sponsor, index }: { sponsor: Sponsor; index: number }) {
                             src={sponsor.logo_url}
                             alt={sponsor.name}
                             fill
-                            sizes="(max-width: 768px) 200px, 280px"
+                            sizes="(max-width: 768px) 210px, 320px"
                             style={{
                                 objectFit: 'contain',
                                 filter: hovered
@@ -222,12 +224,12 @@ export default function Sponsors() {
             <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
             {/* Dekoratif Stickerlar */}
-            <div className="absolute inset-0 z-20 pointer-events-none">
-                <div className="relative w-full h-full">
-                    <StickerPeel imageSrc="/images/hsd-logo-white-1.png" width={240} rotate={15} peelBackHoverPct={40} peelBackActivePct={60} shadowIntensity={0.8} lightingIntensity={0.2} initialPosition={{ x: 50, y: 60 }} className="!pointer-events-auto" />
-                    <StickerPeel imageSrc="/images/hsd-logo.png" width={215} rotate={-20} peelBackHoverPct={35} peelBackActivePct={55} shadowIntensity={0.7} lightingIntensity={0.15} initialPosition={{ x: 1200, y: 50 }} className="hidden md:block !pointer-events-auto" />
-                    <StickerPeel imageSrc="/images/hsd-logo.png" width={190} rotate={25} peelBackHoverPct={30} peelBackActivePct={50} shadowIntensity={0.6} lightingIntensity={0.1} initialPosition={{ x: 100, y: 680 }} className="!pointer-events-auto" />
-                    <StickerPeel imageSrc="/images/hsd-logo-white-1.png" width={205} rotate={-10} peelBackHoverPct={45} peelBackActivePct={65} shadowIntensity={0.75} lightingIntensity={0.2} initialPosition={{ x: 1180, y: 660 }} className="hidden md:block !pointer-events-auto" />
+            <div className="absolute inset-0 z-40 pointer-events-none">
+                <div className="relative w-full h-full pointer-events-none">
+                    <StickerPeel imageSrc="/images/hsd-logo-white-1.png" width={240} rotate={15} peelBackHoverPct={40} peelBackActivePct={60} shadowIntensity={0.8} lightingIntensity={0.2} initialPosition={{ x: 50, y: 60 }} />
+                    <StickerPeel imageSrc="/images/hsd-logo.png" width={215} rotate={-20} peelBackHoverPct={35} peelBackActivePct={55} shadowIntensity={0.7} lightingIntensity={0.15} initialPosition={{ x: 1200, y: 50 }} className="hidden md:block" />
+                    <StickerPeel imageSrc="/images/hsd-logo.png" width={190} rotate={25} peelBackHoverPct={30} peelBackActivePct={50} shadowIntensity={0.6} lightingIntensity={0.1} initialPosition={{ x: 100, y: 680 }} />
+                    <StickerPeel imageSrc="/images/hsd-logo-white-1.png" width={205} rotate={-10} peelBackHoverPct={45} peelBackActivePct={65} shadowIntensity={0.75} lightingIntensity={0.2} initialPosition={{ x: 1180, y: 660 }} className="hidden md:block" />
                 </div>
             </div>
 
@@ -248,7 +250,7 @@ export default function Sponsors() {
             {/* Kartlar */}
             {sponsors.length > 0 ? (
                 <div className="relative z-30 w-full px-4">
-                    <div className="flex flex-wrap gap-5 md:gap-8 items-center justify-center max-w-6xl mx-auto">
+                    <div className="flex flex-wrap gap-6 md:gap-10 lg:gap-12 items-center justify-center max-w-[1100px] mx-auto">
                         {sponsors.map((sponsor, index) => (
                             <SponsorPanel key={sponsor.id} sponsor={sponsor} index={index} />
                         ))}
