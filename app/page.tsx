@@ -1,15 +1,17 @@
+import dynamic from 'next/dynamic';
 import Hero from "@/components/hero/Hero";
-import AboutUs from "@/components/AboutUs";
-import Announcements from "@/components/Announcements";
-import Events from "@/components/Events";
-import Articles from "@/components/Articles";
-import Team from "@/components/Team";
-import Sponsors from "@/components/Sponsors";
-import Gallery from "@/components/Gallery";
-import Contact from "@/components/Contact";
-import ScrollBasedBlur from "@/components/ScrollBasedBlur";
 import FrozenSection from "@/components/FrozenSection";
+import ScrollBasedBlur from "@/components/ScrollBasedBlur";
 import SitePopup from "@/components/SitePopup";
+
+const AboutUs = dynamic(() => import("@/components/AboutUs"), { ssr: true });
+const Announcements = dynamic(() => import("@/components/Announcements"), { ssr: true });
+const Events = dynamic(() => import("@/components/Events"), { ssr: true });
+const Articles = dynamic(() => import("@/components/Articles"), { ssr: true });
+const Team = dynamic(() => import("@/components/Team"), { ssr: true });
+const Sponsors = dynamic(() => import("@/components/Sponsors"), { ssr: true });
+const Gallery = dynamic(() => import("@/components/Gallery"), { ssr: true });
+const Contact = dynamic(() => import("@/components/Contact"), { ssr: true });
 
 export default function Home() {
   return (

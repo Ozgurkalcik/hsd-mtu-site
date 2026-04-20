@@ -97,11 +97,20 @@ void main() {
     var uRes = gl.getUniformLocation(pid, 'uResolution');
     var start = Date.now();
     
-    function draw() {
+    var last = 0;
+    var frameInterval = 1000 / 30; // 30 FPS cap for smoother low-end performance
+
+    function draw(now) {
         var canvasActive = document.getElementById('gl-loader-canvas');
         if (!canvasActive) return;
+
+        if (now - last < frameInterval) {
+            requestAnimationFrame(draw);
+            return;
+        }
+        last = now;
         
-        var dpr = window.devicePixelRatio || 1;
+        var dpr = Math.min(window.devicePixelRatio || 1, 1.25);
         var w = canvasActive.offsetWidth * dpr;
         var h = canvasActive.offsetHeight * dpr;
         

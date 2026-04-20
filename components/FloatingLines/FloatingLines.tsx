@@ -274,12 +274,18 @@ export default function FloatingLines({
   mixBlendMode = 'screen'
 }: FloatingLinesProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const isFrozen = useFrozen();
+  const isFrozenRef = useRef(isFrozen);
   const targetMouseRef = useRef<Vector2>(new Vector2(-1000, -1000));
   const currentMouseRef = useRef<Vector2>(new Vector2(-1000, -1000));
   const targetInfluenceRef = useRef<number>(0);
   const currentInfluenceRef = useRef<number>(0);
   const targetParallaxRef = useRef<Vector2>(new Vector2(0, 0));
   const currentParallaxRef = useRef<Vector2>(new Vector2(0, 0));
+
+  useEffect(() => {
+    isFrozenRef.current = isFrozen;
+  }, [isFrozen]);
 
   const getLineCount = (waveType: 'top' | 'middle' | 'bottom'): number => {
     if (typeof lineCount === 'number') return lineCount;
@@ -302,8 +308,6 @@ export default function FloatingLines({
   const topLineDistance = enabledWaves.includes('top') ? getLineDistance('top') * 0.01 : 0.01;
   const middleLineDistance = enabledWaves.includes('middle') ? getLineDistance('middle') * 0.01 : 0.01;
   const bottomLineDistance = enabledWaves.includes('bottom') ? getLineDistance('bottom') * 0.01 : 0.01;
-
-  const isFrozen = useFrozen(); // Correct placement: Top level
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -446,7 +450,7 @@ export default function FloatingLines({
     let raf = 0;
     const renderLoop = () => {
       // Pause if hidden OR frozen
-      if (document.hidden || isFrozen) {
+      if (document.hidden || isFrozenRef.current) {
         raf = requestAnimationFrame(renderLoop);
         return;
       }
@@ -503,8 +507,7 @@ export default function FloatingLines({
     bendStrength,
     mouseDamping,
     parallax,
-    parallaxStrength,
-    isFrozen
+    parallaxStrength
   ]);
 
   return (

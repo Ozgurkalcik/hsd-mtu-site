@@ -7,33 +7,35 @@ export default function ScrollBasedBlur() {
     const [isVisible, setIsVisible] = useState(true);
 
     useEffect(() => {
-        const handleScroll = () => {
+        let ticking = false;
+
+        const updateVisibility = () => {
             // Find the About Us section
             const aboutSection = document.getElementById("hakkimizda");
 
-            if (!aboutSection) return;
+            if (!aboutSection) {
+                ticking = false;
+                return;
+            }
 
             const rect = aboutSection.getBoundingClientRect();
             const windowHeight = window.innerHeight;
 
-            // Logic:
-            // If the bottom of the About Us section is above the bottom of the viewport (meaning we scrolled past it), hide the blur.
-            // rect.bottom is the distance from the top of the viewport to the bottom of the element.
-            // If rect.bottom < windowHeight, it means the bottom of the element is visible or above the viewport.
-            // Actually, we want it to disappear when we scroll PAST it.
-            // So when rect.bottom <= windowHeight, we are at the end or past it.
+            const nextVisible = rect.bottom > windowHeight;
+            setIsVisible((prev) => (prev === nextVisible ? prev : nextVisible));
+            ticking = false;
+        };
 
-            // Let's add a small buffer so it fades out smoothly just as we finish the section.
-            if (rect.bottom <= windowHeight) {
-                setIsVisible(false);
-            } else {
-                setIsVisible(true);
+        const handleScroll = () => {
+            if (!ticking) {
+                window.requestAnimationFrame(updateVisibility);
+                ticking = true;
             }
         };
 
-        window.addEventListener("scroll", handleScroll);
+        window.addEventListener("scroll", handleScroll, { passive: true });
         // Trigger once on mount
-        handleScroll();
+        updateVisibility();
 
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
