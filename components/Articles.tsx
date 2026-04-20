@@ -69,13 +69,27 @@ export default function Articles() {
                 const rssUrl = settingsData?.value || DEFAULT_RSS_URL;
                 const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
 
-                const response = await fetch(apiUrl);
-                const data: MediumFeed = await response.json();
+                // Zaman aşımı (Timeout) kontrolü ekliyoruz (örn: 5 saniye)
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-                if (data.status === 'ok') {
-                    setArticles(data.items.slice(0, 3));
-                } else {
-                    throw new Error('Failed to fetch Medium feed');
+                try {
+                    const response = await fetch(apiUrl, { signal: controller.signal });
+                    clearTimeout(timeoutId);
+                    
+                    const data: MediumFeed = await response.json();
+
+                    if (data.status === 'ok') {
+                        setArticles(data.items.slice(0, 3));
+                    } else {
+                        throw new Error('Failed to fetch Medium feed');
+                    }
+                } catch (fetchErr: any) {
+                    clearTimeout(timeoutId);
+                    if (fetchErr.name === 'AbortError') {
+                        throw new Error('Makaleler yüklenirken zaman aşımına uğradı');
+                    }
+                    throw fetchErr;
                 }
             } catch (err) {
                 console.error("Error fetching articles:", err);

@@ -70,13 +70,14 @@ function SponsorPanel({ sponsor, index }: { sponsor: Sponsor; index: number }) {
                 onTouchStart={() => setHovered(true)}
                 onTouchEnd={() => setTimeout(() => setHovered(false), 800)}
                 onClick={handleClick}
-                className="relative w-[210px] sm:w-[260px] md:w-[320px] h-[130px] sm:h-[160px] md:h-[190px] rounded-xl overflow-hidden"
+                className="relative w-[210px] sm:w-[260px] md:w-[320px] h-[130px] sm:h-[160px] md:h-[190px] rounded-xl overflow-hidden box-border"
                 style={{
                     cursor: sponsor.website_url ? 'pointer' : 'default',
                     background: 'linear-gradient(160deg, rgba(18,18,18,0.7), rgba(8,8,8,0.9))',
-                    border: hovered ? 'none' : '1px solid rgba(255,255,255,0.04)',
+                    border: '1px solid',
+                    borderColor: hovered ? 'transparent' : 'rgba(255,255,255,0.04)',
                     transform: hovered ? 'scale(1.04)' : 'scale(1)',
-                    transition: 'transform 0.5s cubic-bezier(0.16,1,0.3,1), border 0.3s ease',
+                    transition: 'transform 0.5s cubic-bezier(0.16,1,0.3,1), border-color 0.3s ease',
                 }}
             >
                 {/* Hafif cam parılsma üstte */}
@@ -223,7 +224,7 @@ export default function Sponsors() {
             {/* Top Separator */}
             <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
-            {/* Dekoratif Stickerlar */}
+            {/* Dekoratif Stickerlar Şimdilik Yorumda 
             <div className="absolute inset-0 z-40 pointer-events-none">
                 <div className="relative w-full h-full pointer-events-none">
                     <StickerPeel imageSrc="/images/hsd-logo-white-1.png" width={240} rotate={15} peelBackHoverPct={40} peelBackActivePct={60} shadowIntensity={0.8} lightingIntensity={0.2} initialPosition={{ x: 50, y: 60 }} />
@@ -232,6 +233,7 @@ export default function Sponsors() {
                     <StickerPeel imageSrc="/images/hsd-logo-white-1.png" width={205} rotate={-10} peelBackHoverPct={45} peelBackActivePct={65} shadowIntensity={0.75} lightingIntensity={0.2} initialPosition={{ x: 1180, y: 660 }} className="hidden md:block" />
                 </div>
             </div>
+            */}
 
             {/* Başlık */}
             <motion.div
