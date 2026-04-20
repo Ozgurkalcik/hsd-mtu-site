@@ -85,7 +85,7 @@ export default function AboutUs() {
                             <div className="absolute inset-0 bg-gradient-to-r from-rose-500 via-purple-500 to-rose-500 rounded-2xl opacity-0 group-hover:opacity-100 blur transition-opacity duration-500" />
 
                             {/* Card Content - Optimized (Reduced backdrop blur) */}
-                            <div className="relative h-full bg-black/70 backdrop-blur-sm rounded-2xl border border-white/10 p-8 transition-all duration-300 group-hover:-translate-y-1">
+                            <div className="relative h-full overflow-hidden bg-black/70 backdrop-blur-sm rounded-2xl border border-white/10 p-8 transition-all duration-300 group-hover:-translate-y-1">
 
                                 {/* Icon with Glow */}
                                 <div className="relative w-16 h-16 mb-6">
