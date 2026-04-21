@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 import Image from 'next/image';
+import SafeImage from '@/shared/ui/components/SafeImage';
 import Link from 'next/link';
 import TiltedCard from '@/shared/ui/components/TiltedCard';
 import CommitteeCard from '@/entities/committee';
@@ -135,7 +136,7 @@ export default function Team() {
 
                                         {/* HSD Logo Watermark */}
                                         <div className="absolute top-4 right-4 opacity-50 group-hover:opacity-100 transition-opacity duration-500">
-                                            <Image
+                                            <SafeImage
                                                 src="/assets/image/hsd-logo-white.png"
                                                 alt="HSD Logo"
                                                 width={40}

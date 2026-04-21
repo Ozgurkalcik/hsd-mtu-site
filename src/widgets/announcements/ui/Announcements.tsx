@@ -2,6 +2,7 @@
 
 import ScrollReveal from '@/shared/ui/animations/ScrollReveal/ScrollReveal';
 import Image from "next/image";
+import SafeImage from '@/shared/ui/components/SafeImage';
 import { motion, useAnimationFrame, useMotionValue, useTransform, wrap, AnimatePresence } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
 import SplashCursor from '@/shared/ui/animations/SplashCursor/SplashCursor';
@@ -239,6 +240,7 @@ export default function Announcements() {
                                                 src="/assets/image/hsd-logo-white.png"
                                                 alt="HSD Logo"
                                                 fill
+                                                sizes="(max-width: 768px) 100vw, 40vw"
                                                 className="object-contain"
                                                 style={{ filter: 'brightness(1.2) contrast(1.1)' }}
                                             />
@@ -353,6 +355,7 @@ function CarouselContent({ x, isHovered, isDragging, isModalOpen, onSelect, item
                                 src="/assets/image/hsd-logo-white.png"
                                 alt="HSD Logo"
                                 fill
+                                sizes="256px"
                                 className="object-contain"
                             />
                         </div>

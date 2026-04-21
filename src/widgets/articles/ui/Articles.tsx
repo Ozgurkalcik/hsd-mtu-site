@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import Image from 'next/image';
+import SafeImage from '@/shared/ui/components/SafeImage';
 
 // --- Types ---
 interface MediumItem {
@@ -177,7 +177,7 @@ export default function Articles() {
                                 >
                                     {/* Image */}
                                     <div className="aspect-[1.6/1] w-full overflow-hidden relative">
-                                        <Image
+                                        <SafeImage
                                             src={imageUrl}
                                             alt={article.title}
                                             fill
@@ -193,7 +193,7 @@ export default function Articles() {
                                     <div className="flex flex-col flex-1 p-6">
                                         <div className="flex items-center gap-2 mb-4">
                                             <div className="w-6 h-6 rounded-full bg-gray-100 overflow-hidden ring-1 ring-gray-100 relative">
-                                                <Image src="/images/hsd-white-logo.jpg" alt={article.author} fill sizes="24px" className="object-cover" style={{ objectFit: 'cover' }} />
+                                                <SafeImage src="/images/hsd-white-logo.jpg" alt={article.author} fill sizes="24px" className="object-cover" style={{ objectFit: 'cover' }} />
                                             </div>
                                             <span className="text-xs font-semibold text-gray-900 uppercase tracking-wide">{article.author}</span>
                                         </div>

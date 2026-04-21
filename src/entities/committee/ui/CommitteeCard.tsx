@@ -1,5 +1,5 @@
 import React from 'react';
-import Image from 'next/image';
+import SafeImage from '@/shared/ui/components/SafeImage';
 
 interface CommitteeCardProps {
     name: string;
@@ -19,7 +19,7 @@ export default function CommitteeCard({ name, role, imageSrc }: CommitteeCardPro
 
                 {/* Image Layer */}
                 <div className="absolute inset-0 w-full h-full">
-                    <Image
+                    <SafeImage
                         src={imageSrc}
                         alt={name}
                         fill

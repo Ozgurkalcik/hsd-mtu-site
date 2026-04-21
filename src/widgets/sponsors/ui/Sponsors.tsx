@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Image from 'next/image';
+import SafeImage from '@/shared/ui/components/SafeImage';
 import { motion } from 'framer-motion';
 import StickerPeel from '@/shared/ui/animations/StickerPeel/StickerPeel';
 import { createClient } from '@/shared/api/supabase';
@@ -98,7 +98,7 @@ function SponsorPanel({ sponsor, index }: { sponsor: Sponsor; index: number }) {
                     }}
                 >
                     <div className="relative w-full h-full">
-                        <Image
+                        <SafeImage
                             src={sponsor.logo_url}
                             alt={sponsor.name}
                             fill

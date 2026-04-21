@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { motion, useMotionValue, useSpring, SpringOptions } from 'framer-motion';
 import Image from 'next/image';
-
+import SafeImage from './SafeImage';
 interface TiltedCardProps {
     imageSrc: string;
     altText?: string;
@@ -122,7 +122,7 @@ export default function TiltedCard({
                     scale
                 }}
             >
-                <Image
+                <SafeImage
                     src={imageSrc}
                     alt={altText}
                     fill
