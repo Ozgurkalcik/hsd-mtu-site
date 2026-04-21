@@ -1,5 +1,7 @@
 # HSD MTU (Malatya Turgut Özal Üniversitesi) Resmi Web Sitesi
 
+🌐 **Canlı Site:** [https://hsdmtu.vercel.app/](https://hsdmtu.vercel.app/)
+
 ![Ana Sayfa](./public/images/anasayfa.png)
 
 ## Proje Hakkında
