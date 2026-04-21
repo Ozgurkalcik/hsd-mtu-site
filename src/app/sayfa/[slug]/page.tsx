@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import CustomPageView from '@/pages/custom-page';
+import CustomPageView from '@/views/custom-page';
 
 interface PageProps {
     params: {
