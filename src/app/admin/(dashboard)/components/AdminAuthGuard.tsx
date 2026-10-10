@@ -23,28 +23,44 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
         const supabase = createBrowserClient(url, key)
 
         const checkAuth = async () => {
-            const { data: { user } } = await supabase.auth.getUser()
+            try {
+                // 1. Supabase Auth kontrolü
+                const { data: { user } } = await supabase.auth.getUser()
 
-            if (!user) {
-                router.replace('/admin/login')
-                return
+                if (user) {
+                    const { data: adminUser } = await supabase
+                        .from('admin_users')
+                        .select('id')
+                        .eq('auth_id', user.id)
+                        .single()
+
+                    if (adminUser) {
+                        setIsAuthed(true)
+                        setIsLoading(false)
+                        return
+                    }
+                }
+            } catch (sbErr) {
+                console.warn('Supabase auth guard check error:', sbErr)
             }
 
-            // Admin tablosunda kontrol
-            const { data: adminUser } = await supabase
-                .from('admin_users')
-                .select('id')
-                .eq('auth_id', user.id)
-                .single()
-
-            if (!adminUser) {
-                await supabase.auth.signOut()
-                router.replace('/admin/login')
-                return
+            // 2. Workspace Session (SSO) kontrolü
+            try {
+                const res = await fetch('/api/workspace/auth/session')
+                if (res.ok) {
+                    const data = await res.json()
+                    if (data.authenticated && (data.user?.role === 'super_admin' || data.user?.role === 'workspace_admin')) {
+                        setIsAuthed(true)
+                        setIsLoading(false)
+                        return
+                    }
+                }
+            } catch (wsErr) {
+                console.warn('Workspace session guard check error:', wsErr)
             }
 
-            setIsAuthed(true)
-            setIsLoading(false)
+            // Yetkilendirme sağlanamadı
+            router.replace('/admin/login')
         }
 
         checkAuth()

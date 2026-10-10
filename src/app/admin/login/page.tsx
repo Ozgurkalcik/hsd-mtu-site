@@ -1,51 +1,31 @@
 'use client'
 
 import './login.css'
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion, AnimatePresence } from 'motion/react'
+import { motion } from 'motion/react'
 
 export default function AdminLoginPage() {
     const router = useRouter()
+    const [identifier, setIdentifier] = useState('')
+    const [password, setPassword] = useState('')
     const [error, setError] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [showPassword, setShowPassword] = useState(false)
     const [attempts, setAttempts] = useState(0)
-    const honeypotRef = useRef<HTMLInputElement>(null)
-    const formRef = useRef<HTMLFormElement>(null)
-
-    // Autofill detection: tarayıcı autofill yaptığında input'ların
-    // :-webkit-autofill pseudo-class'ı aktif olur ama change event
-    // tetiklenmeyebilir. FormData API bunu bypass eder.
-    const [autofillDetected, setAutofillDetected] = useState(false)
-
-    useEffect(() => {
-        // Chrome/Safari autofill'i animationstart event'i ile tespit et
-        const form = formRef.current
-        if (!form) return
-
-        const handleAnimationStart = (e: AnimationEvent) => {
-            if (e.animationName === 'onAutoFillStart') {
-                setAutofillDetected(true)
-            }
-        }
-
-        form.addEventListener('animationstart', handleAnimationStart, true)
-        return () => form.removeEventListener('animationstart', handleAnimationStart, true)
-    }, [])
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
         setError('')
 
-        // FormData API — tarayıcı ne doldurmuş olursa olsun doğru değeri verir
-        const formData = new FormData(e.currentTarget)
-        const currentEmail = (formData.get('email') as string)?.trim() || ''
-        const currentPassword = (formData.get('password') as string) || ''
+        const form = e.currentTarget
+        const formData = new FormData(form)
+        const currentIdentifier = (identifier || (formData.get('email') as string) || (formData.get('identifier') as string) || '').trim()
+        const currentPassword = password || (formData.get('password') as string) || ''
 
         // Boş alan kontrolü
-        if (!currentEmail || !currentPassword) {
-            setError('Email ve şifre alanları boş bırakılamaz.')
+        if (!currentIdentifier || !currentPassword) {
+            setError('Lütfen e-posta/kullanıcı adı ve şifre alanlarını doldurun.')
             return
         }
 
@@ -56,21 +36,14 @@ export default function AdminLoginPage() {
 
         setIsLoading(true)
 
-        // Honeypot kontrolü
-        const honeypotValue = (formData.get('website') as string) || ''
-        if (honeypotValue) {
-            setIsLoading(false)
-            return
-        }
-
         try {
             const res = await fetch('/admin/login/api', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    email: currentEmail,
+                    email: currentIdentifier,
+                    identifier: currentIdentifier,
                     password: currentPassword,
-                    website: honeypotValue,
                 }),
             })
 
@@ -79,9 +52,9 @@ export default function AdminLoginPage() {
             if (!res.ok) {
                 setAttempts(prev => prev + 1)
                 if (res.status === 429) {
-                    setError('Çok fazla deneme. 15 dakika bekleyin.')
+                    setError('Çok fazla deneme yapıldı. 15 dakika bekleyin.')
                 } else {
-                    setError(data.error || 'Giriş başarısız.')
+                    setError(data.error || 'Giriş başarısız. Lütfen bilgilerinizi kontrol edin.')
                 }
                 setIsLoading(false)
                 return
@@ -90,8 +63,9 @@ export default function AdminLoginPage() {
             // Başarılı giriş
             router.push('/admin')
             router.refresh()
-        } catch {
-            setError('Bir hata oluştu. Lütfen tekrar deneyin.')
+        } catch (err) {
+            console.error('Admin login error:', err)
+            setError('Bağlantı hatası oluştu. Lütfen tekrar deneyin.')
             setIsLoading(false)
         }
     }
@@ -127,39 +101,18 @@ export default function AdminLoginPage() {
                     <p className="admin-login-subtitle">Yönetim Paneli Girişi</p>
                 </motion.div>
 
-                {/* Form — motion.form yerine native form kullanıyoruz.
-                    Sebebi: Framer Motion, form'a inline style ve transform uygular.
-                    Bu, Chrome'un autofill heuristic'lerini bozar (form'u "dekoratif"
-                    olarak algılar). Native form + wrapper div ile animasyonu
-                    koruyup autofill uyumluluğunu sağlıyoruz. */}
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3, duration: 0.5 }}
-                >
+                <div>
                     <form
-                        ref={formRef}
                         onSubmit={handleSubmit}
                         className="admin-login-form"
                         noValidate
                         autoComplete="on"
                         method="post"
                     >
-                        {/* Honeypot - Bot Koruması */}
-                        <div style={{ position: 'absolute', left: '-9999px', opacity: 0 }} aria-hidden="true">
-                            <input
-                                ref={honeypotRef}
-                                type="text"
-                                name="website"
-                                tabIndex={-1}
-                                autoComplete="off"
-                            />
-                        </div>
-
-                        {/* Email */}
+                        {/* E-posta veya Kullanıcı Adı */}
                         <div className="admin-login-field">
                             <label htmlFor="admin-email" className="admin-login-label">
-                                Email Adresi
+                                E-posta veya Kullanıcı Adı
                             </label>
                             <div className="admin-login-input-wrapper">
                                 <svg className="admin-login-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -168,19 +121,20 @@ export default function AdminLoginPage() {
                                 </svg>
                                 <input
                                     id="admin-email"
-                                    type="email"
+                                    type="text"
                                     name="email"
-                                    placeholder="admin@hsdmtu.com"
+                                    value={identifier}
+                                    onChange={(e) => setIdentifier(e.target.value)}
+                                    placeholder="admin veya admin@hsdmtu.site"
                                     autoComplete="username"
                                     className="admin-login-input"
                                     disabled={isLoading}
+                                    required
                                 />
                             </div>
                         </div>
 
-                        {/* Password — type sabit "password" kalmalı.
-                            showPassword toggle'ı CSS ile yapılır,
-                            type değiştirmek autofill binding'ini kırar. */}
+                        {/* Şifre */}
                         <div className="admin-login-field">
                             <label htmlFor="admin-password" className="admin-login-label">
                                 Şifre
@@ -192,18 +146,22 @@ export default function AdminLoginPage() {
                                 </svg>
                                 <input
                                     id="admin-password"
-                                    type="password"
+                                    type={showPassword ? 'text' : 'password'}
                                     name="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
                                     placeholder="••••••••"
                                     autoComplete="current-password"
-                                    className={`admin-login-input ${showPassword ? 'show-password' : ''}`}
+                                    className="admin-login-input"
                                     disabled={isLoading}
+                                    required
                                 />
                                 <button
                                     type="button"
                                     className="admin-login-toggle-pw"
                                     onClick={() => setShowPassword(!showPassword)}
                                     tabIndex={-1}
+                                    aria-label="Şifreyi göster/gizle"
                                 >
                                     {showPassword ? (
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -220,25 +178,17 @@ export default function AdminLoginPage() {
                             </div>
                         </div>
 
-                        {/* Error */}
-                        <AnimatePresence>
-                            {error && (
-                                <motion.div
-                                    className="admin-login-error"
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                    transition={{ duration: 0.3 }}
-                                >
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <circle cx="12" cy="12" r="10" />
-                                        <line x1="15" x2="9" y1="9" y2="15" />
-                                        <line x1="9" x2="15" y1="9" y2="15" />
-                                    </svg>
-                                    <span>{error}</span>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+                        {/* Error Alert */}
+                        {error && (
+                            <div className="admin-login-error" role="alert" style={{ display: 'flex', alignItems: 'center' }}>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="15" x2="9" y1="9" y2="15" />
+                                    <line x1="9" x2="15" y1="9" y2="15" />
+                                </svg>
+                                <span>{error}</span>
+                            </div>
+                        )}
 
                         {/* Deneme sayacı */}
                         {attempts >= 3 && (
@@ -247,14 +197,17 @@ export default function AdminLoginPage() {
                             </div>
                         )}
 
-                        {/* Submit */}
+                        {/* Submit Button */}
                         <button
                             type="submit"
                             className="admin-login-submit"
                             disabled={isLoading}
                         >
                             {isLoading ? (
-                                <div className="admin-login-spinner" />
+                                <>
+                                    <div className="admin-login-spinner" />
+                                    <span>Giriş Yapılıyor...</span>
+                                </>
                             ) : (
                                 <>
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -262,22 +215,17 @@ export default function AdminLoginPage() {
                                         <polyline points="10 17 15 12 10 7" />
                                         <line x1="15" x2="3" y1="12" y2="12" />
                                     </svg>
-                                    Giriş Yap
+                                    <span>Giriş Yap</span>
                                 </>
                             )}
                         </button>
                     </form>
-                </motion.div>
+                </div>
 
                 {/* Footer */}
-                <motion.p
-                    className="admin-login-footer"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.5 }}
-                >
+                <p className="admin-login-footer">
                     HSD Malatya Turgut Özal Topluluğu © 2026 - MZ
-                </motion.p>
+                </p>
             </motion.div>
         </div>
     )

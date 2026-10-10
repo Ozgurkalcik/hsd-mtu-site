@@ -29,7 +29,15 @@ export async function POST() {
         }
     )
 
-    await supabase.auth.signOut()
+    try {
+        await supabase.auth.signOut()
+    } catch {
+        // ignore
+    }
 
-    return NextResponse.json({ success: true })
+    const response = NextResponse.json({ success: true })
+    cookieStore.delete('hsd_workspace_session')
+    response.cookies.delete('hsd_workspace_session')
+
+    return response
 }

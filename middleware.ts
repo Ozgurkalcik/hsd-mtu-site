@@ -109,11 +109,23 @@ export async function middleware(request: NextRequest) {
             }
         }
 
+        // Eğer workspace session varsa dashboard'a yönlendir
+        const wsSession = request.cookies.get('hsd_workspace_session')?.value
+        if (wsSession && wsSession.length > 20) {
+            return NextResponse.redirect(new URL('/admin', request.url))
+        }
+
         return response
     }
 
     // /admin/* (login hariç) → Auth kontrolü
     const response = NextResponse.next()
+
+    // 1. Workspace Session çerezi varsa doğrudan izin ver (AdminAuthGuard yetkiyi detaylı kontrol eder)
+    const wsSession = request.cookies.get('hsd_workspace_session')?.value
+    if (wsSession && wsSession.length > 20) {
+        return response
+    }
 
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
