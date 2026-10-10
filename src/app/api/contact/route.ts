@@ -3,10 +3,12 @@ import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
 
 // Server-side admin client for DB operations (Bypasses RLS if needed, but here we just need to read)
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY! // API Route'da her zaman service_role kullanılmalı
-);
+function getSupabaseAdmin() {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) return null;
+    return createClient(url, key);
+}
 
 export async function POST(req: Request) {
     try {
@@ -21,10 +23,10 @@ export async function POST(req: Request) {
         }
 
         // 1. Veritabanındaki aktif mailleri çek
-        const { data: dbEmails, error: dbError } = await supabaseAdmin
-            .from('contact_emails')
-            .select('email')
-            .eq('is_active', true);
+        const supabase = getSupabaseAdmin();
+        const { data: dbEmails, error: dbError } = supabase 
+            ? await supabase.from('contact_emails').select('email').eq('is_active', true)
+            : { data: null, error: null };
 
         // 2. Alıcı listesini oluştur
         let recipientList: string[] = [];

@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'motion/react'
 
 const NAV_ITEMS = [
     { href: '/admin', label: 'Dashboard', icon: 'dashboard' },
+    { href: '/admin/workspace', label: 'Topluluk Takvimi & Workspace', icon: 'workspace' },
     { href: '/admin/duyurular', label: 'Duyurular', icon: 'megaphone' },
     { href: '/admin/etkinlikler', label: 'Etkinlikler', icon: 'calendar' },
     { href: '/admin/yazilar', label: 'Yazılar', icon: 'article' },
@@ -27,6 +28,8 @@ function NavIcon({ icon, size = 18 }: { icon: string; size?: number }) {
     switch (icon) {
         case 'dashboard':
             return <svg {...props}><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>
+        case 'workspace':
+            return <svg {...props}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><path d="M8 2v4" /><path d="M16 2v4" /><path d="M2 10h20" /><path d="m9 15 2 2 4-4" /></svg>
         case 'megaphone':
             return <svg {...props}><path d="m3 11 18-5v12L3 13v-2z" /><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" /></svg>
         case 'calendar':
@@ -76,11 +79,12 @@ export default function AdminSidebar() {
     const handleLogout = async () => {
         setIsLoggingOut(true)
         document.body.style.cursor = 'progress'
-        const supabase = createBrowserClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        )
-        await supabase.auth.signOut()
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        if (url && key) {
+            const supabase = createBrowserClient(url, key)
+            await supabase.auth.signOut()
+        }
         router.replace('/admin/login')
     }
 

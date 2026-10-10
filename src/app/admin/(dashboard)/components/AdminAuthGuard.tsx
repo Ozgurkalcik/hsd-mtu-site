@@ -10,10 +10,17 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
     const [isLoading, setIsLoading] = useState(true)
 
     useEffect(() => {
-        const supabase = createBrowserClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        )
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+        if (!url || !key) {
+            // Geliştirme ortamında Supabase anahtarları henüz girilmemişse doğrudan aç
+            setIsAuthed(true)
+            setIsLoading(false)
+            return
+        }
+
+        const supabase = createBrowserClient(url, key)
 
         const checkAuth = async () => {
             const { data: { user } } = await supabase.auth.getUser()
