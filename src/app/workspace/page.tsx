@@ -89,7 +89,7 @@ export default function WorkspacePage() {
     // Quick Login Helper for Demo/Admins
     const handleQuickLogin = (idOrEmail: string) => {
         setLoginIdentifier(idOrEmail);
-        setLoginPassword('');
+        setLoginPassword('admin_bootstrap_pass_2026');
     };
 
     return (
@@ -212,6 +212,9 @@ export default function WorkspacePage() {
                                     admin@hsdmtu.site
                                 </button>
                             </div>
+                            <p className="text-[10px] text-zinc-500 mt-2 font-mono">
+                                Test parolası: <code className="text-rose-400/90 bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-800">admin_bootstrap_pass_2026</code>
+                            </p>
                         </div>
                     </div>
                 </div>

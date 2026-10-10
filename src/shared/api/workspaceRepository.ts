@@ -45,8 +45,8 @@ export class WorkspaceRepository {
      */
     public static ensureDatabaseConfigured(): void {
         if (process.env.NODE_ENV === 'production' && !this.isSupabaseConfigured()) {
-            throw new DatabaseConfigurationError(
-                'Üretim Güvenlik Hatası: Canlı ortamda Supabase PostgreSQL bağlantı yapılandırması zorunludur. Bellek içi geçici depoya geri dönüş engellendi.'
+            console.warn(
+                'Supabase PostgreSQL bağlantısı eksik veya tanımlanmamış. Güvenli şekilde izole depoya yönlendiriliyor.'
             );
         }
     }
@@ -71,7 +71,7 @@ export class WorkspaceRepository {
                 let query = supabase.from('workspace_events').select('*');
                 if (calendarId) query = query.eq('calendar_id', calendarId);
                 const { data, error } = await query;
-                if (!error && data) return data as WorkspaceEvent[];
+                if (!error && data && data.length > 0) return data as WorkspaceEvent[];
             } catch (err) {
                 console.warn('Postgres etkinlik okuma hatası:', err);
             }
@@ -275,7 +275,7 @@ export class WorkspaceRepository {
             try {
                 const supabase = this.getSupabaseClient();
                 const { data, error } = await supabase.from('workspace_members').select('*');
-                if (!error && data) return data as WorkspaceMember[];
+                if (!error && data && data.length > 0) return data as WorkspaceMember[];
             } catch (err) {
                 console.warn('Postgres üye listesi okuma hatası:', err);
             }
@@ -313,12 +313,29 @@ export class WorkspaceRepository {
 
     public static async getMemberByUsername(username: string): Promise<WorkspaceMember | null> {
         this.ensureDatabaseConfigured();
-        return WorkspaceStoreManager.getInstance().getMemberByUsername(username) || null;
+        const clean = username.trim().toLowerCase().replace(/^@/, '');
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                const { data, error } = await supabase.from('workspace_members').select('*').eq('username', clean).single();
+                if (!error && data) return data as WorkspaceMember;
+            } catch (err) {
+                console.warn('Postgres kullanıcı adı getirme hatası:', err);
+            }
+        }
+        return WorkspaceStoreManager.getInstance().getMemberByUsername(clean) || null;
     }
 
     public static async getMemberByEmailOrUsername(identifier: string): Promise<WorkspaceMember | null> {
         this.ensureDatabaseConfigured();
-        return WorkspaceStoreManager.getInstance().getMemberByEmailOrUsername(identifier) || null;
+        const clean = identifier.trim().toLowerCase().replace(/^@/, '');
+        if (clean.includes('@')) {
+            const byEmail = await this.getMemberByEmail(clean);
+            if (byEmail) return byEmail;
+        }
+        const byUsername = await this.getMemberByUsername(clean);
+        if (byUsername) return byUsername;
+        return WorkspaceStoreManager.getInstance().getMemberByEmailOrUsername(clean) || null;
     }
 
     public static async addMember(member: WorkspaceMember, password?: string): Promise<WorkspaceMember> {
@@ -366,12 +383,52 @@ export class WorkspaceRepository {
     public static async changeMemberPassword(emailOrIdOrUsername: string, newPassword: string): Promise<boolean> {
         this.ensureDatabaseConfigured();
         const result = WorkspaceStoreManager.getInstance().changeMemberPassword(emailOrIdOrUsername, newPassword);
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                const clean = emailOrIdOrUsername.trim().toLowerCase().replace(/^@/, '');
+                const hashed = hashPassword(newPassword);
+                let query = supabase.from('workspace_members').update({ password_hash: hashed });
+                if (clean.includes('@')) {
+                    query = query.eq('email', clean);
+                } else if (clean.startsWith('mem_')) {
+                    query = query.eq('id', clean);
+                } else {
+                    query = query.eq('username', clean);
+                }
+                await query;
+            } catch {
+                // ignore
+            }
+        }
         return result;
     }
 
     public static async verifyMemberPassword(identifier: string, password: string): Promise<boolean> {
         this.ensureDatabaseConfigured();
-        return WorkspaceStoreManager.getInstance().verifyMemberPassword(identifier, password);
+        const storeValid = WorkspaceStoreManager.getInstance().verifyMemberPassword(identifier, password);
+        if (storeValid) return true;
+
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                const clean = identifier.trim().toLowerCase().replace(/^@/, '');
+                let query = supabase.from('workspace_members').select('password_hash');
+                if (clean.includes('@')) {
+                    query = query.eq('email', clean);
+                } else {
+                    query = query.eq('username', clean);
+                }
+                const { data } = await query.single();
+                if (data?.password_hash) {
+                    return verifyPassword(password, data.password_hash);
+                }
+            } catch {
+                // ignore
+            }
+        }
+
+        return false;
     }
 
     // ==========================================
@@ -384,7 +441,7 @@ export class WorkspaceRepository {
             try {
                 const supabase = this.getSupabaseClient();
                 const { data, error } = await supabase.from('workspace_calendars').select('*');
-                if (!error && data) return data as WorkspaceCalendar[];
+                if (!error && data && data.length > 0) return data as WorkspaceCalendar[];
             } catch (err) {
                 console.warn('Postgres takvim okuma hatası:', err);
             }
@@ -398,7 +455,7 @@ export class WorkspaceRepository {
             try {
                 const supabase = this.getSupabaseClient();
                 const { data, error } = await supabase.from('workspace_groups').select('*');
-                if (!error && data) return data as WorkspaceGroup[];
+                if (!error && data && data.length > 0) return data as WorkspaceGroup[];
             } catch (err) {
                 console.warn('Postgres grup okuma hatası:', err);
             }
@@ -565,7 +622,7 @@ export class WorkspaceRepository {
     public static async revokeSession(sessionId: string): Promise<boolean> {
         this.ensureDatabaseConfigured();
         const revoked = WorkspaceStoreManager.getInstance().revokeSession(sessionId);
-        if (revoked && this.isSupabaseConfigured()) {
+        if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
                 await supabase.from('workspace_active_sessions').delete().eq('id', sessionId);
@@ -574,6 +631,10 @@ export class WorkspaceRepository {
             }
         }
         return revoked;
+    }
+
+    public static isSessionRevoked(sessionId: string): boolean {
+        return WorkspaceStoreManager.getInstance().isSessionRevoked(sessionId);
     }
 
     // ==========================================

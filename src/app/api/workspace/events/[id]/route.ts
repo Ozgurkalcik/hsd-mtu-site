@@ -85,6 +85,10 @@ export async function PATCH(req: Request, context: RouteParams) {
     }
 }
 
+export async function PUT(req: Request, context: RouteParams) {
+    return PATCH(req, context);
+}
+
 export async function DELETE(req: Request, context: RouteParams) {
     try {
         const { id } = await context.params;

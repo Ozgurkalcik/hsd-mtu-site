@@ -96,24 +96,24 @@ export default function AdminWorkspacePage() {
         setLoading(true);
         try {
             const [memRes, grpRes, rolRes, sesRes, audRes, setRes] = await Promise.all([
-                fetch('/api/workspace/admin/members'),
-                fetch('/api/workspace/admin/groups'),
-                fetch('/api/workspace/admin/roles'),
-                fetch('/api/workspace/admin/sessions'),
-                fetch('/api/workspace/admin/audit-logs'),
-                fetch('/api/workspace/admin/settings'),
+                fetch('/api/workspace/admin/members').catch(() => null),
+                fetch('/api/workspace/admin/groups').catch(() => null),
+                fetch('/api/workspace/admin/roles').catch(() => null),
+                fetch('/api/workspace/admin/sessions').catch(() => null),
+                fetch('/api/workspace/admin/audit-logs').catch(() => null),
+                fetch('/api/workspace/admin/settings').catch(() => null),
             ]);
 
-            if (memRes.ok) setMembers((await memRes.json()).members || []);
-            if (grpRes.ok) {
+            if (memRes && memRes.ok) setMembers((await memRes.json()).members || []);
+            if (grpRes && grpRes.ok) {
                 const grpData = (await grpRes.json()).groups || [];
                 setGroups(grpData);
                 if (!selectedGroup && grpData.length > 0) setSelectedGroup(grpData[0]);
             }
-            if (rolRes.ok) setRoles((await rolRes.json()).roles || []);
-            if (sesRes.ok) setSessions((await sesRes.json()).sessions || []);
-            if (audRes.ok) setAuditLogs((await audRes.json()).auditLogs || []);
-            if (setRes.ok) setSettings((await setRes.json()).settings || null);
+            if (rolRes && rolRes.ok) setRoles((await rolRes.json()).roles || []);
+            if (sesRes && sesRes.ok) setSessions((await sesRes.json()).sessions || []);
+            if (audRes && audRes.ok) setAuditLogs((await audRes.json()).auditLogs || []);
+            if (setRes && setRes.ok) setSettings((await setRes.json()).settings || null);
         } catch (err: any) {
             console.error('Admin veri yükleme hatası:', err);
             showNotification('error', 'Veriler yüklenirken hata oluştu.');

@@ -7,9 +7,14 @@ export async function POST() {
     try {
         const session = await getWorkspaceSession();
         const cookieStore = await cookies();
+        const sessionCookie = cookieStore.get(WORKSPACE_COOKIE_NAME);
+        const tokenToRevoke = sessionCookie?.value || session?.sessionId;
+
+        if (tokenToRevoke) {
+            await WorkspaceRepository.revokeSession(tokenToRevoke);
+        }
 
         if (session) {
-            await WorkspaceRepository.revokeSession(session.sessionId);
             await WorkspaceRepository.logAudit({
                 id: `audit_${Date.now()}`,
                 user_id: session.member.id,
@@ -24,7 +29,7 @@ export async function POST() {
 
         cookieStore.set(WORKSPACE_COOKIE_NAME, '', {
             httpOnly: true,
-            sameSite: 'strict',
+            sameSite: 'lax',
             secure: process.env.NODE_ENV === 'production',
             path: '/',
             maxAge: 0

@@ -69,35 +69,45 @@ export default function NotionCalendar({
     // Initial Data Fetch
     const fetchInitialData = useCallback(async () => {
         try {
-            const [evRes, notifRes, memRes] = await Promise.all([
+            const promises: Promise<Response | null>[] = [
                 fetch('/api/workspace/events'),
                 fetch('/api/workspace/notifications'),
-                fetch('/api/workspace/admin/members').catch(() => null),
-            ]);
+            ];
 
-            if (evRes.ok) {
+            if (isAdmin) {
+                promises.push(fetch('/api/workspace/admin/members').catch(() => null));
+            }
+
+            const [evRes, notifRes, memRes] = await Promise.all(promises);
+
+            if (evRes && evRes.ok) {
                 const data = await evRes.json();
                 setEvents(data.events || []);
                 setCalendars(data.calendars || []);
                 setGroups(data.groups || []);
+                if (data.members && data.members.length > 0) {
+                    setMembers(data.members);
+                }
                 if (data.calendars && selectedCalendarIds.length === 0) {
                     setSelectedCalendarIds(data.calendars.map((c: WorkspaceCalendar) => c.id));
                 }
             }
 
-            if (notifRes.ok) {
+            if (notifRes && notifRes.ok) {
                 const notifData = await notifRes.json();
                 setNotifications(notifData.notifications || []);
             }
 
             if (memRes && memRes.ok) {
                 const memData = await memRes.json();
-                setMembers(memData.members || []);
+                if (memData.members && memData.members.length > 0) {
+                    setMembers(memData.members);
+                }
             }
         } catch (err) {
             console.error('Workspace verileri yüklenirken hata:', err);
         }
-    }, [selectedCalendarIds.length]);
+    }, [selectedCalendarIds.length, isAdmin]);
 
     useEffect(() => {
         fetchInitialData();

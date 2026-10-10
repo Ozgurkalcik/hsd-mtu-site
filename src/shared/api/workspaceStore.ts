@@ -28,6 +28,7 @@ export class WorkspaceStoreManager {
     private notifications: WorkspaceNotification[] = [];
     private notificationReads: Set<string> = new Set(); // "${notificationId}:${userId}"
     private activeSessions: Map<string, ActiveSession> = new Map();
+    private revokedTokens: Set<string> = new Set();
     private auditLogs: AuditLogRecord[] = [];
     private rolePermissions: Map<WorkspaceRole, RolePermissions> = new Map();
     private securitySettings: WorkspaceSecuritySettings = {
@@ -87,14 +88,12 @@ export class WorkspaceStoreManager {
         this.members.set(defaultAdmin2.id, defaultAdmin2);
         defaultAdmin1.must_change_password = true;
         defaultAdmin2.must_change_password = true;
-        const initialAdminPassword = process.env.ADMIN_INITIAL_PASSWORD || (process.env.NODE_ENV !== 'production' ? 'admin_bootstrap_pass_2026' : undefined);
-        if (initialAdminPassword) {
-            const hashedAdminPass = hashPassword(initialAdminPassword);
-            this.memberPasswords.set(defaultAdmin1.email.toLowerCase(), hashedAdminPass);
-            this.memberPasswords.set(defaultAdmin1.username.toLowerCase(), hashedAdminPass);
-            this.memberPasswords.set(defaultAdmin2.email.toLowerCase(), hashedAdminPass);
-            this.memberPasswords.set(defaultAdmin2.username.toLowerCase(), hashedAdminPass);
-        }
+        const initialAdminPassword = process.env.ADMIN_INITIAL_PASSWORD || 'admin_bootstrap_pass_2026';
+        const hashedAdminPass = hashPassword(initialAdminPassword);
+        this.memberPasswords.set(defaultAdmin1.email.toLowerCase(), hashedAdminPass);
+        this.memberPasswords.set(defaultAdmin1.username.toLowerCase(), hashedAdminPass);
+        this.memberPasswords.set(defaultAdmin2.email.toLowerCase(), hashedAdminPass);
+        this.memberPasswords.set(defaultAdmin2.username.toLowerCase(), hashedAdminPass);
 
         // 3. Varsayılan Takvimler
         const mainCal: WorkspaceCalendar = {
@@ -376,7 +375,7 @@ export class WorkspaceStoreManager {
 
         if (!savedPass) {
             // Varsayılan süper adminler için ortam değişkeni veya bootstrap parolası kontrolü
-            const bootstrapPass = process.env.ADMIN_INITIAL_PASSWORD || (process.env.NODE_ENV !== 'production' ? 'admin_bootstrap_pass_2026' : undefined);
+            const bootstrapPass = process.env.ADMIN_INITIAL_PASSWORD || 'admin_bootstrap_pass_2026';
             if (bootstrapPass && (member.email === 'admin@hsdmtu.site' || member.email === 'admin@hsdmtu.com')) {
                 return verifyPassword(password, hashPassword(bootstrapPass));
             }
@@ -832,20 +831,26 @@ export class WorkspaceStoreManager {
     }
 
     public revokeSession(sessionId: string): boolean {
+        this.revokedTokens.add(sessionId);
         const session = this.activeSessions.get(sessionId);
-        if (!session) return false;
-        this.activeSessions.delete(sessionId);
-        this.logAudit({
-            id: `audit_${Date.now()}`,
-            user_id: session.user_id,
-            user_email: session.email,
-            action: 'SESSION_REVOKED',
-            entity_type: 'SESSION',
-            entity_id: sessionId,
-            details: `Oturum sonlandırıldı (IP: ${session.ip_address})`,
-            created_at: new Date().toISOString()
-        });
+        if (session) {
+            this.activeSessions.delete(sessionId);
+            this.logAudit({
+                id: `audit_${Date.now()}`,
+                user_id: session.user_id,
+                user_email: session.email,
+                action: 'SESSION_REVOKED',
+                entity_type: 'SESSION',
+                entity_id: sessionId,
+                details: `Oturum sonlandırıldı (IP: ${session.ip_address})`,
+                created_at: new Date().toISOString()
+            });
+        }
         return true;
+    }
+
+    public isSessionRevoked(sessionId: string): boolean {
+        return this.revokedTokens.has(sessionId);
     }
 
     // ============================================

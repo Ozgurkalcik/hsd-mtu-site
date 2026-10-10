@@ -165,3 +165,58 @@ export function resetRateLimit(key: string): void {
     rateLimitMap.delete(key);
 }
 
+/**
+ * Serverless ve Vercel için Kriptografik Olarak İmzalı Durumsuz (Stateless) Oturum Tokenları
+ */
+export interface SignedSessionPayload {
+    userId: string;
+    email: string;
+    role: string;
+    displayName: string;
+    createdAt: number;
+    expiresAt: number;
+}
+
+const SESSION_SIGN_SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    'hsd_mtu_workspace_stateless_session_secret_2026';
+
+export function createSignedSessionToken(
+    payload: Omit<SignedSessionPayload, 'createdAt' | 'expiresAt'>,
+    ttlSeconds: number = 7 * 24 * 3600
+): string {
+    const now = Date.now();
+    const fullPayload: SignedSessionPayload = {
+        ...payload,
+        createdAt: now,
+        expiresAt: now + ttlSeconds * 1000,
+    };
+    const dataStr = Buffer.from(JSON.stringify(fullPayload)).toString('base64url');
+    const signature = crypto.createHmac('sha256', SESSION_SIGN_SECRET).update(dataStr).digest('hex');
+    return `${dataStr}.${signature}`;
+}
+
+export function verifySignedSessionToken(token: string): SignedSessionPayload | null {
+    try {
+        if (!token || typeof token !== 'string') return null;
+        const [dataStr, signature] = token.split('.');
+        if (!dataStr || !signature) return null;
+
+        const expectedSig = crypto.createHmac('sha256', SESSION_SIGN_SECRET).update(dataStr).digest('hex');
+        const sigBuf = Buffer.from(signature, 'hex');
+        const expBuf = Buffer.from(expectedSig, 'hex');
+        if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+            return null;
+        }
+
+        const payload: SignedSessionPayload = JSON.parse(Buffer.from(dataStr, 'base64url').toString('utf8'));
+        if (Date.now() > payload.expiresAt) {
+            return null;
+        }
+
+        return payload;
+    } catch {
+        return null;
+    }
+}
+

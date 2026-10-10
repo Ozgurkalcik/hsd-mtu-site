@@ -11,11 +11,21 @@ export async function GET(req: Request) {
         const events = await WorkspaceRepository.getEvents(calendarId);
         const calendars = await WorkspaceRepository.getCalendars();
         const groups = await WorkspaceRepository.getGroups();
+        const allMembers = await WorkspaceRepository.getMembers();
+        const members = (allMembers || []).map(m => ({
+            id: m.id,
+            display_name: m.display_name,
+            username: m.username,
+            role: m.role,
+            status: m.status,
+            avatar_url: m.avatar_url
+        }));
 
         return NextResponse.json({
             events,
             calendars,
-            groups
+            groups,
+            members
         });
     } catch (err: any) {
         return NextResponse.json(
