@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { WorkspaceRepository } from '@/shared/api/workspaceRepository'
-import { createSignedSessionToken } from '@/shared/lib/security'
+import { createSignedSessionToken, checkRateLimit, resetRateLimit } from '@/shared/lib/security'
 import { WORKSPACE_COOKIE_NAME } from '@/app/api/workspace/authHelper'
 
 export async function POST(request: Request) {
@@ -18,6 +18,17 @@ export async function POST(request: Request) {
 
     const cleanIdentifier = rawIdentifier.toLowerCase().replace(/^@/, '')
     const candidateEmail = cleanIdentifier.includes('@') ? cleanIdentifier : `${cleanIdentifier}@hsdmtu.site`
+
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || '127.0.0.1'
+    const rateLimitKey = `admin_login_${ip}_${cleanIdentifier}`
+    const rateLimit = checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000)
+
+    if (!rateLimit.allowed) {
+        return NextResponse.json(
+            { error: `Çok fazla başarısız giriş denemesi yapıldı. Lütfen ${rateLimit.retryAfterSeconds} saniye sonra tekrar deneyin.` },
+            { status: 429 }
+        )
+    }
 
     const cookiesToSetList: { name: string; value: string; options: any }[] = []
 
@@ -108,7 +119,10 @@ export async function POST(request: Request) {
         )
     }
 
-    // Başarılı giriş: Vercel serverless uyumlu imzalı session token üret
+    // Giriş başarılı: Rate limit sıfırla
+    resetRateLimit(rateLimitKey);
+
+    // Vercel serverless uyumlu imzalı session token üret
     const sessionToken = createSignedSessionToken({
         userId: authenticatedAdmin.id,
         email: authenticatedAdmin.email,

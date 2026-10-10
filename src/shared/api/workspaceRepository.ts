@@ -418,6 +418,15 @@ export class WorkspaceRepository {
             .replace(/[^a-z0-9]/g, '');
     }
 
+    public static sanitizeMember(member: WorkspaceMember | null): WorkspaceMember | null {
+        if (!member) return null;
+        const sanitized = { ...member };
+        if ('password_hash' in sanitized) {
+            delete (sanitized as any).password_hash;
+        }
+        return sanitized;
+    }
+
     public static async resolveMemberAvatar(member: WorkspaceMember | null): Promise<WorkspaceMember | null> {
         if (!member) return null;
         this.ensureDatabaseConfigured();
@@ -457,7 +466,7 @@ export class WorkspaceRepository {
                 // ignore
             }
         }
-        return member;
+        return this.sanitizeMember(member);
     }
 
     public static async getMembers(): Promise<WorkspaceMember[]> {
@@ -517,7 +526,7 @@ export class WorkspaceRepository {
                 }
             }
         }
-        return members;
+        return members.map(m => this.sanitizeMember(m)!);
     }
 
     public static async getMemberById(id: string): Promise<WorkspaceMember | null> {

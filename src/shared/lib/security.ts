@@ -147,6 +147,13 @@ export function checkRateLimit(
     const now = Date.now();
     const entry = rateLimitMap.get(key);
 
+    // Süresi dolmuş eski kayıtları temizle (bellek sızıntısı koruması)
+    if (rateLimitMap.size > 500) {
+        for (const [k, v] of rateLimitMap.entries()) {
+            if (now > v.resetAt) rateLimitMap.delete(k);
+        }
+    }
+
     if (!entry || now > entry.resetAt) {
         rateLimitMap.set(key, { count: 1, resetAt: now + windowMs });
         return { allowed: true, remaining: maxAttempts - 1, retryAfterSeconds: 0 };
@@ -177,9 +184,19 @@ export interface SignedSessionPayload {
     expiresAt: number;
 }
 
-const SESSION_SIGN_SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    'hsd_mtu_workspace_stateless_session_secret_2026';
+function getSessionSignSecret(): string {
+    const secret =
+        process.env.WORKSPACE_SESSION_SECRET ||
+        process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (secret && secret.trim().length >= 16) {
+        return secret.trim();
+    }
+
+    // Sunucu tarafı izole hash türetimi (Asla istemciye açık NEXT_PUBLIC_ anahtarı kullanılmaz)
+    const seed = process.env.DATABASE_URL || process.env.NODE_ENV || 'hsd_mtu_workspace_secure_core_secret_v2';
+    return crypto.createHash('sha256').update(`hsd_session_${seed}`).digest('hex');
+}
 
 export function createSignedSessionToken(
     payload: Omit<SignedSessionPayload, 'createdAt' | 'expiresAt'>,
@@ -192,7 +209,8 @@ export function createSignedSessionToken(
         expiresAt: now + ttlSeconds * 1000,
     };
     const dataStr = Buffer.from(JSON.stringify(fullPayload)).toString('base64url');
-    const signature = crypto.createHmac('sha256', SESSION_SIGN_SECRET).update(dataStr).digest('hex');
+    const secret = getSessionSignSecret();
+    const signature = crypto.createHmac('sha256', secret).update(dataStr).digest('hex');
     return `${dataStr}.${signature}`;
 }
 
@@ -202,7 +220,8 @@ export function verifySignedSessionToken(token: string): SignedSessionPayload | 
         const [dataStr, signature] = token.split('.');
         if (!dataStr || !signature) return null;
 
-        const expectedSig = crypto.createHmac('sha256', SESSION_SIGN_SECRET).update(dataStr).digest('hex');
+        const secret = getSessionSignSecret();
+        const expectedSig = crypto.createHmac('sha256', secret).update(dataStr).digest('hex');
         const sigBuf = Buffer.from(signature, 'hex');
         const expBuf = Buffer.from(expectedSig, 'hex');
         if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {

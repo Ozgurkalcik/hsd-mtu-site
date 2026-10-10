@@ -1,6 +1,17 @@
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
+import { checkRateLimit } from '@/shared/lib/security';
+
+function escapeHtml(str: string): string {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
 
 // Server-side admin client for DB operations (Bypasses RLS if needed, but here we just need to read)
 function getSupabaseAdmin() {
@@ -12,6 +23,17 @@ function getSupabaseAdmin() {
 
 export async function POST(req: Request) {
     try {
+        const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || '127.0.0.1';
+        
+        // Spam ve Kota Tüketimi Koruması: IP bazlı 15 dakikada en fazla 5 mesaj
+        const rateLimit = checkRateLimit(`contact_${ip}`, 5, 15 * 60 * 1000);
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { error: `Çok fazla mesaj gönderildi. Lütfen ${rateLimit.retryAfterSeconds} saniye sonra tekrar deneyin.` },
+                { status: 429 }
+            );
+        }
+
         const { name, email, subject, message } = await req.json();
 
         // Basit Doğrulama
@@ -21,6 +43,10 @@ export async function POST(req: Request) {
                 { status: 400 }
             );
         }
+
+        // Header enjeksiyonunu önleme
+        const safeName = String(name).replace(/[\r\n]/g, ' ').trim().slice(0, 100);
+        const safeSubject = String(subject || 'Konu Yok').replace(/[\r\n]/g, ' ').trim().slice(0, 150);
 
         // 1. Veritabanındaki aktif mailleri çek
         const supabase = getSupabaseAdmin();
@@ -53,16 +79,16 @@ export async function POST(req: Request) {
             },
         });
 
-        // E-posta İçeriği
+        // E-posta İçeriği (HTML Sanitizasyonlu)
         const mailOptions = {
-            from: `"${name}" <${process.env.SMTP_USER}>`,
+            from: `"${safeName}" <${process.env.SMTP_USER}>`,
             to: recipients,
             replyTo: email,
-            subject: `Yeni İletişim Formu Mesajı: ${subject || 'Konu Yok'}`,
+            subject: `Yeni İletişim Formu Mesajı: ${safeSubject}`,
             text: `
-                İsim: ${name}
+                İsim: ${safeName}
                 E-posta: ${email}
-                Konu: ${subject}
+                Konu: ${safeSubject}
                 
                 Mesaj:
                 ${message}
@@ -70,12 +96,12 @@ export async function POST(req: Request) {
             html: `
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
                     <h2 style="color: #e11d48; margin-bottom: 30px;">HSD-MTU | Yeni Mesaj</h2>
-                    <p><strong>Gönderen:</strong> ${name}</p>
-                    <p><strong>E-posta:</strong> ${email}</p>
-                    <p><strong>Konu:</strong> ${subject}</p>
+                    <p><strong>Gönderen:</strong> ${escapeHtml(safeName)}</p>
+                    <p><strong>E-posta:</strong> ${escapeHtml(email)}</p>
+                    <p><strong>Konu:</strong> ${escapeHtml(safeSubject)}</p>
                     <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
                     <p><strong>Mesaj:</strong></p>
-                    <p style="white-space: pre-wrap; line-height: 1.6; background: #f9f9f9; padding: 15px; border-radius: 5px;">${message}</p>
+                    <p style="white-space: pre-wrap; line-height: 1.6; background: #f9f9f9; padding: 15px; border-radius: 5px;">${escapeHtml(message)}</p>
                 </div>
             `,
         };
