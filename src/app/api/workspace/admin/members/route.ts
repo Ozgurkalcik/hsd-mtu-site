@@ -169,10 +169,10 @@ export async function DELETE(req: Request) {
             return NextResponse.json({ error: 'Üye bulunamadı.' }, { status: 404 });
         }
 
-        // Hedef üye super_admin ise sadece super_admin silebilir
-        if (targetMember.role === 'super_admin' && session.member.role !== 'super_admin') {
+        // Çekirdek sistem ana yönetici hesaplarını koru
+        if (targetMember.id === 'mem_admin_1' || targetMember.id === 'mem_admin_2') {
             return NextResponse.json(
-                { error: 'Yetersiz yetki: Süper Yönetici hesabı yalnızca başka bir Süper Yönetici tarafından silinebilir.' },
+                { error: 'Sistem varsayılan Süper Yönetici hesabı silinemez.' },
                 { status: 403 }
             );
         }

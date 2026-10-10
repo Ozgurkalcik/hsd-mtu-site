@@ -266,16 +266,41 @@ export class WorkspaceRepository {
 
     public static async addSubtask(eventId: string, title: string): Promise<WorkspaceSubtask> {
         this.ensureDatabaseConfigured();
-        const storeSubtask = WorkspaceStoreManager.getInstance().addSubtask(eventId, title);
+        const subtaskId = `sub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        const newSubtask: WorkspaceSubtask = {
+            id: subtaskId,
+            event_id: eventId,
+            title,
+            is_completed: false,
+            created_at: new Date().toISOString()
+        };
+
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                await supabase.from('workspace_event_subtasks').insert(storeSubtask);
+                const { data, error } = await supabase
+                    .from('workspace_event_subtasks')
+                    .insert(newSubtask)
+                    .select()
+                    .single();
+
+                if (!error && data) {
+                    try { WorkspaceStoreManager.getInstance().addSubtask(eventId, title); } catch {}
+                    return data as WorkspaceSubtask;
+                }
+                if (error) {
+                    console.warn('Postgres subtask ekleme uyarısı:', error);
+                }
             } catch (err) {
                 console.warn('Postgres subtask ekleme hatası:', err);
             }
         }
-        return storeSubtask;
+
+        try {
+            return WorkspaceStoreManager.getInstance().addSubtask(eventId, title);
+        } catch {
+            return newSubtask;
+        }
     }
 
     public static async toggleSubtask(eventId: string, subtaskId: string, isCompleted?: boolean): Promise<WorkspaceSubtask | null> {
@@ -331,32 +356,109 @@ export class WorkspaceRepository {
 
     public static async addComment(eventId: string, userId: string, userName: string, content: string): Promise<WorkspaceComment> {
         this.ensureDatabaseConfigured();
-        const storeComment = WorkspaceStoreManager.getInstance().addComment(eventId, userId, userName, content);
+        const commentId = `com_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        const nowIso = new Date().toISOString();
+
+        const newComment: WorkspaceComment = {
+            id: commentId,
+            event_id: eventId,
+            user_id: userId,
+            user_name: userName,
+            content,
+            created_at: nowIso
+        };
+
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                const dbComment = {
-                    id: storeComment.id,
-                    event_id: storeComment.event_id,
-                    user_id: storeComment.user_id,
-                    user_name: storeComment.user_name,
-                    content: storeComment.content,
-                    created_at: storeComment.created_at
-                };
-                const { error } = await supabase.from('workspace_event_comments').insert(dbComment);
+                const { data, error } = await supabase
+                    .from('workspace_event_comments')
+                    .insert(newComment)
+                    .select()
+                    .single();
+
+                if (!error && data) {
+                    try {
+                        WorkspaceStoreManager.getInstance().addComment(eventId, userId, userName, content);
+                    } catch {}
+                    return data as WorkspaceComment;
+                }
                 if (error) {
-                    console.warn('Postgres yorum ekleme hatası:', error);
+                    console.warn('Postgres yorum ekleme uyarısı:', error);
                 }
             } catch (err) {
                 console.warn('Postgres yorum ekleme hatası:', err);
             }
         }
-        return storeComment;
+
+        try {
+            return WorkspaceStoreManager.getInstance().addComment(eventId, userId, userName, content);
+        } catch {
+            return newComment;
+        }
     }
 
     // ==========================================
     // ÜYELER (Members & User Accounts)
     // ==========================================
+
+    public static normalizeNameForMatch(name: string): string {
+        if (!name) return '';
+        return name
+            .trim()
+            .replace(/İ/g, 'i')
+            .replace(/I/g, 'ı')
+            .toLowerCase()
+            .replace(/ç/g, 'c')
+            .replace(/ğ/g, 'g')
+            .replace(/ı/g, 'i')
+            .replace(/ö/g, 'o')
+            .replace(/ş/g, 's')
+            .replace(/ü/g, 'u')
+            .replace(/[^a-z0-9]/g, '');
+    }
+
+    public static async resolveMemberAvatar(member: WorkspaceMember | null): Promise<WorkspaceMember | null> {
+        if (!member) return null;
+        this.ensureDatabaseConfigured();
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                const { data: teamMembers } = await supabase
+                    .from('team_members')
+                    .select('full_name, image_url')
+                    .not('image_url', 'is', null);
+
+                if (teamMembers && teamMembers.length > 0) {
+                    const memNorm = this.normalizeNameForMatch(member.display_name);
+                    const userNorm = member.username ? this.normalizeNameForMatch(member.username) : '';
+
+                    for (const tm of teamMembers) {
+                        if (!tm.full_name || !tm.image_url) continue;
+                        const tmNorm = this.normalizeNameForMatch(tm.full_name);
+                        if (
+                            tmNorm === memNorm ||
+                            (memNorm.length >= 3 && tmNorm.includes(memNorm)) ||
+                            (tmNorm.length >= 3 && memNorm.includes(tmNorm)) ||
+                            (userNorm.length >= 3 && tmNorm.includes(userNorm))
+                        ) {
+                            member.avatar_url = tm.image_url;
+                            // Arka planda veritabanına da kalıcı olarak yaz
+                            supabase
+                                .from('workspace_members')
+                                .update({ avatar_url: tm.image_url })
+                                .eq('id', member.id)
+                                .then(() => {});
+                            break;
+                        }
+                    }
+                }
+            } catch {
+                // ignore
+            }
+        }
+        return member;
+    }
 
     public static async getMembers(): Promise<WorkspaceMember[]> {
         this.ensureDatabaseConfigured();
@@ -377,18 +479,20 @@ export class WorkspaceRepository {
                         .not('image_url', 'is', null);
 
                     if (teamMembers && teamMembers.length > 0) {
-                        const teamMap = new Map<string, string>();
-                        for (const tm of teamMembers) {
-                            if (tm.full_name && tm.image_url) {
-                                teamMap.set(tm.full_name.trim().toLowerCase(), tm.image_url);
-                            }
-                        }
-
                         for (const m of members) {
-                            if (!m.avatar_url) {
-                                const nameKey = m.display_name.trim().toLowerCase();
-                                if (teamMap.has(nameKey)) {
-                                    m.avatar_url = teamMap.get(nameKey);
+                            const memNorm = this.normalizeNameForMatch(m.display_name);
+                            const userNorm = m.username ? this.normalizeNameForMatch(m.username) : '';
+                            for (const tm of teamMembers) {
+                                if (!tm.full_name || !tm.image_url) continue;
+                                const tmNorm = this.normalizeNameForMatch(tm.full_name);
+                                if (
+                                    tmNorm === memNorm ||
+                                    (memNorm.length >= 3 && tmNorm.includes(memNorm)) ||
+                                    (tmNorm.length >= 3 && memNorm.includes(tmNorm)) ||
+                                    (userNorm.length >= 3 && tmNorm.includes(userNorm))
+                                ) {
+                                    m.avatar_url = tm.image_url;
+                                    break;
                                 }
                             }
                         }
@@ -418,45 +522,57 @@ export class WorkspaceRepository {
 
     public static async getMemberById(id: string): Promise<WorkspaceMember | null> {
         this.ensureDatabaseConfigured();
+        let found: WorkspaceMember | null = null;
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
                 const { data, error } = await supabase.from('workspace_members').select('*').eq('id', id).single();
-                if (!error && data) return data as WorkspaceMember;
+                if (!error && data) found = data as WorkspaceMember;
             } catch (err) {
                 console.warn('Postgres üye getirme hatası:', err);
             }
         }
-        return WorkspaceStoreManager.getInstance().getMemberById(id) || null;
+        if (!found) {
+            found = WorkspaceStoreManager.getInstance().getMemberById(id) || null;
+        }
+        return await this.resolveMemberAvatar(found);
     }
 
     public static async getMemberByEmail(email: string): Promise<WorkspaceMember | null> {
         this.ensureDatabaseConfigured();
+        let found: WorkspaceMember | null = null;
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
                 const { data, error } = await supabase.from('workspace_members').select('*').eq('email', email.trim().toLowerCase()).single();
-                if (!error && data) return data as WorkspaceMember;
+                if (!error && data) found = data as WorkspaceMember;
             } catch (err) {
                 console.warn('Postgres üye getirme hatası:', err);
             }
         }
-        return WorkspaceStoreManager.getInstance().getMemberByEmail(email) || null;
+        if (!found) {
+            found = WorkspaceStoreManager.getInstance().getMemberByEmail(email) || null;
+        }
+        return await this.resolveMemberAvatar(found);
     }
 
     public static async getMemberByUsername(username: string): Promise<WorkspaceMember | null> {
         this.ensureDatabaseConfigured();
         const clean = username.trim().toLowerCase().replace(/^@/, '');
+        let found: WorkspaceMember | null = null;
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
                 const { data, error } = await supabase.from('workspace_members').select('*').eq('username', clean).single();
-                if (!error && data) return data as WorkspaceMember;
+                if (!error && data) found = data as WorkspaceMember;
             } catch (err) {
                 console.warn('Postgres kullanıcı adı getirme hatası:', err);
             }
         }
-        return WorkspaceStoreManager.getInstance().getMemberByUsername(clean) || null;
+        if (!found) {
+            found = WorkspaceStoreManager.getInstance().getMemberByUsername(clean) || null;
+        }
+        return await this.resolveMemberAvatar(found);
     }
 
     public static async getMemberByEmailOrUsername(identifier: string): Promise<WorkspaceMember | null> {
@@ -468,7 +584,8 @@ export class WorkspaceRepository {
         }
         const byUsername = await this.getMemberByUsername(clean);
         if (byUsername) return byUsername;
-        return WorkspaceStoreManager.getInstance().getMemberByEmailOrUsername(clean) || null;
+        const fromStore = WorkspaceStoreManager.getInstance().getMemberByEmailOrUsername(clean) || null;
+        return await this.resolveMemberAvatar(fromStore);
     }
 
     public static async addMember(member: WorkspaceMember, password?: string): Promise<WorkspaceMember> {

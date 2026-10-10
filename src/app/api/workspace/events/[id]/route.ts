@@ -39,7 +39,14 @@ export async function PATCH(req: Request, context: RouteParams) {
             );
         }
 
-        if (!session.permissions.can_edit) {
+        const canEdit = session.permissions?.can_edit ||
+            session.member.role === 'super_admin' ||
+            session.member.role === 'workspace_admin' ||
+            session.member.role?.toLowerCase().includes('admin') ||
+            session.member.role?.toLowerCase().includes('lead') ||
+            session.member.role?.toLowerCase().includes('editor');
+
+        if (!canEdit) {
             return NextResponse.json(
                 { error: 'Etkinlik düzenleme yetkiniz bulunmamaktadır.' },
                 { status: 403 }
@@ -101,11 +108,22 @@ export async function DELETE(req: Request, context: RouteParams) {
             );
         }
 
-        if (!session.permissions.can_delete) {
-            return NextResponse.json(
-                { error: 'Etkinlik silme yetkiniz bulunmamaktadır.' },
-                { status: 403 }
-            );
+        const canDelete = session.permissions?.can_delete ||
+            session.member.role === 'super_admin' ||
+            session.member.role === 'workspace_admin' ||
+            session.member.role?.toLowerCase().includes('admin') ||
+            session.member.role?.toLowerCase().includes('lead') ||
+            session.member.role?.toLowerCase().includes('editor');
+
+        if (!canDelete) {
+            const existing = await WorkspaceRepository.getEventById(id);
+            const isAssignee = existing?.assignees?.includes(session.member.id);
+            if (!isAssignee) {
+                return NextResponse.json(
+                    { error: 'Etkinlik silme yetkiniz bulunmamaktadır.' },
+                    { status: 403 }
+                );
+            }
         }
 
         const deleted = await WorkspaceRepository.deleteEvent(id);

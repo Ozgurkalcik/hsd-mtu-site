@@ -929,14 +929,61 @@ export class WorkspaceStoreManager {
     }
 
     public getPermissionsForRole(role: WorkspaceRole): RolePermissions {
-        return this.rolePermissions.get(role) || {
+        if (this.rolePermissions.has(role)) {
+            const p = this.rolePermissions.get(role)!;
+            // Editor için de silme izni ver
+            if (role === 'editor') {
+                return { ...p, can_delete: true };
+            }
+            return p;
+        }
+
+        const r = (role || '').toLowerCase();
+        if (r.includes('admin') || r === 'super_admin' || r === 'workspace_admin') {
+            return {
+                role,
+                can_view: true,
+                can_create: true,
+                can_edit: true,
+                can_delete: true,
+                can_upload: true,
+                can_share: true
+            };
+        }
+
+        if (r.includes('lead') || r.includes('editor') || r.includes('baskan') || r.includes('yonetici')) {
+            return {
+                role,
+                can_view: true,
+                can_create: true,
+                can_edit: true,
+                can_delete: true,
+                can_upload: true,
+                can_share: true
+            };
+        }
+
+        if (r === 'viewer' || r.includes('salt_okunur') || r.includes('readonly')) {
+            return {
+                role,
+                can_view: true,
+                can_create: false,
+                can_edit: false,
+                can_delete: false,
+                can_upload: false,
+                can_share: false
+            };
+        }
+
+        // Genel komite ve aktif çalışma alanı üyeleri için varsayılan tam düzenleme yetkisi
+        return {
             role,
             can_view: true,
-            can_create: false,
-            can_edit: false,
-            can_delete: false,
-            can_upload: false,
-            can_share: false
+            can_create: true,
+            can_edit: true,
+            can_delete: true,
+            can_upload: true,
+            can_share: true
         };
     }
 

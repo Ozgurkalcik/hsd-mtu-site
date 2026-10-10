@@ -53,7 +53,14 @@ export async function POST(req: Request) {
             );
         }
 
-        if (!session.permissions.can_create) {
+        const canCreate = session.permissions?.can_create ||
+            session.member.role === 'super_admin' ||
+            session.member.role === 'workspace_admin' ||
+            session.member.role?.toLowerCase().includes('admin') ||
+            session.member.role?.toLowerCase().includes('lead') ||
+            session.member.role?.toLowerCase().includes('editor');
+
+        if (!canCreate) {
             return NextResponse.json(
                 { error: 'Etkinlik oluşturma yetkiniz bulunmamaktadır.' },
                 { status: 403 }

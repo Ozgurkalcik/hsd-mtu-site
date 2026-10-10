@@ -11,6 +11,7 @@ import {
     RolePermissions
 } from '@/shared/api/workspaceTypes';
 import { useFrozen } from '@/shared/lib/FrozenSection';
+import { createClient } from '@/shared/api/supabase';
 import EventDrawer from './EventDrawer';
 
 export type CalendarViewMode = 'ay' | '3ay' | '6ay' | 'hafta' | 'gun' | 'liste';
@@ -66,6 +67,82 @@ export default function NotionCalendar({
 
     // User Profile Dropdown Menu State
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+
+    // Otomatik Profil Fotoğrafı Eşleştirme (/ekip -> team_members)
+    const [teamAvatarUrl, setTeamAvatarUrl] = useState<string | null>(null);
+    const [teamRoleTitle, setTeamRoleTitle] = useState<string | null>(null);
+    const [isTeamMatched, setIsTeamMatched] = useState<boolean>(false);
+
+    useEffect(() => {
+        if (!currentUser) return;
+
+        let isMounted = true;
+        const scanTeamMembers = async () => {
+            try {
+                const supabase = createClient();
+                const { data: teamList } = await supabase
+                    .from('team_members')
+                    .select('full_name, role_title, image_url, is_active')
+                    .eq('is_active', true);
+
+                if (!isMounted || !teamList || teamList.length === 0) return;
+
+                const normalize = (str: string) => {
+                    if (!str) return '';
+                    return str
+                        .trim()
+                        .replace(/İ/g, 'i')
+                        .replace(/I/g, 'ı')
+                        .toLowerCase()
+                        .replace(/ç/g, 'c')
+                        .replace(/ğ/g, 'g')
+                        .replace(/ı/g, 'i')
+                        .replace(/ö/g, 'o')
+                        .replace(/ş/g, 's')
+                        .replace(/ü/g, 'u')
+                        .replace(/[^a-z0-9]/g, '');
+                };
+
+                const userNorm = normalize(currentUser.display_name || '');
+                const usernameNorm = normalize(currentUser.username || '');
+                const emailPrefixNorm = normalize((currentUser.email || '').split('@')[0]);
+
+                for (const tm of teamList) {
+                    if (!tm.full_name) continue;
+                    const tmNorm = normalize(tm.full_name);
+
+                    const isDirectMatch =
+                        tmNorm === userNorm ||
+                        (userNorm.length >= 3 && tmNorm.includes(userNorm)) ||
+                        (tmNorm.length >= 3 && userNorm.includes(tmNorm)) ||
+                        (usernameNorm.length >= 3 && tmNorm.includes(usernameNorm)) ||
+                        (emailPrefixNorm.length >= 3 && tmNorm.includes(emailPrefixNorm));
+
+                    const tmWords: string[] = tm.full_name.toLowerCase().split(/\s+/).filter((w: string) => w.length >= 3);
+                    const userWords: string[] = (currentUser.display_name || '').toLowerCase().split(/\s+/).filter((w: string) => w.length >= 3);
+                    const wordMatch = tmWords.length > 0 && userWords.some((uw: string) => tmWords.some((tw: string) => normalize(tw) === normalize(uw)));
+
+                    if (isDirectMatch || wordMatch) {
+                        if (tm.image_url) {
+                            setTeamAvatarUrl(tm.image_url);
+                        }
+                        if (tm.role_title) {
+                            setTeamRoleTitle(tm.role_title);
+                        }
+                        setIsTeamMatched(true);
+                        break;
+                    }
+                }
+            } catch (err) {
+                console.warn('Ekip üyeleri otomatik eşleme uyarısı:', err);
+            }
+        };
+
+        scanTeamMembers();
+        return () => { isMounted = false; };
+    }, [currentUser?.display_name, currentUser?.username, currentUser?.email]);
+
+    const activeAvatar = teamAvatarUrl || currentUser?.avatar_url || null;
 
     // Drag-and-drop feedback
     const [draggedEventId, setDraggedEventId] = useState<string | null>(null);
@@ -335,129 +412,146 @@ export default function NotionCalendar({
 
     return (
         <div className="flex flex-col h-[calc(100vh-2rem)] min-h-[750px] bg-zinc-950 text-zinc-100 rounded-2xl border border-zinc-800/80 shadow-2xl overflow-hidden font-sans">
-            {/* ── TOP HEADER / TOOLBAR (ORGANİZE & DÜZENLİ YERLEŞİM) ── */}
-            <header className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 px-4 py-3 border-b border-zinc-800/80 bg-zinc-900/60 backdrop-blur-md">
+            {/* ── TOP HEADER / TOOLBAR (PROFESYONEL PRO GLASSMORPHIC TASARIM) ── */}
+            <header className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 px-4 sm:px-5 py-2.5 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-2xl sticky top-0 z-40 transition-all select-none">
                 {/* 1. Sol Alan: Ana Sayfa Bağlantısı, Marka & Akıllı Tarih Navigasyonu */}
-                <div className="flex items-center gap-2.5 flex-wrap">
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                     {/* Ana Sayfaya Dön Butonu */}
                     <Link
                         href="/"
-                        className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white transition-all flex items-center gap-1.5 text-xs font-medium shrink-0"
+                        className="group px-2.5 py-1.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-800/90 hover:border-zinc-700 text-zinc-400 hover:text-white transition-all flex items-center gap-1.5 text-xs font-medium shrink-0 shadow-sm"
                         title="Ana Sayfaya Dön"
                     >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                        <svg className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                             <path d="m15 18-6-6 6-6" />
                         </svg>
                         <span className="hidden sm:inline">Ana Sayfa</span>
                     </Link>
 
-                    <div className="h-4 w-px bg-zinc-800 shrink-0" />
+                    <div className="h-4 w-px bg-zinc-800/80 shrink-0" />
 
-                    {/* Logo & Başlık */}
+                    {/* Logo & Marka Rozeti */}
                     <div className="flex items-center gap-2 shrink-0">
-                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-rose-600 to-rose-700 flex items-center justify-center shadow-sm shadow-rose-950/40 text-white font-bold text-xs">
-                            H
+                        <div className="relative">
+                            <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-rose-600 via-rose-600 to-red-500 flex items-center justify-center shadow-md shadow-rose-950/60 text-white font-extrabold text-[11px] tracking-tight border border-rose-400/30">
+                                HSD
+                            </div>
+                            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-rose-400 rounded-full animate-ping opacity-75" />
                         </div>
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-xs sm:text-sm font-bold tracking-tight text-white">
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs sm:text-sm font-bold tracking-tight text-white flex items-center gap-1.5">
                                 Topluluk Takvimi
                             </span>
-                            <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-zinc-800/80 text-rose-400 font-mono border border-zinc-700/50">
-                                Workspace
+                            <span className="hidden md:inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-emerald-950/60 text-emerald-300 font-mono border border-emerald-800/50">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                Canlı
                             </span>
                         </div>
                     </div>
 
-                    <div className="h-4 w-px bg-zinc-800 shrink-0 hidden sm:block" />
+                    <div className="h-4 w-px bg-zinc-800/80 shrink-0 hidden sm:block" />
 
-                    {/* Akıllı Navigasyon Butonları */}
-                    <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-0.5 shrink-0">
+                    {/* Akıllı Periyot Gezgini (Prev / Bugün / Next) */}
+                    <div className="flex items-center gap-0.5 bg-zinc-900/90 border border-zinc-800/90 rounded-xl p-0.5 shrink-0 shadow-inner">
                         <button
                             type="button"
                             onClick={() => handleNavigate('prev')}
-                            className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+                            className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
                             title="Önceki Periyot"
                         >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                                 <polyline points="15 18 9 12 15 6" />
                             </svg>
                         </button>
                         <button
                             type="button"
                             onClick={() => handleNavigate('today')}
-                            className="px-2.5 py-0.5 rounded-lg text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors"
+                            className="px-2.5 py-0.5 rounded-lg text-xs font-semibold text-zinc-200 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
                         >
                             Bugün
                         </button>
                         <button
                             type="button"
                             onClick={() => handleNavigate('next')}
-                            className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+                            className="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
                             title="Sonraki Periyot"
                         >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                                 <polyline points="9 18 15 12 9 6" />
                             </svg>
                         </button>
                     </div>
 
                     {/* Dinamik Dönem Başlığı */}
-                    <span className="text-xs sm:text-sm font-bold text-white tracking-tight shrink-0 pl-1">
-                        {periodTitle}
-                    </span>
+                    <div className="flex items-center gap-1.5 pl-1 shrink-0">
+                        <span className="text-zinc-500 text-xs">📅</span>
+                        <span className="text-xs sm:text-sm font-bold text-white tracking-tight">
+                            {periodTitle}
+                        </span>
+                    </div>
                 </div>
 
-                {/* 2. Orta & Sağ Alan: Görünüm Seçici, Arama, Bildirimler, Admin & Profil */}
-                <div className="flex items-center justify-between lg:justify-end gap-2 flex-wrap">
-                    {/* Görünüm Seçenekleri Segmented Control */}
-                    <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-0.5 text-xs font-medium shrink-0">
+                {/* 2. Orta & Sağ Bölüm: Segmented View, Arama, Bildirimler, Yeni Etkinlik & Profil */}
+                <div className="flex items-center justify-between xl:justify-end gap-2 flex-wrap">
+                    {/* Görünüm Modları (Segmented Control) */}
+                    <div className="flex items-center bg-zinc-900/90 border border-zinc-800/90 rounded-xl p-0.5 text-xs font-medium shrink-0 shadow-inner">
                         {(['ay', '3ay', '6ay', 'hafta', 'gun', 'liste'] as CalendarViewMode[]).map((mode) => (
                             <button
                                 key={mode}
                                 type="button"
                                 onClick={() => setViewMode(mode)}
-                                className={`px-2.5 py-1 rounded-lg capitalize transition-all ${viewMode === mode
-                                        ? 'bg-zinc-800 text-white font-semibold shadow-xs'
-                                        : 'text-zinc-400 hover:text-zinc-200'
-                                    }`}
+                                className={`px-2.5 py-1 rounded-lg capitalize transition-all cursor-pointer ${
+                                    viewMode === mode
+                                        ? 'bg-gradient-to-r from-rose-600 to-rose-700 text-white font-bold shadow-md shadow-rose-950/50'
+                                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                                }`}
                             >
                                 {mode === 'ay' ? 'Ay' :
-                                    mode === '3ay' ? '3 Ay' :
-                                        mode === '6ay' ? '6 Ay' :
-                                            mode === 'hafta' ? 'Hafta' :
-                                                mode === 'gun' ? 'Gün' : 'Liste'}
+                                 mode === '3ay' ? '3 Ay' :
+                                 mode === '6ay' ? '6 Ay' :
+                                 mode === 'hafta' ? 'Hafta' :
+                                 mode === 'gun' ? 'Gün' : 'Liste'}
                             </button>
                         ))}
                     </div>
 
-                    {/* Arama Kutusu */}
-                    <div className="relative hidden md:block">
+                    {/* Arama Inputu */}
+                    <div className="relative hidden lg:block">
                         <input
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Etkinlik ara..."
-                            className="w-36 lg:w-44 bg-zinc-900 border border-zinc-800 rounded-xl pl-7 pr-3 py-1 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-rose-500 transition-all"
+                            placeholder="Etkinlik veya kişi..."
+                            className="w-36 xl:w-44 bg-zinc-900/90 border border-zinc-800/90 rounded-xl pl-7 pr-3 py-1 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-rose-500 transition-all font-medium"
                         />
                         <svg className="w-3.5 h-3.5 text-zinc-500 absolute left-2 top-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
+                        {searchQuery && (
+                            <button
+                                type="button"
+                                onClick={() => setSearchQuery('')}
+                                className="absolute right-2 top-1.5 text-zinc-500 hover:text-white text-xs cursor-pointer"
+                            >
+                                ✕
+                            </button>
+                        )}
                     </div>
 
-                    {/* Bildirim Merkezi (🔔) */}
+                    {/* Bildirim Çanı */}
                     <div className="relative shrink-0">
                         <button
                             type="button"
                             onClick={() => setIsNotifOpen(!isNotifOpen)}
-                            className="relative p-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700 transition-all"
-                            title="Bildirim Merkezi"
+                            className="relative p-1.5 rounded-xl bg-zinc-900/90 border border-zinc-800/90 text-zinc-300 hover:text-white hover:border-zinc-700 transition-all cursor-pointer shadow-sm"
+                            title="Bildirimler"
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                                 <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                             </svg>
                             {unreadCount > 0 && (
-                                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-600 text-white text-[10px] font-bold flex items-center justify-center animate-pulse">
+                                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-600 text-white text-[10px] font-bold flex items-center justify-center shadow-sm shadow-rose-950/80 animate-pulse">
                                     {unreadCount}
                                 </span>
                             )}
@@ -465,36 +559,34 @@ export default function NotionCalendar({
 
                         {/* Açılır Bildirim Paneli */}
                         {isNotifOpen && (
-                            <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-zinc-950 border border-zinc-800 shadow-2xl p-4 z-50 animate-in fade-in slide-in-from-top-2">
+                            <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-zinc-950/95 border border-zinc-800 shadow-2xl p-4 z-50 animate-in fade-in slide-in-from-top-2 backdrop-blur-2xl">
                                 <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5 mb-3">
                                     <div className="flex items-center gap-2">
-                                        <h3 className="text-sm font-semibold text-white">Bildirimler</h3>
+                                        <h3 className="text-xs font-bold text-white uppercase tracking-wider">Bildirim Merkezi</h3>
                                         {unreadCount > 0 && (
                                             <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-800 font-mono">
                                                 {unreadCount} yeni
                                             </span>
                                         )}
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        {unreadCount > 0 && (
-                                            <button
-                                                type="button"
-                                                onClick={handleMarkAllNotificationsRead}
-                                                className="text-[11px] text-zinc-400 hover:text-rose-400 transition-colors"
-                                            >
-                                                Tümünü Okundu Say
-                                            </button>
-                                        )}
-                                    </div>
+                                    {unreadCount > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={handleMarkAllNotificationsRead}
+                                            className="text-[11px] text-zinc-400 hover:text-rose-400 transition-colors font-medium cursor-pointer"
+                                        >
+                                            Tümünü Okundu Say
+                                        </button>
+                                    )}
                                 </div>
 
                                 {!desktopNotifAllowed && (
                                     <div className="p-2.5 mb-3 rounded-xl bg-rose-950/30 border border-rose-900/50 flex items-center justify-between text-xs">
-                                        <span className="text-rose-200">Masaüstü bildirimleri kapalı</span>
+                                        <span className="text-rose-200 text-[11px]">Masaüstü anlık bildirimleri</span>
                                         <button
                                             type="button"
                                             onClick={requestNotificationPermission}
-                                            className="px-2 py-1 rounded bg-rose-600 text-white font-medium hover:bg-rose-500 transition-colors text-[11px]"
+                                            className="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-medium hover:bg-rose-500 transition-colors text-[11px] cursor-pointer"
                                         >
                                             İzin Ver
                                         </button>
@@ -506,10 +598,11 @@ export default function NotionCalendar({
                                         notifications.map(n => (
                                             <div
                                                 key={n.id}
-                                                className={`p-3 rounded-xl border transition-all text-xs ${n.is_read
+                                                className={`p-3 rounded-xl border transition-all text-xs ${
+                                                    n.is_read
                                                         ? 'bg-zinc-900/40 border-zinc-900 text-zinc-400'
                                                         : 'bg-zinc-900/90 border-zinc-800 text-zinc-200 shadow-xs'
-                                                    }`}
+                                                }`}
                                             >
                                                 <div className="flex items-center justify-between mb-1">
                                                     <span className="font-semibold text-white flex items-center gap-1.5">
@@ -529,53 +622,67 @@ export default function NotionCalendar({
                                             </div>
                                         ))
                                     ) : (
-                                        <p className="text-center text-xs text-zinc-500 py-6 italic">Bildiriminiz bulunmuyor.</p>
+                                        <p className="text-center text-xs text-zinc-500 py-6 italic">Yeni bildirim bulunmuyor.</p>
                                     )}
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    {/* Yeni Etkinlik Butonu */}
+                    {/* "+ Yeni Etkinlik" Butonu */}
                     <button
                         type="button"
                         onClick={() => handleOpenNewEvent(new Date())}
-                        className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm shadow-rose-950/40 transition-all shrink-0 cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-600 via-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-rose-950/50 transition-all shrink-0 cursor-pointer border border-rose-500/30 active:scale-95"
                     >
-                        <span>+</span>
+                        <span className="font-bold text-sm leading-none">+</span>
                         <span className="hidden sm:inline">Yeni Etkinlik</span>
                     </button>
 
-                    {/* ── BİRLEŞTİRİLMİŞ KULLANICI PROFİLİ, ADMİN VE ÇIKIŞ MENÜSÜ ── */}
+                    {/* ── PROFESYONEL SEVİYE KULLANICI PROFİLİ (BAR PP & HESAP ADASI) ── */}
                     {currentUser ? (
                         <div className="relative shrink-0">
                             <button
                                 type="button"
                                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                                className="flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-850 transition-all cursor-pointer group"
+                                className="flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 hover:border-rose-500/50 hover:bg-zinc-850/90 transition-all cursor-pointer group shadow-sm"
                                 title="Kullanıcı Menüsü"
                             >
-                                {/* Profil Fotoğrafı veya İsim Baş harfi Avatarı */}
-                                {currentUser.avatar_url ? (
-                                    <img
-                                        src={currentUser.avatar_url}
-                                        alt={currentUser.display_name}
-                                        className="w-7 h-7 rounded-xl object-cover border border-zinc-700/80 group-hover:border-rose-500/50 shadow-sm"
-                                    />
-                                ) : (
-                                    <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-rose-600 via-rose-500 to-amber-500 flex items-center justify-center text-[11px] font-bold text-white shadow-sm border border-rose-400/30">
-                                        {currentUser.display_name.substring(0, 2).toUpperCase()}
-                                    </div>
-                                )}
+                                {/* PP: /ekip Eşleşen Fotoğrafı veya Monogram Baş Harfi */}
+                                <div className="relative shrink-0">
+                                    {activeAvatar ? (
+                                        <img
+                                            src={activeAvatar}
+                                            alt={currentUser.display_name}
+                                            className="w-7 h-7 rounded-xl object-cover border border-zinc-700/80 group-hover:border-rose-500/70 shadow-sm"
+                                        />
+                                    ) : (
+                                        <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-rose-600 via-rose-500 to-amber-500 flex items-center justify-center text-[10px] font-bold text-white shadow-sm border border-rose-400/30">
+                                            {currentUser.display_name.substring(0, 2).toUpperCase()}
+                                        </div>
+                                    )}
+                                    {/* Çevrimiçi Durum Göstergesi */}
+                                    <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-zinc-950 rounded-full" />
+                                </div>
 
                                 <div className="flex flex-col items-start text-left leading-tight hidden sm:flex">
-                                    <span className="text-xs font-semibold text-zinc-200 group-hover:text-white transition-colors max-w-[100px] truncate">
+                                    <span className="text-xs font-semibold text-zinc-100 group-hover:text-white transition-colors max-w-[110px] truncate">
                                         {currentUser.display_name}
                                     </span>
-                                    <span className="text-[10px] text-zinc-500 font-mono">
-                                        {currentUser.role === 'super_admin' ? 'Süper Admin' :
-                                         currentUser.role === 'workspace_admin' ? 'Yönetici' :
-                                         currentUser.role === 'editor' ? 'Editör' : 'Üye'}
+                                    <span className="text-[10px] text-zinc-400 font-mono flex items-center gap-1">
+                                        {isTeamMatched ? (
+                                            <span className="text-emerald-400 font-medium flex items-center gap-0.5">
+                                                <span>✓</span> Ekip
+                                            </span>
+                                        ) : currentUser.role === 'super_admin' ? (
+                                            <span className="text-amber-400 font-medium">👑 Admin</span>
+                                        ) : currentUser.role === 'workspace_admin' ? (
+                                            <span className="text-rose-400 font-medium">🛡️ Yönetici</span>
+                                        ) : currentUser.role === 'editor' ? (
+                                            <span className="text-blue-400 font-medium">✍️ Editör</span>
+                                        ) : (
+                                            'Üye'
+                                        )}
                                     </span>
                                 </div>
 
@@ -585,43 +692,64 @@ export default function NotionCalendar({
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
                                 >
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M19 9l-7 7-7-7" />
                                 </svg>
                             </button>
 
-                            {/* Açılır Kullanıcı Menüsü */}
+                            {/* Açılır Kullanıcı Menüsü Popover */}
                             {isUserMenuOpen && (
-                                <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-zinc-950 border border-zinc-800 shadow-2xl p-3.5 z-50 animate-in fade-in slide-in-from-top-2 backdrop-blur-xl">
-                                    {/* Profil Kartı */}
+                                <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-zinc-950/95 border border-zinc-800 shadow-2xl p-3.5 z-50 animate-in fade-in slide-in-from-top-2 backdrop-blur-2xl">
+                                    {/* Profil Başlığı */}
                                     <div className="flex items-center gap-3 pb-3 border-b border-zinc-800/80">
-                                        {currentUser.avatar_url ? (
-                                            <img
-                                                src={currentUser.avatar_url}
-                                                alt={currentUser.display_name}
-                                                className="w-11 h-11 rounded-2xl object-cover border-2 border-rose-500/40 shadow-md shrink-0"
-                                            />
-                                        ) : (
-                                            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-rose-600 via-rose-500 to-amber-500 flex items-center justify-center text-sm font-bold text-white shadow-md border border-rose-400/40 shrink-0">
-                                                {currentUser.display_name.substring(0, 2).toUpperCase()}
-                                            </div>
-                                        )}
+                                        <div className="relative shrink-0">
+                                            {activeAvatar ? (
+                                                <img
+                                                    src={activeAvatar}
+                                                    alt={currentUser.display_name}
+                                                    className="w-12 h-12 rounded-2xl object-cover border-2 border-rose-500/50 shadow-md"
+                                                />
+                                            ) : (
+                                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-600 via-rose-500 to-amber-500 flex items-center justify-center text-sm font-bold text-white shadow-md border border-rose-400/40">
+                                                    {currentUser.display_name.substring(0, 2).toUpperCase()}
+                                                </div>
+                                            )}
+                                            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-zinc-950 rounded-full" />
+                                        </div>
                                         <div className="flex-1 min-w-0">
-                                            <h4 className="text-sm font-bold text-white truncate">
-                                                {currentUser.display_name}
+                                            <h4 className="text-sm font-bold text-white truncate flex items-center gap-1.5">
+                                                <span>{currentUser.display_name}</span>
+                                                {isTeamMatched && (
+                                                    <span className="text-[10px] text-emerald-400" title="Ekip Listesiyle Eşleşti">✓</span>
+                                                )}
                                             </h4>
                                             <p className="text-[11px] text-zinc-400 font-mono truncate">
                                                 {currentUser.email}
                                             </p>
-                                            <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-rose-950/80 text-rose-300 border border-rose-800/60 font-medium">
-                                                {currentUser.role === 'super_admin' ? '👑 Süper Yönetici' :
-                                                 currentUser.role === 'workspace_admin' ? '🛡️ Topluluk Yöneticisi' :
-                                                 currentUser.role === 'editor' ? '✍️ Çekirdek Editör' : '👁️ Gözlemci'}
-                                            </span>
+                                            {teamRoleTitle ? (
+                                                <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-rose-950/80 text-rose-300 border border-rose-800/60 font-medium truncate max-w-[190px]">
+                                                    {teamRoleTitle}
+                                                </span>
+                                            ) : (
+                                                <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-zinc-900 text-zinc-300 border border-zinc-800 font-medium">
+                                                    {currentUser.role === 'super_admin' ? '👑 Süper Yönetici' :
+                                                     currentUser.role === 'workspace_admin' ? '🛡️ Topluluk Yöneticisi' :
+                                                     currentUser.role === 'editor' ? '✍️ Çekirdek Editör' : '👥 Topluluk Üyesi'}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
 
-                                    {/* Linkler & Kısayollar */}
+                                    {/* Kısayol Menü Linkleri */}
                                     <div className="py-2 space-y-1">
+                                        <Link
+                                            href="/ekip"
+                                            onClick={() => setIsUserMenuOpen(false)}
+                                            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-900 transition-colors"
+                                        >
+                                            <span className="text-sm">🌟</span>
+                                            <span>HSD Ekip Sayfası (/ekip)</span>
+                                        </Link>
+
                                         {isAdmin && (
                                             <>
                                                 <Link
@@ -644,7 +772,7 @@ export default function NotionCalendar({
                                         )}
                                     </div>
 
-                                    {/* Çıkış Butonu */}
+                                    {/* Çıkış Yap Butonu */}
                                     {onLogout && (
                                         <div className="pt-2 border-t border-zinc-800/80">
                                             <button
@@ -667,7 +795,7 @@ export default function NotionCalendar({
                         <button
                             type="button"
                             onClick={onRequireLogin}
-                            className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 text-xs font-semibold shrink-0 transition-all flex items-center gap-1 cursor-pointer"
+                            className="px-3.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 text-xs font-semibold shrink-0 transition-all flex items-center gap-1.5 cursor-pointer"
                         >
                             <span>🔒</span>
                             <span>Giriş Yap</span>
