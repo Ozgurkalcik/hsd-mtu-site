@@ -62,6 +62,10 @@ export default function NotionCalendar({
     // Event Drawer State
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [editingEvent, setEditingEvent] = useState<WorkspaceEvent | null>(null);
+    const [initialTargetDate, setInitialTargetDate] = useState<Date | null>(null);
+
+    // User Profile Dropdown Menu State
+    const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
     // Drag-and-drop feedback
     const [draggedEventId, setDraggedEventId] = useState<string | null>(null);
@@ -314,13 +318,15 @@ export default function NotionCalendar({
     };
 
     // Open Event Drawer for New or Edit
-    const handleOpenNewEvent = () => {
+    const handleOpenNewEvent = (targetDate?: Date) => {
         setEditingEvent(null);
+        setInitialTargetDate(targetDate || new Date());
         setIsDrawerOpen(true);
     };
 
     const handleOpenEditEvent = (ev: WorkspaceEvent) => {
         setEditingEvent(ev);
+        setInitialTargetDate(new Date(ev.start_time));
         setIsDrawerOpen(true);
     };
 
@@ -530,59 +536,141 @@ export default function NotionCalendar({
                         )}
                     </div>
 
-                    {/* Admin Paneli Kısayolu */}
-                    {isAdmin && (
-                        <Link
-                            href="/admin/workspace"
-                            className="px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white text-xs font-medium transition-all flex items-center gap-1.5 shrink-0"
-                            title="Admin Yönetim Paneli"
-                        >
-                            <span>⚙️</span>
-                            <span className="hidden sm:inline">Admin</span>
-                        </Link>
-                    )}
-
                     {/* Yeni Etkinlik Butonu */}
                     <button
                         type="button"
-                        onClick={handleOpenNewEvent}
-                        className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center gap-1 shadow-sm shadow-rose-950/40 transition-all shrink-0"
+                        onClick={() => handleOpenNewEvent(new Date())}
+                        className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm shadow-rose-950/40 transition-all shrink-0 cursor-pointer"
                     >
                         <span>+</span>
                         <span className="hidden sm:inline">Yeni Etkinlik</span>
                     </button>
 
-                    {/* Profil / Oturum Alanı */}
+                    {/* ── BİRLEŞTİRİLMİŞ KULLANICI PROFİLİ, ADMİN VE ÇIKIŞ MENÜSÜ ── */}
                     {currentUser ? (
-                        <div className="flex items-center gap-2 pl-1 border-l border-zinc-800 shrink-0">
-                            <div
-                                className="w-7 h-7 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-bold text-rose-400"
-                                title={`${currentUser.display_name} (${currentUser.role})`}
+                        <div className="relative shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                                className="flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-850 transition-all cursor-pointer group"
+                                title="Kullanıcı Menüsü"
                             >
-                                {currentUser.display_name.charAt(0)}
-                            </div>
-                            <span className="text-xs text-zinc-300 font-medium hidden xl:inline max-w-[90px] truncate">
-                                {currentUser.display_name}
-                            </span>
-                            {onLogout && (
-                                <button
-                                    type="button"
-                                    onClick={onLogout}
-                                    className="p-1 text-zinc-400 hover:text-rose-400 text-xs transition-colors"
-                                    title="Çıkış Yap"
+                                {/* Profil Fotoğrafı veya İsim Baş harfi Avatarı */}
+                                {currentUser.avatar_url ? (
+                                    <img
+                                        src={currentUser.avatar_url}
+                                        alt={currentUser.display_name}
+                                        className="w-7 h-7 rounded-xl object-cover border border-zinc-700/80 group-hover:border-rose-500/50 shadow-sm"
+                                    />
+                                ) : (
+                                    <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-rose-600 via-rose-500 to-amber-500 flex items-center justify-center text-[11px] font-bold text-white shadow-sm border border-rose-400/30">
+                                        {currentUser.display_name.substring(0, 2).toUpperCase()}
+                                    </div>
+                                )}
+
+                                <div className="flex flex-col items-start text-left leading-tight hidden sm:flex">
+                                    <span className="text-xs font-semibold text-zinc-200 group-hover:text-white transition-colors max-w-[100px] truncate">
+                                        {currentUser.display_name}
+                                    </span>
+                                    <span className="text-[10px] text-zinc-500 font-mono">
+                                        {currentUser.role === 'super_admin' ? 'Süper Admin' :
+                                         currentUser.role === 'workspace_admin' ? 'Yönetici' :
+                                         currentUser.role === 'editor' ? 'Editör' : 'Üye'}
+                                    </span>
+                                </div>
+
+                                <svg
+                                    className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`}
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
                                 >
-                                    ⎋
-                                </button>
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+
+                            {/* Açılır Kullanıcı Menüsü */}
+                            {isUserMenuOpen && (
+                                <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-zinc-950 border border-zinc-800 shadow-2xl p-3.5 z-50 animate-in fade-in slide-in-from-top-2 backdrop-blur-xl">
+                                    {/* Profil Kartı */}
+                                    <div className="flex items-center gap-3 pb-3 border-b border-zinc-800/80">
+                                        {currentUser.avatar_url ? (
+                                            <img
+                                                src={currentUser.avatar_url}
+                                                alt={currentUser.display_name}
+                                                className="w-11 h-11 rounded-2xl object-cover border-2 border-rose-500/40 shadow-md shrink-0"
+                                            />
+                                        ) : (
+                                            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-rose-600 via-rose-500 to-amber-500 flex items-center justify-center text-sm font-bold text-white shadow-md border border-rose-400/40 shrink-0">
+                                                {currentUser.display_name.substring(0, 2).toUpperCase()}
+                                            </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="text-sm font-bold text-white truncate">
+                                                {currentUser.display_name}
+                                            </h4>
+                                            <p className="text-[11px] text-zinc-400 font-mono truncate">
+                                                {currentUser.email}
+                                            </p>
+                                            <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-rose-950/80 text-rose-300 border border-rose-800/60 font-medium">
+                                                {currentUser.role === 'super_admin' ? '👑 Süper Yönetici' :
+                                                 currentUser.role === 'workspace_admin' ? '🛡️ Topluluk Yöneticisi' :
+                                                 currentUser.role === 'editor' ? '✍️ Çekirdek Editör' : '👁️ Gözlemci'}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Linkler & Kısayollar */}
+                                    <div className="py-2 space-y-1">
+                                        {isAdmin && (
+                                            <>
+                                                <Link
+                                                    href="/admin/workspace"
+                                                    onClick={() => setIsUserMenuOpen(false)}
+                                                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-900 transition-colors"
+                                                >
+                                                    <span className="text-sm">⚙️</span>
+                                                    <span>Workspace Yönetim Paneli</span>
+                                                </Link>
+                                                <Link
+                                                    href="/admin/ekip"
+                                                    onClick={() => setIsUserMenuOpen(false)}
+                                                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-900 transition-colors"
+                                                >
+                                                    <span className="text-sm">👥</span>
+                                                    <span>Ekip Üyeleri (Profil Fotoğrafları)</span>
+                                                </Link>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    {/* Çıkış Butonu */}
+                                    {onLogout && (
+                                        <div className="pt-2 border-t border-zinc-800/80">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setIsUserMenuOpen(false);
+                                                    onLogout();
+                                                }}
+                                                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:text-white hover:bg-rose-950/50 border border-rose-900/40 transition-colors cursor-pointer"
+                                            >
+                                                <span>⎋</span>
+                                                <span>Güvenli Çıkış Yap</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             )}
                         </div>
                     ) : onRequireLogin && (
                         <button
                             type="button"
                             onClick={onRequireLogin}
-                            className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 text-xs font-semibold shrink-0 transition-all flex items-center gap-1"
+                            className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 text-xs font-semibold shrink-0 transition-all flex items-center gap-1 cursor-pointer"
                         >
                             <span>🔒</span>
-                            <span>Giriş</span>
+                            <span>Giriş Yap</span>
                         </button>
                     )}
                 </div>
@@ -664,10 +752,19 @@ export default function NotionCalendar({
                             events={filteredEvents}
                             onEventClick={handleOpenEditEvent}
                             onDayClick={(dateStr) => {
+                                const todayStr = new Date().toISOString().split('T')[0];
+                                const isPast = dateStr < todayStr;
+                                const canCreatePast = isAdmin || currentUser?.role === 'super_admin' || currentUser?.role === 'workspace_admin';
+
+                                if (isPast && !canCreatePast) {
+                                    alert(`Geçmiş bir tarihe (${dateStr}) yeni etkinlik eklenemez. Yalnızca geçmiş etkinlikleri inceleyebilirsiniz.`);
+                                    return;
+                                }
+
                                 const [y, m, d] = dateStr.split('-');
                                 const clickedDate = new Date(Number(y), Number(m) - 1, Number(d), 10, 0);
                                 setCurrentDate(clickedDate);
-                                handleOpenNewEvent();
+                                handleOpenNewEvent(clickedDate);
                             }}
                             onDropOnDate={handleDropOnDate}
                             onDragStart={(id) => setDraggedEventId(id)}
@@ -733,6 +830,7 @@ export default function NotionCalendar({
                 isOpen={isDrawerOpen}
                 onClose={() => setIsDrawerOpen(false)}
                 event={editingEvent}
+                initialDate={initialTargetDate}
                 calendars={calendars}
                 groups={groups}
                 members={members}

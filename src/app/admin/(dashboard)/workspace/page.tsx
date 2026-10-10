@@ -138,6 +138,9 @@ export default function AdminWorkspacePage() {
             const data = await res.json();
             if (res.ok) {
                 showNotification('success', `✓ ${newMemberForm.display_name} (@${data.member?.username || newMemberForm.username}) başarıyla oluşturuldu!`);
+                if (data.member) {
+                    setMembers(prev => [data.member, ...prev.filter(m => m.id !== data.member.id)]);
+                }
                 setIsAddMemberOpen(false);
                 setNewMemberForm({ display_name: '', username: '', email: '', password: '', role: 'editor', group_id: '' });
                 loadData();

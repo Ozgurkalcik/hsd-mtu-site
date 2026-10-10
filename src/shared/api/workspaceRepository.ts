@@ -71,7 +71,26 @@ export class WorkspaceRepository {
                 let query = supabase.from('workspace_events').select('*');
                 if (calendarId) query = query.eq('calendar_id', calendarId);
                 const { data, error } = await query;
-                if (!error && data && data.length > 0) return data as WorkspaceEvent[];
+                if (!error && data && data.length > 0) {
+                    // Yorum ve alt görevleri veritabanından çekip bağla
+                    const [comRes, subRes] = await Promise.all([
+                        supabase.from('workspace_event_comments').select('*'),
+                        supabase.from('workspace_event_subtasks').select('*')
+                    ]);
+
+                    const comments = comRes.data || [];
+                    const subtasks = subRes.data || [];
+
+                    const enriched = data.map((ev: any) => ({
+                        ...ev,
+                        comments: comments.filter((c: any) => c.event_id === ev.id),
+                        subtasks: subtasks.filter((s: any) => s.event_id === ev.id),
+                        attachments: [],
+                        reminders: []
+                    })) as WorkspaceEvent[];
+
+                    return enriched;
+                }
             } catch (err) {
                 console.warn('Postgres etkinlik okuma hatası:', err);
             }
@@ -85,7 +104,19 @@ export class WorkspaceRepository {
             try {
                 const supabase = this.getSupabaseClient();
                 const { data, error } = await supabase.from('workspace_events').select('*').eq('id', id).single();
-                if (!error && data) return data as WorkspaceEvent;
+                if (!error && data) {
+                    const [comRes, subRes] = await Promise.all([
+                        supabase.from('workspace_event_comments').select('*').eq('event_id', id),
+                        supabase.from('workspace_event_subtasks').select('*').eq('event_id', id)
+                    ]);
+                    return {
+                        ...data,
+                        comments: comRes.data || [],
+                        subtasks: subRes.data || [],
+                        attachments: [],
+                        reminders: []
+                    } as WorkspaceEvent;
+                }
             } catch (err) {
                 console.warn('Postgres etkinlik getirme hatası:', err);
             }
@@ -95,19 +126,59 @@ export class WorkspaceRepository {
 
     public static async createEvent(event: WorkspaceEvent): Promise<WorkspaceEvent> {
         this.ensureDatabaseConfigured();
+        const storeEvent = WorkspaceStoreManager.getInstance().addEvent(event);
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                const { data, error } = await supabase.from('workspace_events').insert(event).select().single();
+                // İlişkisel tablolara ait olan dizi alanları ayıkla
+                const dbEvent = {
+                    id: event.id,
+                    calendar_id: event.calendar_id,
+                    title: event.title,
+                    description: event.description || '',
+                    category: event.category || 'Toplantı',
+                    color: event.color || '#dc2626',
+                    start_time: event.start_time,
+                    end_time: event.end_time,
+                    is_all_day: Boolean(event.is_all_day),
+                    assignees: event.assignees || [],
+                    location: event.location || null,
+                    meeting_link: event.meeting_link || null,
+                    status: event.status || 'scheduled',
+                    version: event.version || 1,
+                    created_at: event.created_at || new Date().toISOString(),
+                    updated_at: event.updated_at || new Date().toISOString()
+                };
+
+                const { data, error } = await supabase.from('workspace_events').insert(dbEvent).select().single();
                 if (!error && data) {
-                    WorkspaceStoreManager.getInstance().addEvent(event);
-                    return data as WorkspaceEvent;
+                    // Alt görev varsa veritabanına ekle
+                    if (event.subtasks && event.subtasks.length > 0) {
+                        for (const st of event.subtasks) {
+                            await supabase.from('workspace_event_subtasks').insert(st);
+                        }
+                    }
+                    // Yorum varsa veritabanına ekle
+                    if (event.comments && event.comments.length > 0) {
+                        for (const com of event.comments) {
+                            await supabase.from('workspace_event_comments').insert(com);
+                        }
+                    }
+                    return {
+                        ...data,
+                        subtasks: event.subtasks || [],
+                        comments: event.comments || [],
+                        attachments: event.attachments || [],
+                        reminders: event.reminders || []
+                    } as WorkspaceEvent;
+                } else if (error) {
+                    console.warn('Postgres etkinlik kayıt hatası:', error);
                 }
             } catch (err) {
                 console.warn('Postgres etkinlik kayıt hatası:', err);
             }
         }
-        return WorkspaceStoreManager.getInstance().addEvent(event);
+        return storeEvent;
     }
 
     public static async updateEventWithConcurrency(
@@ -132,9 +203,11 @@ export class WorkspaceRepository {
                 }
 
                 const newVersion = currentEvent.version + 1;
+                const { comments, subtasks, attachments, reminders, ...allowedDbFields } = updates as any;
+
                 const { data, error } = await supabase
                     .from('workspace_events')
-                    .update({ ...updates, version: newVersion, updated_at: new Date().toISOString() })
+                    .update({ ...allowedDbFields, version: newVersion, updated_at: new Date().toISOString() })
                     .eq('id', id)
                     .eq('version', expectedVersion)
                     .select()
@@ -142,7 +215,8 @@ export class WorkspaceRepository {
 
                 if (!error && data) {
                     WorkspaceStoreManager.getInstance().updateEventWithConcurrency(id, updates, expectedVersion);
-                    return { success: true, event: data as WorkspaceEvent };
+                    const fresh = await this.getEventById(id);
+                    return { success: true, event: fresh || (data as WorkspaceEvent) };
                 } else if (error?.code === 'PGRST116') {
                     const fresh = await this.getEventById(id);
                     return { success: false, conflict: true, currentVersion: fresh?.version, event: fresh || undefined };
@@ -241,8 +315,12 @@ export class WorkspaceRepository {
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                const { data, error } = await supabase.from('workspace_event_comments').select('*').eq('event_id', eventId);
-                if (!error && data) return data as WorkspaceComment[];
+                const { data, error } = await supabase
+                    .from('workspace_event_comments')
+                    .select('*')
+                    .eq('event_id', eventId)
+                    .order('created_at', { ascending: true });
+                if (!error && data && data.length > 0) return data as WorkspaceComment[];
             } catch (err) {
                 console.warn('Postgres yorum okuma hatası:', err);
             }
@@ -257,7 +335,18 @@ export class WorkspaceRepository {
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                await supabase.from('workspace_event_comments').insert(storeComment);
+                const dbComment = {
+                    id: storeComment.id,
+                    event_id: storeComment.event_id,
+                    user_id: storeComment.user_id,
+                    user_name: storeComment.user_name,
+                    content: storeComment.content,
+                    created_at: storeComment.created_at
+                };
+                const { error } = await supabase.from('workspace_event_comments').insert(dbComment);
+                if (error) {
+                    console.warn('Postgres yorum ekleme hatası:', error);
+                }
             } catch (err) {
                 console.warn('Postgres yorum ekleme hatası:', err);
             }
@@ -271,16 +360,60 @@ export class WorkspaceRepository {
 
     public static async getMembers(): Promise<WorkspaceMember[]> {
         this.ensureDatabaseConfigured();
+        let members: WorkspaceMember[] = [];
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
                 const { data, error } = await supabase.from('workspace_members').select('*');
-                if (!error && data && data.length > 0) return data as WorkspaceMember[];
+                if (!error && data && data.length > 0) {
+                    members = data as WorkspaceMember[];
+                }
+
+                // Ekip üyeleri (team_members) tablosundan profil fotoğraflarını çekip bağla
+                try {
+                    const { data: teamMembers } = await supabase
+                        .from('team_members')
+                        .select('full_name, image_url')
+                        .not('image_url', 'is', null);
+
+                    if (teamMembers && teamMembers.length > 0) {
+                        const teamMap = new Map<string, string>();
+                        for (const tm of teamMembers) {
+                            if (tm.full_name && tm.image_url) {
+                                teamMap.set(tm.full_name.trim().toLowerCase(), tm.image_url);
+                            }
+                        }
+
+                        for (const m of members) {
+                            if (!m.avatar_url) {
+                                const nameKey = m.display_name.trim().toLowerCase();
+                                if (teamMap.has(nameKey)) {
+                                    m.avatar_url = teamMap.get(nameKey);
+                                }
+                            }
+                        }
+                    }
+                } catch {
+                    // ignore
+                }
             } catch (err) {
                 console.warn('Postgres üye listesi okuma hatası:', err);
             }
         }
-        return WorkspaceStoreManager.getInstance().getMembers();
+
+        if (members.length === 0) {
+            members = WorkspaceStoreManager.getInstance().getMembers();
+        } else {
+            // Local store'daki yeni eklenenleri de koru
+            const storeMembers = WorkspaceStoreManager.getInstance().getMembers();
+            const memberIds = new Set(members.map(m => m.id));
+            for (const sm of storeMembers) {
+                if (!memberIds.has(sm.id)) {
+                    members.push(sm);
+                }
+            }
+        }
+        return members;
     }
 
     public static async getMemberById(id: string): Promise<WorkspaceMember | null> {
@@ -344,7 +477,39 @@ export class WorkspaceRepository {
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                await supabase.from('workspace_members').insert(member);
+                const payload: any = {
+                    id: member.id,
+                    email: member.email,
+                    display_name: member.display_name,
+                    role: member.role,
+                    status: member.status || 'active',
+                    mfa_enabled: Boolean(member.mfa_enabled),
+                    must_change_password: Boolean(member.must_change_password),
+                    avatar_url: member.avatar_url || null,
+                    created_at: member.created_at || new Date().toISOString()
+                };
+                if (member.username) payload.username = member.username;
+                if (member.group_id) payload.group_id = member.group_id;
+                if (password) payload.password_hash = hashPassword(password);
+
+                const { error } = await supabase.from('workspace_members').insert(payload);
+                if (error) {
+                    console.warn('Postgres üye ekleme hatası, temel kolonlarla deneniyor:', error);
+                    const corePayload = {
+                        id: member.id,
+                        email: member.email,
+                        display_name: member.display_name,
+                        role: member.role,
+                        status: member.status || 'active',
+                        mfa_enabled: Boolean(member.mfa_enabled),
+                        avatar_url: member.avatar_url || null,
+                        created_at: member.created_at || new Date().toISOString()
+                    };
+                    const { error: coreErr } = await supabase.from('workspace_members').insert(corePayload);
+                    if (coreErr) {
+                        console.error('Postgres temel üye ekleme hatası:', coreErr);
+                    }
+                }
             } catch (err) {
                 console.warn('Postgres üye ekleme hatası:', err);
             }

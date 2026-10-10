@@ -95,31 +95,64 @@ export class WorkspaceStoreManager {
         this.memberPasswords.set(defaultAdmin2.email.toLowerCase(), hashedAdminPass);
         this.memberPasswords.set(defaultAdmin2.username.toLowerCase(), hashedAdminPass);
 
-        // 3. Varsayılan Takvimler
-        const mainCal: WorkspaceCalendar = {
+        // 3. Varsayılan Takvimler (Tüm Komite Takvimleri)
+        const coreCal: WorkspaceCalendar = {
             id: 'cal_core',
-            title: 'HSD Ana Takvim',
-            color: '#dc2626',
-            description: 'Tüm topluluk ve çekirdek ekip etkinlikleri',
+            title: 'Genel Topluluk Takvimi',
+            color: '#ef4444',
+            description: 'Tüm HSD MTÜ üyelerine açık genel etkinlikler ve zirveler',
             is_private: false
         };
-        const devCal: WorkspaceCalendar = {
-            id: 'cal_dev',
-            title: 'Proje & Hackathon',
+        const projCal: WorkspaceCalendar = {
+            id: 'cal_proj',
+            title: 'Proje Komitesi Takvimi',
             color: '#8b5cf6',
-            description: 'Yazılım projeleri, sprintler ve kod atölyeleri',
+            description: 'Yazılım geliştirme, sprintler, code-review ve teknik hackathonlar',
+            is_private: false
+        };
+        const eventCal: WorkspaceCalendar = {
+            id: 'cal_event',
+            title: 'Etkinlik & Sponsorluk Komitesi',
+            color: '#dc2626',
+            description: 'Fiziki konferanslar, atölyeler ve sponsorluk görüşmeleri',
             is_private: false
         };
         const socialCal: WorkspaceCalendar = {
             id: 'cal_social',
-            title: 'Sosyal Medya & İçerik',
+            title: 'Sosyal Medya & Tasarım Komitesi',
             color: '#ec4899',
-            description: 'Instagram, LinkedIn ve Medium içerik akışı',
+            description: 'Görsel iletişim, sosyal medya akışı ve tasarım teslimleri',
             is_private: false
         };
-        this.calendars.set(mainCal.id, mainCal);
-        this.calendars.set(devCal.id, devCal);
+        const mediumCal: WorkspaceCalendar = {
+            id: 'cal_medium',
+            title: 'Medium Komitesi Takvimi',
+            color: '#f59e0b',
+            description: 'Teknik blog makaleleri, bülten hazırlığı ve peer-review',
+            is_private: false
+        };
+        const mgmtCal: WorkspaceCalendar = {
+            id: 'cal_mgmt',
+            title: 'Yönetim & Koordinasyon Takvimi',
+            color: '#3b82f6',
+            description: 'Liderlik toplantıları, komite başkanları oturumları',
+            is_private: true
+        };
+        const aiCal: WorkspaceCalendar = {
+            id: 'cal_ai',
+            title: 'Ar-Ge & Yapay Zeka Komitesi',
+            color: '#10b981',
+            description: 'Yapay zeka modelleri, makale incelemeleri ve akademik projeler',
+            is_private: false
+        };
+
+        this.calendars.set(coreCal.id, coreCal);
+        this.calendars.set(projCal.id, projCal);
+        this.calendars.set(eventCal.id, eventCal);
         this.calendars.set(socialCal.id, socialCal);
+        this.calendars.set(mediumCal.id, mediumCal);
+        this.calendars.set(mgmtCal.id, mgmtCal);
+        this.calendars.set(aiCal.id, aiCal);
 
         // 4. Varsayılan Komiteler (Core Team)
         const projectCommittee: WorkspaceGroup = {
@@ -158,10 +191,31 @@ export class WorkspaceStoreManager {
             role_key: 'writer_lead',
             members: [defaultAdmin1.id]
         };
+        const mgmtCommittee: WorkspaceGroup = {
+            id: 'grp_mgmt',
+            name: 'Yönetim & Koordinasyon Komitesi',
+            code: 'MANAGEMENT',
+            description: 'Çekirdek liderlik, topluluk stratejisi ve idari koordinasyon.',
+            color: '#3b82f6',
+            role_key: 'super_admin',
+            members: [defaultAdmin1.id, defaultAdmin2.id]
+        };
+        const aiCommittee: WorkspaceGroup = {
+            id: 'grp_ai',
+            name: 'Ar-Ge & Yapay Zeka Komitesi',
+            code: 'AI_RESEARCH',
+            description: 'Makine öğrenimi, büyük dil modelleri ve derin teknoloji araştırmaları.',
+            color: '#10b981',
+            role_key: 'ai_lead',
+            members: [defaultAdmin1.id]
+        };
+
         this.groups.set(projectCommittee.id, projectCommittee);
         this.groups.set(eventSponsorCommittee.id, eventSponsorCommittee);
         this.groups.set(socialDesignCommittee.id, socialDesignCommittee);
         this.groups.set(mediumCommittee.id, mediumCommittee);
+        this.groups.set(mgmtCommittee.id, mgmtCommittee);
+        this.groups.set(aiCommittee.id, aiCommittee);
 
         // 5. Başlangıç Etkinlikleri (Örnek Core Verisi)
         const now = new Date();

@@ -16,6 +16,7 @@ interface EventDrawerProps {
     isOpen: boolean;
     onClose: () => void;
     event: WorkspaceEvent | null;
+    initialDate?: Date | null;
     calendars: WorkspaceCalendar[];
     groups: WorkspaceGroup[];
     members: WorkspaceMember[];
@@ -487,6 +488,7 @@ export default function EventDrawer({
     isOpen,
     onClose,
     event,
+    initialDate,
     calendars,
     groups,
     members,
@@ -513,6 +515,23 @@ export default function EventDrawer({
     const [comments, setComments] = useState<WorkspaceComment[]>([]);
     const [attachments, setAttachments] = useState<WorkspaceAttachment[]>([]);
     const [version, setVersion] = useState<number>(1);
+
+    // Past Event Detection & Permissions
+    const isEventPast = useMemo(() => {
+        if (!event) return false;
+        try {
+            return new Date(event.end_time).getTime() < Date.now();
+        } catch {
+            return false;
+        }
+    }, [event]);
+
+    const canEditPast = useMemo(() => {
+        if (!isEventPast) return true;
+        if (currentMember?.role === 'super_admin' || currentMember?.role === 'workspace_admin') return true;
+        if (currentMember?.group_id) return true;
+        return false;
+    }, [isEventPast, currentMember]);
 
     // Active Tab for Markdown
     const [descTab, setDescTab] = useState<'write' | 'preview'>('write');
@@ -569,6 +588,18 @@ export default function EventDrawer({
             setAttachments(event.attachments || []);
             setVersion(event.version || 1);
 
+            // Fetch latest comments directly from database
+            if (event.id) {
+                fetch(`/api/workspace/events/${event.id}/comments`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.comments && Array.isArray(data.comments)) {
+                            setComments(data.comments);
+                        }
+                    })
+                    .catch(err => console.error('Yorum yükleme hatası:', err));
+            }
+
             // Parse Dates
             try {
                 const s = new Date(event.start_time);
@@ -584,19 +615,21 @@ export default function EventDrawer({
                 setEndDate(today);
             }
         } else {
-            // New Event Defaults
-            const now = new Date();
-            const today = now.toISOString().split('T')[0];
-            const nextHour = new Date(now.getTime() + 60 * 60 * 1000);
+            // New Event Defaults: Use clicked date (initialDate) if available!
+            const baseDate = initialDate ? new Date(initialDate) : new Date();
+            const year = baseDate.getFullYear();
+            const month = String(baseDate.getMonth() + 1).padStart(2, '0');
+            const day = String(baseDate.getDate()).padStart(2, '0');
+            const targetDateStr = `${year}-${month}-${day}`;
 
             setTitle('');
             setCalendarId(calendars[0]?.id || 'cal_core');
             setCategory('Toplantı');
             setColor(calendars[0]?.color || '#dc2626');
-            setStartDate(today);
-            setStartTime(now.toTimeString().substring(0, 5));
-            setEndDate(today);
-            setEndTime(nextHour.toTimeString().substring(0, 5));
+            setStartDate(targetDateStr);
+            setStartTime('10:00');
+            setEndDate(targetDateStr);
+            setEndTime('11:00');
             setIsAllDay(false);
             setLocation('');
             setMeetingLink('');
@@ -613,7 +646,7 @@ export default function EventDrawer({
         setAppliedTemplateFeedback(null);
         setAnnouncementSuccess(false);
         setAnnouncementMsg('');
-    }, [isOpen, event, calendars, currentMember]);
+    }, [isOpen, event, initialDate, calendars, currentMember]);
 
     // Keyboard ESC to close
     useEffect(() => {
@@ -902,11 +935,22 @@ export default function EventDrawer({
 
         if (event?.id) {
             try {
-                await fetch(`/api/workspace/events/${event.id}/comments`, {
+                const res = await fetch(`/api/workspace/events/${event.id}/comments`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ content: newCom.content }),
                 });
+                const data = await res.json();
+                if (res.ok && data.comment) {
+                    setComments(prev => prev.map(c => c.id === newCom.id ? data.comment : c));
+                    if (event) {
+                        const updated = {
+                            ...event,
+                            comments: [...(event.comments || []).filter(c => c.id !== newCom.id), data.comment]
+                        };
+                        onEventSaved(updated);
+                    }
+                }
             } catch (err) {
                 console.error('Yorum API hatası:', err);
             }
@@ -1054,6 +1098,25 @@ export default function EventDrawer({
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 <span>{errorMsg}</span>
+                            </div>
+                        )}
+
+                        {/* Geçmiş Etkinlik Uyarısı */}
+                        {isEventPast && (
+                            <div className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 shadow-md ${
+                                canEditPast 
+                                    ? 'bg-amber-950/40 border-amber-800/60 text-amber-200' 
+                                    : 'bg-zinc-900 border-zinc-700 text-zinc-300'
+                            }`}>
+                                <span className="text-amber-400 font-bold text-sm shrink-0">⏳</span>
+                                <div>
+                                    <span className="font-semibold block">Bu etkinlik geçmiş bir tarihe aittir ({startDate}).</span>
+                                    {!canEditPast && (
+                                        <span className="text-zinc-400 text-[11px] block mt-0.5">
+                                            Geçmiş etkinlikler yalnızca sistem ve komite yöneticileri tarafından düzenlenebilir (salt okunur mod).
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         )}
 
@@ -1814,7 +1877,7 @@ export default function EventDrawer({
                     {/* ── 3. FOOTER ACTIONS ── */}
                     <div className="p-4 border-t border-zinc-800 bg-zinc-900/90 flex items-center justify-between backdrop-blur-md shrink-0">
                         <div>
-                            {event && (
+                            {event && canEditPast && (
                                 <button
                                     type="button"
                                     onClick={handleDelete}
@@ -1832,16 +1895,18 @@ export default function EventDrawer({
                                 onClick={onClose}
                                 className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
                             >
-                                İptal
+                                {isEventPast && !canEditPast ? 'Kapat' : 'İptal'}
                             </button>
-                            <button
-                                type="submit"
-                                form="event-form"
-                                disabled={isSaving}
-                                className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 shadow-lg shadow-rose-950/40 transition-all disabled:opacity-50"
-                            >
-                                {isSaving ? 'Kaydediliyor...' : (event ? 'Güncelle' : 'Etkinliği Oluştur')}
-                            </button>
+                            {(!isEventPast || canEditPast) && (
+                                <button
+                                    type="submit"
+                                    form="event-form"
+                                    disabled={isSaving}
+                                    className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 shadow-lg shadow-rose-950/40 transition-all disabled:opacity-50"
+                                >
+                                    {isSaving ? 'Kaydediliyor...' : (event ? 'Güncelle' : 'Etkinliği Oluştur')}
+                                </button>
+                            )}
                         </div>
                     </div>
 

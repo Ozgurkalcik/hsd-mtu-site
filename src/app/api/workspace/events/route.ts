@@ -5,6 +5,14 @@ import { WorkspaceEvent } from '@/shared/api/workspaceTypes';
 
 export async function GET(req: Request) {
     try {
+        const session = await getWorkspaceSession();
+        if (!session) {
+            return NextResponse.json(
+                { error: 'Topluluk Takvimine erişmek için yetkili hesapla giriş yapmalısınız.' },
+                { status: 401 }
+            );
+        }
+
         const { searchParams } = new URL(req.url);
         const calendarId = searchParams.get('calendar_id') || undefined;
 

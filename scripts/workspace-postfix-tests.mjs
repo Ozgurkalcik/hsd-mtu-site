@@ -45,16 +45,16 @@ async function runPostFixTests() {
     // ----------------------------------------------------
     console.log('\n--- 1. UNAUTHENTICATED (ANONYMOUS) SECURITY BARRIER TESTS ---');
 
-    // 1.1 GET /api/workspace/events -> Public Calendar (200 OK)
+    // 1.1 GET /api/workspace/events without cookie -> MUST BE 401 (Strict Lock)
     try {
         const res = await fetch(`${BASE_URL}/api/workspace/events`);
-        if (res.status === 200) {
-            record('Public Events Read (GET /api/workspace/events)', 'Auth/Public', 'PASS', 'Status 200: Topluluk takvimi anonim okunabilir.');
+        if (res.status === 401) {
+            record('Anonymous Events Read Blocked (GET /api/workspace/events)', 'Auth/Strict', 'PASS', 'Status 401: Oturumu olmayan kullanıcının takvim verilerini okuması kesinlikle engellendi.');
         } else {
-            record('Public Events Read (GET /api/workspace/events)', 'Auth/Public', 'FAIL', `Status: ${res.status}`);
+            record('Anonymous Events Read Blocked (GET /api/workspace/events)', 'Auth/Strict', 'FAIL', `Status: ${res.status} (Beklenen: 401)`);
         }
     } catch (e) {
-        record('Public Events Read', 'Auth/Public', 'FAIL', e.message);
+        record('Anonymous Events Read Blocked', 'Auth/Strict', 'FAIL', e.message);
     }
 
     // 1.2 POST /api/workspace/events without cookie -> MUST BE 401
