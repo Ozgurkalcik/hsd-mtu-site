@@ -23,6 +23,7 @@ interface EventDrawerProps {
     groups: WorkspaceGroup[];
     members: WorkspaceMember[];
     currentMember: WorkspaceMember | null;
+    theme?: 'light' | 'dark';
     onEventSaved: (event: WorkspaceEvent) => void;
     onEventDeleted: (eventId: string) => void;
 }
@@ -495,9 +496,11 @@ export default function EventDrawer({
     groups,
     members,
     currentMember,
+    theme = 'dark',
     onEventSaved,
     onEventDeleted,
 }: EventDrawerProps) {
+    const isLight = theme === 'light';
     // Form State
     const [title, setTitle] = useState('');
     const [calendarId, setCalendarId] = useState('cal_core');
@@ -1184,25 +1187,35 @@ export default function EventDrawer({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-black/80 backdrop-blur-sm transition-opacity animate-in fade-in duration-200">
+        <div className={`fixed inset-0 z-50 overflow-hidden backdrop-blur-sm transition-opacity animate-in fade-in duration-200 ${
+            isLight ? 'bg-slate-900/40' : 'bg-black/80'
+        }`}>
             <div className="absolute inset-y-0 right-0 flex max-w-full pl-4 sm:pl-10">
-                <div className="w-screen max-w-2xl bg-zinc-950 border-l border-zinc-800 text-zinc-100 shadow-2xl flex flex-col h-full">
+                <div className={`w-screen max-w-2xl border-l shadow-2xl flex flex-col h-full transition-colors ${
+                    isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-zinc-950 border-zinc-800 text-zinc-100'
+                }`}>
 
                     {/* ── 1. HEADER (Yüksek Kontrast & Kolay Okunabilirlik) ── */}
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900/90 backdrop-blur-md shrink-0">
+                    <div className={`flex items-center justify-between px-6 py-4 border-b backdrop-blur-md shrink-0 ${
+                        isLight ? 'bg-slate-50/95 border-slate-200 text-slate-900' : 'bg-zinc-900/90 border-zinc-800 text-white'
+                    }`}>
                         <div className="flex items-center gap-3">
                             <span
                                 className="w-4 h-4 rounded-full inline-block shadow-md ring-2 ring-white/30 shrink-0"
                                 style={{ backgroundColor: color }}
                             />
                             <div>
-                                <h2 className="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                                <h2 className={`text-base sm:text-lg font-bold tracking-tight flex items-center gap-2 ${
+                                    isLight ? 'text-slate-900' : 'text-white'
+                                }`}>
                                     {event ? 'Etkinliği Düzenle' : 'Yeni Topluluk Etkinliği'}
-                                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-zinc-800 text-rose-300 border border-zinc-700/80 font-mono">
+                                    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full font-mono border ${
+                                        isLight ? 'bg-slate-100 text-slate-700 border-slate-300' : 'bg-zinc-800 text-rose-300 border-zinc-700/80'
+                                    }`}>
                                         {category}
                                     </span>
                                 </h2>
-                                <p className="text-xs text-zinc-400 font-medium">
+                                <p className={`text-xs font-medium ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
                                     HSD Malatya Turgut Özal Üniversitesi Çekirdek Ekip Çalışma Alanı
                                 </p>
                             </div>
@@ -1210,14 +1223,18 @@ export default function EventDrawer({
 
                         <div className="flex items-center gap-2">
                             {event && (
-                                <span className="text-xs px-2.5 py-1 rounded-lg bg-zinc-800 text-zinc-300 font-mono border border-zinc-700 font-semibold" title="Versiyon Kilidi">
+                                <span className={`text-xs px-2.5 py-1 rounded-lg font-mono border font-semibold ${
+                                    isLight ? 'bg-slate-100 text-slate-600 border-slate-300' : 'bg-zinc-800 text-zinc-300 border-zinc-700'
+                                }`} title="Versiyon Kilidi">
                                     v{version}
                                 </span>
                             )}
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                                className={`p-2 rounded-xl transition-colors ${
+                                    isLight ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-100' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+                                }`}
                                 title="Kapat (Esc)"
                             >
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -1279,15 +1296,25 @@ export default function EventDrawer({
 
                         {/* ── PRATİKLİK MERKEZİ: HIZLI KOMİTE ŞABLONLARI ── */}
                         {!event && (
-                            <div className="p-4 rounded-2xl bg-gradient-to-br from-zinc-900 via-zinc-900/90 to-zinc-950 border border-zinc-700/80 shadow-md space-y-3.5">
-                                <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
+                            <div className={`p-4 rounded-2xl shadow-sm space-y-3.5 transition-colors ${
+                                isLight
+                                    ? 'bg-gradient-to-br from-rose-50/40 via-white to-slate-50 border border-slate-200'
+                                    : 'bg-gradient-to-br from-zinc-900 via-zinc-900/90 to-zinc-950 border border-zinc-700/80 shadow-md'
+                            }`}>
+                                <div className={`flex items-center justify-between pb-2.5 border-b ${
+                                    isLight ? 'border-slate-200' : 'border-zinc-800'
+                                }`}>
                                     <div className="flex items-center gap-2">
-                                        <span className="text-rose-400 text-base">⚡</span>
-                                        <span className="text-xs font-bold uppercase tracking-wider text-white">
+                                        <span className="text-rose-500 text-base">⚡</span>
+                                        <span className={`text-xs font-bold uppercase tracking-wider ${
+                                            isLight ? 'text-slate-800' : 'text-white'
+                                        }`}>
                                             Komite Hızlı Etkinlik Şablonları (Tek Tıkla Kur)
                                         </span>
                                     </div>
-                                    <span className="text-[11px] text-zinc-400 font-mono font-semibold">
+                                    <span className={`text-[11px] font-mono font-semibold ${
+                                        isLight ? 'text-slate-500' : 'text-zinc-400'
+                                    }`}>
                                         {filteredTemplates.length} Hazır Şablon
                                     </span>
                                 </div>
@@ -1308,7 +1335,9 @@ export default function EventDrawer({
                                             className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-all text-center ${
                                                 activeCommitteeTab === tab.id
                                                     ? 'bg-rose-600 text-white shadow-sm'
-                                                    : 'bg-zinc-950 text-zinc-400 hover:text-zinc-200 border border-zinc-800 hover:border-zinc-700'
+                                                    : isLight
+                                                        ? 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-100 shadow-xs'
+                                                        : 'bg-zinc-950 text-zinc-400 hover:text-zinc-200 border border-zinc-800 hover:border-zinc-700'
                                             }`}
                                         >
                                             {tab.label}
@@ -1323,7 +1352,11 @@ export default function EventDrawer({
                                             key={tmpl.id}
                                             type="button"
                                             onClick={() => handleApplyTemplate(tmpl)}
-                                            className="text-left p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-zinc-600 hover:bg-zinc-900 transition-all group flex items-start gap-2.5 relative"
+                                            className={`text-left p-2.5 rounded-xl transition-all group flex items-start gap-2.5 relative border ${
+                                                isLight
+                                                    ? 'bg-white border-slate-200 hover:border-rose-400 hover:bg-rose-50/30 shadow-xs'
+                                                    : 'bg-zinc-950 border border-zinc-800 hover:border-zinc-600 hover:bg-zinc-900'
+                                            }`}
                                         >
                                             <span
                                                 className="w-3 h-3 rounded-full mt-0.5 shrink-0 group-hover:scale-125 transition-transform ring-1 ring-white/20"
@@ -1331,14 +1364,20 @@ export default function EventDrawer({
                                             />
                                             <div className="overflow-hidden flex-1">
                                                 <div className="flex items-center justify-between gap-1">
-                                                    <p className="text-xs font-bold text-zinc-100 group-hover:text-white truncate">
+                                                    <p className={`text-xs font-bold truncate ${
+                                                        isLight ? 'text-slate-800 group-hover:text-rose-600' : 'text-zinc-100 group-hover:text-white'
+                                                    }`}>
                                                         {tmpl.label}
                                                     </p>
-                                                    <span className="text-[10px] font-mono text-zinc-400 shrink-0">
+                                                    <span className={`text-[10px] font-mono shrink-0 ${
+                                                        isLight ? 'text-slate-500' : 'text-zinc-400'
+                                                    }`}>
                                                         {tmpl.durationMinutes} Dk
                                                     </span>
                                                 </div>
-                                                <p className="text-[11px] text-zinc-400 font-medium truncate mt-0.5">
+                                                <p className={`text-[11px] font-medium truncate mt-0.5 ${
+                                                    isLight ? 'text-slate-500' : 'text-zinc-400'
+                                                }`}>
                                                     {tmpl.committeeName} • {tmpl.category}
                                                 </p>
                                             </div>
@@ -1352,24 +1391,36 @@ export default function EventDrawer({
 
                             {/* ── BÖLÜM 1: ETKİNLİK BAŞLIĞI ── */}
                             <div className="space-y-1.5">
-                                <label className="block text-xs font-bold text-zinc-200 uppercase tracking-wider">
-                                    Etkinlik Başlığı <span className="text-rose-400">*</span>
+                                <label className={`block text-xs font-bold uppercase tracking-wider ${
+                                    isLight ? 'text-slate-700' : 'text-zinc-200'
+                                }`}>
+                                    Etkinlik Başlığı <span className="text-rose-500">*</span>
                                 </label>
                                 <input
                                     type="text"
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
                                     placeholder="Örn: HSD Haftalık Çekirdek Ekip Sprint & Koordinasyon Toplantısı..."
-                                    className="w-full text-base sm:text-lg font-bold bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all shadow-inner"
+                                    className={`w-full text-base sm:text-lg font-bold rounded-xl px-4 py-3 transition-all ${
+                                        isLight
+                                            ? 'bg-slate-50 border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 shadow-xs'
+                                            : 'bg-zinc-900 border border-zinc-700 text-white placeholder-zinc-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 shadow-inner'
+                                    }`}
                                     autoFocus={!event}
                                     required
                                 />
                             </div>
 
                             {/* ── BÖLÜM 2: KOMİTE / TAKVİM, KATEGORİ & RENK ── */}
-                            <div className="p-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-4">
-                                <div className="flex items-center gap-2 border-b border-zinc-800 pb-2">
-                                    <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
+                            <div className={`p-4 rounded-2xl space-y-4 transition-colors ${
+                                isLight
+                                    ? 'bg-slate-50/80 border border-slate-200'
+                                    : 'bg-zinc-900/70 border border-zinc-800'
+                            }`}>
+                                <div className={`flex items-center gap-2 pb-2 border-b ${
+                                    isLight ? 'border-slate-200 text-slate-800' : 'border-zinc-800 text-zinc-300'
+                                }`}>
+                                    <span className="text-xs font-bold uppercase tracking-wider">
                                         Komite, Takvim & Kategori Ayarları
                                     </span>
                                 </div>
@@ -1377,7 +1428,9 @@ export default function EventDrawer({
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     {/* Takvim Seçimi */}
                                     <div>
-                                        <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-1.5">
+                                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${
+                                            isLight ? 'text-slate-600' : 'text-zinc-300'
+                                        }`}>
                                             Topluluk Takvimi
                                         </label>
                                         <select
@@ -1387,7 +1440,11 @@ export default function EventDrawer({
                                                 const selected = calendars.find(c => c.id === e.target.value);
                                                 if (selected) setColor(selected.color);
                                             }}
-                                            className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-zinc-100 focus:outline-none focus:border-rose-500"
+                                            className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-rose-500 ${
+                                                isLight
+                                                    ? 'bg-white border border-slate-300 text-slate-800'
+                                                    : 'bg-zinc-950 border border-zinc-700 text-zinc-100'
+                                            }`}
                                         >
                                             {calendars.map(cal => (
                                                 <option key={cal.id} value={cal.id}>{cal.title}</option>
@@ -1397,13 +1454,19 @@ export default function EventDrawer({
 
                                     {/* Kategori Seçimi */}
                                     <div>
-                                        <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-1.5">
+                                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${
+                                            isLight ? 'text-slate-600' : 'text-zinc-300'
+                                        }`}>
                                             Etkinlik Kategorisi
                                         </label>
                                         <select
                                             value={category}
                                             onChange={(e) => setCategory(e.target.value)}
-                                            className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-zinc-100 focus:outline-none focus:border-rose-500"
+                                            className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-rose-500 ${
+                                                isLight
+                                                    ? 'bg-white border border-slate-300 text-slate-800'
+                                                    : 'bg-zinc-950 border border-zinc-700 text-zinc-100'
+                                            }`}
                                         >
                                             <option value="Toplantı">Toplantı & Koordinasyon</option>
                                             <option value="Geliştirme">Yazılım, Sprint & PR</option>
@@ -1448,15 +1511,25 @@ export default function EventDrawer({
                             </div>
 
                             {/* ── BÖLÜM 2.5: ERİŞİM & GÖRÜNÜRLÜK DÜZEYİ (RBAC KORUMALI) ── */}
-                            <div className="p-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-3">
-                                <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                            <div className={`p-4 rounded-2xl ${
+                                isLight 
+                                    ? 'bg-slate-50/80 border border-slate-200' 
+                                    : 'bg-zinc-900/70 border border-zinc-800'
+                            } space-y-3`}>
+                                <div className={`flex items-center justify-between border-b pb-2 ${
+                                    isLight ? 'border-slate-200' : 'border-zinc-800'
+                                }`}>
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm">🛡️</span>
-                                        <span className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
+                                        <span className={`text-xs font-bold uppercase tracking-wider ${
+                                            isLight ? 'text-slate-700' : 'text-zinc-200'
+                                        }`}>
                                             Erişim & Görünürlük Düzeyi
                                         </span>
                                     </div>
-                                    <span className="text-[10px] font-mono text-zinc-400 font-semibold px-2 py-0.5 rounded bg-zinc-800">
+                                    <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded ${
+                                        isLight ? 'text-slate-600 bg-slate-200/80 border border-slate-300/70' : 'text-zinc-400 bg-zinc-800'
+                                    }`}>
                                         {visibility === 'public' ? '🌍 Herkese Açık' : visibility === 'admin_only' ? '🛡️ Yönetici Özel' : '🔒 Gizli'}
                                     </span>
                                 </div>
@@ -1468,17 +1541,23 @@ export default function EventDrawer({
                                         onClick={() => setVisibility('public')}
                                         className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
                                             visibility === 'public'
-                                                ? 'bg-zinc-800/90 border-emerald-500 shadow-md ring-1 ring-emerald-500/30'
-                                                : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50'
+                                                ? isLight
+                                                    ? 'bg-emerald-50/90 border-emerald-500 shadow-sm ring-1 ring-emerald-500/30'
+                                                    : 'bg-zinc-800/90 border-emerald-500 shadow-md ring-1 ring-emerald-500/30'
+                                                : isLight
+                                                    ? 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80'
+                                                    : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50'
                                         }`}
                                     >
                                         <div>
                                             <div className="flex items-center justify-between mb-1">
                                                 <span className="text-base">🌍</span>
-                                                {visibility === 'public' && <span className="text-[10px] text-emerald-400 font-bold">✓ Seçili</span>}
+                                                {visibility === 'public' && (
+                                                    <span className={`text-[10px] font-bold ${isLight ? 'text-emerald-700' : 'text-emerald-400'}`}>✓ Seçili</span>
+                                                )}
                                             </div>
-                                            <p className="text-xs font-bold text-white">Tüm Topluluk</p>
-                                            <p className="text-[10px] text-zinc-400 mt-0.5 leading-snug">
+                                            <p className={`text-xs font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>Tüm Topluluk</p>
+                                            <p className={`text-[10px] mt-0.5 leading-snug ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
                                                 Tüm topluluk üyeleri takvimde görüntüleyebilir.
                                             </p>
                                         </div>
@@ -1490,17 +1569,23 @@ export default function EventDrawer({
                                         onClick={() => setVisibility('admin_only')}
                                         className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
                                             visibility === 'admin_only'
-                                                ? 'bg-zinc-800/90 border-amber-500 shadow-md ring-1 ring-amber-500/30'
-                                                : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50'
+                                                ? isLight
+                                                    ? 'bg-amber-50/90 border-amber-500 shadow-sm ring-1 ring-amber-500/30'
+                                                    : 'bg-zinc-800/90 border-amber-500 shadow-md ring-1 ring-amber-500/30'
+                                                : isLight
+                                                    ? 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80'
+                                                    : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50'
                                         }`}
                                     >
                                         <div>
                                             <div className="flex items-center justify-between mb-1">
                                                 <span className="text-base">🛡️</span>
-                                                {visibility === 'admin_only' && <span className="text-[10px] text-amber-400 font-bold">✓ Seçili</span>}
+                                                {visibility === 'admin_only' && (
+                                                    <span className={`text-[10px] font-bold ${isLight ? 'text-amber-700' : 'text-amber-400'}`}>✓ Seçili</span>
+                                                )}
                                             </div>
-                                            <p className="text-xs font-bold text-white">Sadece Adminler</p>
-                                            <p className="text-[10px] text-zinc-400 mt-0.5 leading-snug">
+                                            <p className={`text-xs font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>Sadece Adminler</p>
+                                            <p className={`text-[10px] mt-0.5 leading-snug ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
                                                 Yalnızca Super Admin, Workspace Admin ve Editorler görür.
                                             </p>
                                         </div>
@@ -1512,17 +1597,23 @@ export default function EventDrawer({
                                         onClick={() => setVisibility('private')}
                                         className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
                                             visibility === 'private'
-                                                ? 'bg-zinc-800/90 border-rose-500 shadow-md ring-1 ring-rose-500/30'
-                                                : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50'
+                                                ? isLight
+                                                    ? 'bg-rose-50/90 border-rose-500 shadow-sm ring-1 ring-rose-500/30'
+                                                    : 'bg-zinc-800/90 border-rose-500 shadow-md ring-1 ring-rose-500/30'
+                                                : isLight
+                                                    ? 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80'
+                                                    : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50'
                                         }`}
                                     >
                                         <div>
                                             <div className="flex items-center justify-between mb-1">
                                                 <span className="text-base">🔒</span>
-                                                {visibility === 'private' && <span className="text-[10px] text-rose-400 font-bold">✓ Seçili</span>}
+                                                {visibility === 'private' && (
+                                                    <span className={`text-[10px] font-bold ${isLight ? 'text-rose-700' : 'text-rose-400'}`}>✓ Seçili</span>
+                                                )}
                                             </div>
-                                            <p className="text-xs font-bold text-white">Sadece Ben</p>
-                                            <p className="text-[10px] text-zinc-400 mt-0.5 leading-snug">
+                                            <p className={`text-xs font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>Sadece Ben</p>
+                                            <p className={`text-[10px] mt-0.5 leading-snug ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
                                                 Yalnızca oluşturan siz ve Super Admin görebilir.
                                             </p>
                                         </div>
@@ -1531,9 +1622,17 @@ export default function EventDrawer({
                             </div>
 
                             {/* ── BÖLÜM 3: ZAMANLAMA, TARİH & HIZLI SÜRE KISAYOLLARI ── */}
-                            <div className="p-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-4">
-                                <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-                                    <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
+                            <div className={`p-4 rounded-2xl ${
+                                isLight 
+                                    ? 'bg-slate-50/80 border border-slate-200' 
+                                    : 'bg-zinc-900/70 border border-zinc-800'
+                            } space-y-4`}>
+                                <div className={`flex items-center justify-between border-b pb-2 ${
+                                    isLight ? 'border-slate-200' : 'border-zinc-800'
+                                }`}>
+                                    <span className={`text-xs font-bold uppercase tracking-wider ${
+                                        isLight ? 'text-slate-700' : 'text-zinc-300'
+                                    }`}>
                                         Zamanlama & Süre Hesaplama
                                     </span>
                                     <label className="inline-flex items-center cursor-pointer gap-2">
@@ -1543,14 +1642,16 @@ export default function EventDrawer({
                                             onChange={(e) => setIsAllDay(e.target.checked)}
                                             className="sr-only peer"
                                         />
-                                        <div className="w-9 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-600 relative"></div>
-                                        <span className="text-xs font-bold text-zinc-200">Tüm Gün</span>
+                                        <div className={`w-9 h-5 ${isLight ? 'bg-slate-300' : 'bg-zinc-700'} peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-600 relative`}></div>
+                                        <span className={`text-xs font-bold ${isLight ? 'text-slate-700' : 'text-zinc-200'}`}>Tüm Gün</span>
                                     </label>
                                 </div>
 
                                 {/* Tarih Kısayolları */}
                                 <div>
-                                    <span className="text-[11px] font-semibold text-zinc-400 block mb-1.5">
+                                    <span className={`text-[11px] font-semibold block mb-1.5 ${
+                                        isLight ? 'text-slate-500' : 'text-zinc-400'
+                                    }`}>
                                         Hızlı Tarih Seçimi:
                                     </span>
                                     <div className="flex flex-wrap items-center gap-1.5 text-xs">
@@ -1566,7 +1667,11 @@ export default function EventDrawer({
                                                 key={dp.id}
                                                 type="button"
                                                 onClick={() => handleQuickDate(dp.id as any)}
-                                                className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700/80 transition-colors"
+                                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                                                    isLight
+                                                        ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200 shadow-xs'
+                                                        : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700/80'
+                                                }`}
                                             >
                                                 {dp.label}
                                             </button>
@@ -1577,7 +1682,9 @@ export default function EventDrawer({
                                 {/* Süre Kısayolları (Otomatik Bitiş Saati Hesaplar) */}
                                 {!isAllDay && (
                                     <div>
-                                        <span className="text-[11px] font-semibold text-zinc-400 block mb-1.5">
+                                        <span className={`text-[11px] font-semibold block mb-1.5 ${
+                                            isLight ? 'text-slate-500' : 'text-zinc-400'
+                                        }`}>
                                             Toplantı Süresi (Bitişi Otomatik Hesaplar):
                                         </span>
                                         <div className="flex flex-wrap items-center gap-1.5 text-xs">
@@ -1594,7 +1701,11 @@ export default function EventDrawer({
                                                     key={dur.mins}
                                                     type="button"
                                                     onClick={() => handleSetDuration(dur.mins)}
-                                                    className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-rose-900/60 hover:text-white text-zinc-300 text-xs font-mono font-bold border border-zinc-700/80 transition-colors"
+                                                    className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition-colors ${
+                                                        isLight
+                                                            ? 'bg-white hover:bg-rose-50 hover:text-rose-600 text-slate-700 border-slate-200 shadow-xs'
+                                                            : 'bg-zinc-800 hover:bg-rose-900/60 hover:text-white text-zinc-300 border-zinc-700/80'
+                                                    }`}
                                                 >
                                                     {dur.label}
                                                 </button>
@@ -1606,13 +1717,19 @@ export default function EventDrawer({
                                 {/* Tarih & Saat Inputları */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                                     <div>
-                                        <label className="block text-xs font-bold text-zinc-300 mb-1">Başlangıç Zamanı</label>
+                                        <label className={`block text-xs font-bold mb-1 ${
+                                            isLight ? 'text-slate-600' : 'text-zinc-300'
+                                        }`}>Başlangıç Zamanı</label>
                                         <div className="flex gap-2">
                                             <input
                                                 type="date"
                                                 value={startDate}
                                                 onChange={(e) => setStartDate(e.target.value)}
-                                                className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-zinc-100 text-xs font-semibold focus:outline-none focus:border-rose-500"
+                                                className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-rose-500 ${
+                                                    isLight
+                                                        ? 'bg-white border-slate-300 text-slate-800'
+                                                        : 'bg-zinc-950 border-zinc-700 text-zinc-100'
+                                                }`}
                                                 required
                                             />
                                             {!isAllDay && (
@@ -1620,7 +1737,11 @@ export default function EventDrawer({
                                                     type="time"
                                                     value={startTime}
                                                     onChange={(e) => setStartTime(e.target.value)}
-                                                    className="w-28 bg-zinc-950 border border-zinc-700 rounded-xl px-2.5 py-2 text-zinc-100 text-xs font-mono font-bold focus:outline-none focus:border-rose-500"
+                                                    className={`w-28 border rounded-xl px-2.5 py-2 text-xs font-mono font-bold focus:outline-none focus:border-rose-500 ${
+                                                        isLight
+                                                            ? 'bg-white border-slate-300 text-slate-800'
+                                                            : 'bg-zinc-950 border-zinc-700 text-zinc-100'
+                                                    }`}
                                                     required
                                                 />
                                             )}
@@ -1628,13 +1749,19 @@ export default function EventDrawer({
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-bold text-zinc-300 mb-1">Bitiş Zamanı</label>
+                                        <label className={`block text-xs font-bold mb-1 ${
+                                            isLight ? 'text-slate-600' : 'text-zinc-300'
+                                        }`}>Bitiş Zamanı</label>
                                         <div className="flex gap-2">
                                             <input
                                                 type="date"
                                                 value={endDate}
                                                 onChange={(e) => setEndDate(e.target.value)}
-                                                className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-zinc-100 text-xs font-semibold focus:outline-none focus:border-rose-500"
+                                                className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-rose-500 ${
+                                                    isLight
+                                                        ? 'bg-white border-slate-300 text-slate-800'
+                                                        : 'bg-zinc-950 border-zinc-700 text-zinc-100'
+                                                }`}
                                                 required
                                             />
                                             {!isAllDay && (
@@ -1642,7 +1769,11 @@ export default function EventDrawer({
                                                     type="time"
                                                     value={endTime}
                                                     onChange={(e) => setEndTime(e.target.value)}
-                                                    className="w-28 bg-zinc-950 border border-zinc-700 rounded-xl px-2.5 py-2 text-zinc-100 text-xs font-mono font-bold focus:outline-none focus:border-rose-500"
+                                                    className={`w-28 border rounded-xl px-2.5 py-2 text-xs font-mono font-bold focus:outline-none focus:border-rose-500 ${
+                                                        isLight
+                                                            ? 'bg-white border-slate-300 text-slate-800'
+                                                            : 'bg-zinc-950 border-zinc-700 text-zinc-100'
+                                                    }`}
                                                     required
                                                 />
                                             )}
@@ -1652,11 +1783,19 @@ export default function EventDrawer({
                             </div>
 
                             {/* ── BÖLÜM 3.5: PROFESYONEL HATIRLATICI MEKANİZMASI ── */}
-                            <div className="p-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-3.5">
-                                <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                            <div className={`p-4 rounded-2xl ${
+                                isLight 
+                                    ? 'bg-slate-50/80 border border-slate-200' 
+                                    : 'bg-zinc-900/70 border border-zinc-800'
+                            } space-y-3.5`}>
+                                <div className={`flex items-center justify-between border-b pb-2 ${
+                                    isLight ? 'border-slate-200' : 'border-zinc-800'
+                                }`}>
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm">⏰</span>
-                                        <span className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
+                                        <span className={`text-xs font-bold uppercase tracking-wider ${
+                                            isLight ? 'text-slate-700' : 'text-zinc-200'
+                                        }`}>
                                             Profesyonel Hatırlatıcı Mekanizması ({reminders.length})
                                         </span>
                                     </div>
@@ -1664,7 +1803,11 @@ export default function EventDrawer({
                                         type="button"
                                         onClick={handleTestInstantReminder}
                                         disabled={isTestingReminder}
-                                        className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors px-2.5 py-1 rounded-lg bg-zinc-800 border border-zinc-700 hover:border-zinc-600 disabled:opacity-50"
+                                        className={`text-[11px] font-bold flex items-center gap-1 transition-colors px-2.5 py-1 rounded-lg border disabled:opacity-50 ${
+                                            isLight
+                                                ? 'bg-white border-slate-200 text-rose-600 hover:bg-rose-50/60 shadow-xs'
+                                                : 'bg-zinc-800 border-zinc-700 text-rose-400 hover:text-rose-300 hover:border-zinc-600'
+                                        }`}
                                         title="Sistem ve tarayıcı hatırlatıcısını hemen test et"
                                     >
                                         <span>🔔</span>
@@ -1673,7 +1816,11 @@ export default function EventDrawer({
                                 </div>
 
                                 {reminderTestSuccess && (
-                                    <div className="p-2.5 rounded-xl bg-emerald-950/70 border border-emerald-800 text-emerald-200 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                                    <div className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 animate-in fade-in ${
+                                        isLight
+                                            ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                                            : 'bg-emerald-950/70 border-emerald-800 text-emerald-200'
+                                    }`}>
                                         <span>✓</span>
                                         <span>Test hatırlatıcısı başarıyla gönderildi! Bildirim merkezinden ve sisteminizden kontrol edebilirsiniz.</span>
                                     </div>
@@ -1681,35 +1828,53 @@ export default function EventDrawer({
 
                                 {/* Hızlı Hatırlatıcı Ekleme Butonları */}
                                 <div>
-                                    <span className="text-[11px] font-semibold text-zinc-400 block mb-1.5">
+                                    <span className={`text-[11px] font-semibold block mb-1.5 ${
+                                        isLight ? 'text-slate-500' : 'text-zinc-400'
+                                    }`}>
                                         Hızlı Hatırlatıcı Ekle:
                                     </span>
                                     <div className="flex flex-wrap items-center gap-1.5">
                                         <button
                                             type="button"
                                             onClick={() => handleAddReminder(15, 'all')}
-                                            className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700/80 transition-colors"
+                                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                                                isLight
+                                                    ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200 shadow-xs'
+                                                    : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700/80'
+                                            }`}
                                         >
                                             + ⏱️ 15 Dk Önce
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => handleAddReminder(60, 'all')}
-                                            className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700/80 transition-colors"
+                                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                                                isLight
+                                                    ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200 shadow-xs'
+                                                    : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700/80'
+                                            }`}
                                         >
                                             + ⏰ 1 Saat Önce
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => handleAddReminder(1440, 'all')}
-                                            className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700/80 transition-colors"
+                                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                                                isLight
+                                                    ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200 shadow-xs'
+                                                    : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700/80'
+                                            }`}
                                         >
                                             + 📅 1 Gün Önce
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => handleAddReminder(2880, 'admins')}
-                                            className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700/80 transition-colors"
+                                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                                                isLight
+                                                    ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200 shadow-xs'
+                                                    : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700/80'
+                                            }`}
                                         >
                                             + 🛡️ 2 Gün Önce (Yöneticiler)
                                         </button>
@@ -1719,7 +1884,9 @@ export default function EventDrawer({
                                 {/* Aktif Hatırlatıcılar Listesi */}
                                 <div className="space-y-1.5">
                                     {reminders.length === 0 ? (
-                                        <p className="text-xs text-zinc-500 italic py-1">Henüz planlanmış hatırlatıcı yok. Yukarıdaki butonlardan ekleyebilirsiniz.</p>
+                                        <p className={`text-xs italic py-1 ${
+                                            isLight ? 'text-slate-500' : 'text-zinc-500'
+                                        }`}>Henüz planlanmış hatırlatıcı yok. Yukarıdaki butonlardan ekleyebilirsiniz.</p>
                                     ) : (
                                         reminders.map(rem => {
                                             const mins = rem.minutes_before ?? rem.trigger_minutes_before ?? 60;
@@ -1733,19 +1900,31 @@ export default function EventDrawer({
                                             return (
                                                 <div
                                                     key={rem.id}
-                                                    className="flex items-center justify-between p-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs"
+                                                    className={`flex items-center justify-between p-2 rounded-xl border text-xs ${
+                                                        isLight
+                                                            ? 'bg-white border-slate-200'
+                                                            : 'bg-zinc-950 border-zinc-800'
+                                                    }`}
                                                 >
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-rose-400">🔔</span>
-                                                        <span className="font-semibold text-zinc-200">{label}</span>
-                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">
+                                                        <span className="text-rose-500">🔔</span>
+                                                        <span className={`font-semibold ${isLight ? 'text-slate-800' : 'text-zinc-200'}`}>{label}</span>
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                                                            isLight
+                                                                ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                                                                : 'bg-zinc-800 text-zinc-400'
+                                                        }`}>
                                                             {targetLabel}
                                                         </span>
                                                     </div>
                                                     <button
                                                         type="button"
                                                         onClick={() => handleRemoveReminder(rem.id)}
-                                                        className="text-zinc-500 hover:text-rose-400 p-1 text-xs transition-colors"
+                                                        className={`p-1 text-xs transition-colors ${
+                                                            isLight
+                                                                ? 'text-slate-400 hover:text-rose-600'
+                                                                : 'text-zinc-500 hover:text-rose-400'
+                                                        }`}
                                                         title="Hatırlatıcıyı Kaldır"
                                                     >
                                                         ✕
@@ -1758,84 +1937,95 @@ export default function EventDrawer({
                             </div>
 
                             {/* ── BÖLÜM 4: KONUM, PLATFORM & BAĞLANTILAR ── */}
-                            <div className="p-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-3.5">
-                                <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-                                    <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
+                            <div className={`p-4 rounded-2xl ${
+                                isLight 
+                                    ? 'bg-slate-50/80 border border-slate-200' 
+                                    : 'bg-zinc-900/70 border border-zinc-800'
+                            } space-y-3.5`}>
+                                <div className={`flex items-center justify-between border-b pb-2 ${
+                                    isLight ? 'border-slate-200' : 'border-zinc-800'
+                                }`}>
+                                    <span className={`text-xs font-bold uppercase tracking-wider ${
+                                        isLight ? 'text-slate-700' : 'text-zinc-300'
+                                    }`}>
                                         Konum & Görüşme Platformu
                                     </span>
                                 </div>
 
                                 {/* Hızlı Platform Kısayolları */}
                                 <div>
-                                    <span className="text-[11px] font-semibold text-zinc-400 block mb-1.5">
+                                    <span className={`text-[11px] font-semibold block mb-1.5 ${
+                                        isLight ? 'text-slate-500' : 'text-zinc-400'
+                                    }`}>
                                         Hazır Platform / Konum Seç:
                                     </span>
                                     <div className="flex flex-wrap items-center gap-1.5">
-                                        <button
-                                            type="button"
-                                            onClick={() => handleQuickLocation('Google Meet', 'https://meet.google.com/hsd-mtu')}
-                                            className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 border border-zinc-700/80"
-                                        >
-                                            📹 Google Meet
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleQuickLocation('Discord Ses Kanalı', 'https://discord.gg/hsdmtu')}
-                                            className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 border border-zinc-700/80"
-                                        >
-                                            💬 Discord Ses
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleQuickLocation('MTÜ Mühendislik D-102 Lab')}
-                                            className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 border border-zinc-700/80"
-                                        >
-                                            🏛️ Mühendislik D-102
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleQuickLocation('MTÜ Battalgazi Konferans Salonu')}
-                                            className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 border border-zinc-700/80"
-                                        >
-                                            🎤 Konferans Salonu
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleQuickLocation('MTÜ Merkez Fuaye Stand Alanı')}
-                                            className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 border border-zinc-700/80"
-                                        >
-                                            🎪 Merkez Fuaye
-                                        </button>
+                                        {[
+                                            { name: '📹 Google Meet', url: 'https://meet.google.com/hsd-mtu' },
+                                            { name: '💬 Discord Ses', url: 'https://discord.gg/hsdmtu' },
+                                            { name: '🏛️ Mühendislik D-102', url: undefined },
+                                            { name: '🎤 Konferans Salonu', url: undefined },
+                                            { name: '🎪 Merkez Fuaye', url: undefined },
+                                        ].map((item, idx) => (
+                                            <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => handleQuickLocation(item.name.replace(/^[^\s]+\s/, ''), item.url)}
+                                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                                                    isLight
+                                                        ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200 shadow-xs'
+                                                        : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700/80'
+                                                }`}
+                                            >
+                                                {item.name}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                                     <div>
-                                        <label className="block text-xs font-bold text-zinc-300 mb-1">Fiziksel / Dijital Konum</label>
+                                        <label className={`block text-xs font-bold mb-1 ${
+                                            isLight ? 'text-slate-600' : 'text-zinc-300'
+                                        }`}>Fiziksel / Dijital Konum</label>
                                         <input
                                             type="text"
                                             value={location}
                                             onChange={(e) => setLocation(e.target.value)}
                                             placeholder="Örn: MTÜ Battalgazi Kampüsü veya Google Meet"
-                                            className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-xs font-medium text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-rose-500"
+                                            className={`w-full border rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-rose-500 ${
+                                                isLight
+                                                    ? 'bg-white border-slate-300 text-slate-800 placeholder-slate-400'
+                                                    : 'bg-zinc-950 border-zinc-700 text-zinc-100 placeholder-zinc-500'
+                                            }`}
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-zinc-300 mb-1">Online Görüşme Linki</label>
+                                        <label className={`block text-xs font-bold mb-1 ${
+                                            isLight ? 'text-slate-600' : 'text-zinc-300'
+                                        }`}>Online Görüşme Linki</label>
                                         <div className="flex gap-2">
                                             <input
                                                 type="url"
                                                 value={meetingLink}
                                                 onChange={(e) => setMeetingLink(e.target.value)}
                                                 placeholder="https://meet.google.com/..."
-                                                className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-rose-500 font-mono"
+                                                className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-rose-500 font-mono ${
+                                                    isLight
+                                                        ? 'bg-white border-slate-300 text-slate-800 placeholder-slate-400'
+                                                        : 'bg-zinc-950 border-zinc-700 text-zinc-100 placeholder-zinc-500'
+                                                }`}
                                             />
                                             {meetingLink && (
                                                 <a
                                                     href={meetingLink}
                                                     target="_blank"
                                                     rel="noreferrer"
-                                                    className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-rose-300 hover:text-white text-xs font-bold flex items-center justify-center shrink-0 border border-zinc-700"
+                                                    className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center shrink-0 border transition-colors ${
+                                                        isLight
+                                                            ? 'bg-white hover:bg-slate-100 text-rose-600 border-slate-300 shadow-xs'
+                                                            : 'bg-zinc-800 hover:bg-zinc-700 text-rose-300 hover:text-white border-zinc-700'
+                                                    }`}
                                                     title="Bağlantıyı Yeni Sekmede Aç"
                                                 >
                                                     ↗
@@ -1848,7 +2038,9 @@ export default function EventDrawer({
 
                             {/* ── BÖLÜM 5: ETKİNLİK DURUMU ── */}
                             <div>
-                                <label className="block text-xs font-bold text-zinc-200 uppercase tracking-wider mb-2">
+                                <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${
+                                    isLight ? 'text-slate-700' : 'text-zinc-200'
+                                }`}>
                                     Etkinlik Durumu
                                 </label>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -1859,8 +2051,12 @@ export default function EventDrawer({
                                             onClick={() => setStatus(st)}
                                             className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all ${
                                                 status === st
-                                                    ? 'bg-zinc-800 border-rose-500 text-white shadow-sm'
-                                                    : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                                                    ? isLight
+                                                        ? 'bg-rose-50 border-rose-500 text-rose-700 shadow-sm'
+                                                        : 'bg-zinc-800 border-rose-500 text-white shadow-sm'
+                                                    : isLight
+                                                        ? 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                                                        : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200'
                                             }`}
                                         >
                                             {st === 'scheduled' ? '🗓️ Planlandı' :
@@ -1872,17 +2068,29 @@ export default function EventDrawer({
                             </div>
 
                             {/* ── BÖLÜM 6: MARKDOWN AÇIKLAMA & GÜNDEM ── */}
-                            <div className="p-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-2.5">
-                                <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-                                    <label className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
+                            <div className={`p-4 rounded-2xl ${
+                                isLight 
+                                    ? 'bg-slate-50/80 border border-slate-200' 
+                                    : 'bg-zinc-900/70 border border-zinc-800'
+                            } space-y-2.5`}>
+                                <div className={`flex items-center justify-between border-b pb-2 ${
+                                    isLight ? 'border-slate-200' : 'border-zinc-800'
+                                }`}>
+                                    <label className={`text-xs font-bold uppercase tracking-wider ${
+                                        isLight ? 'text-slate-700' : 'text-zinc-200'
+                                    }`}>
                                         Açıklama & Gündem (Markdown Destekli)
                                     </label>
-                                    <div className="flex gap-1 bg-zinc-800 p-0.5 rounded-lg text-xs">
+                                    <div className={`flex gap-1 p-0.5 rounded-lg text-xs ${
+                                        isLight ? 'bg-slate-200/80' : 'bg-zinc-800'
+                                    }`}>
                                         <button
                                             type="button"
                                             onClick={() => setDescTab('write')}
                                             className={`px-3 py-1 rounded-md text-xs font-bold transition-colors ${
-                                                descTab === 'write' ? 'bg-zinc-700 text-white shadow-xs' : 'text-zinc-400 hover:text-zinc-200'
+                                                descTab === 'write' 
+                                                    ? isLight ? 'bg-white text-slate-900 shadow-xs' : 'bg-zinc-700 text-white shadow-xs'
+                                                    : isLight ? 'text-slate-500 hover:text-slate-900' : 'text-zinc-400 hover:text-zinc-200'
                                             }`}
                                         >
                                             Düzenle
@@ -1891,7 +2099,9 @@ export default function EventDrawer({
                                             type="button"
                                             onClick={() => setDescTab('preview')}
                                             className={`px-3 py-1 rounded-md text-xs font-bold transition-colors ${
-                                                descTab === 'preview' ? 'bg-zinc-700 text-white shadow-xs' : 'text-zinc-400 hover:text-zinc-200'
+                                                descTab === 'preview' 
+                                                    ? isLight ? 'bg-white text-slate-900 shadow-xs' : 'bg-zinc-700 text-white shadow-xs'
+                                                    : isLight ? 'text-slate-500 hover:text-slate-900' : 'text-zinc-400 hover:text-zinc-200'
                                             }`}
                                         >
                                             Önizleme
@@ -1905,25 +2115,45 @@ export default function EventDrawer({
                                         onChange={(e) => setDescription(e.target.value)}
                                         rows={6}
                                         placeholder="Etkinlik gündemi, hedefler, toplantı notları veya rehberler... (# Başlık, - Madde)"
-                                        className="w-full bg-zinc-950 border border-zinc-700 rounded-xl p-3.5 text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-rose-500 font-mono leading-relaxed"
+                                        className={`w-full border rounded-xl p-3.5 text-xs sm:text-sm focus:outline-none focus:border-rose-500 font-mono leading-relaxed ${
+                                            isLight
+                                                ? 'bg-white border-slate-300 text-slate-800 placeholder-slate-400'
+                                                : 'bg-zinc-950 border-zinc-700 text-zinc-100 placeholder-zinc-500'
+                                        }`}
                                     />
                                 ) : (
-                                    <div className="p-4 bg-zinc-950 rounded-xl min-h-[120px] text-xs sm:text-sm text-zinc-200 border border-zinc-800 leading-relaxed font-sans whitespace-pre-wrap">
-                                        {description || <p className="text-zinc-500 italic">Henüz bir açıklama veya gündem yazılmadı.</p>}
+                                    <div className={`p-4 rounded-xl min-h-[120px] text-xs sm:text-sm border leading-relaxed font-sans whitespace-pre-wrap ${
+                                        isLight
+                                            ? 'bg-white text-slate-800 border-slate-200'
+                                            : 'bg-zinc-950 text-zinc-200 border-zinc-800'
+                                    }`}>
+                                        {description || <p className={`italic ${isLight ? 'text-slate-400' : 'text-zinc-500'}`}>Henüz bir açıklama veya gündem yazılmadı.</p>}
                                     </div>
                                 )}
                             </div>
                         </form>
 
                         {/* ── BÖLÜM 7: GÖREV KONTROL LİSTESİ (CHECKLIST & İLERLEME ÇUBUĞU) ── */}
-                        <div className="p-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-3.5">
-                            <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                        <div className={`p-4 rounded-2xl ${
+                            isLight 
+                                ? 'bg-slate-50/80 border border-slate-200' 
+                                : 'bg-zinc-900/70 border border-zinc-800'
+                        } space-y-3.5`}>
+                            <div className={`flex items-center justify-between border-b pb-2 ${
+                                isLight ? 'border-slate-200' : 'border-zinc-800'
+                            }`}>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
+                                    <span className={`text-xs font-bold uppercase tracking-wider ${
+                                        isLight ? 'text-slate-700' : 'text-zinc-200'
+                                    }`}>
                                         Görev Kontrol Listesi ({completedSubtasksCount}/{subtasks.length})
                                     </span>
                                     {subtasks.length > 0 && (
-                                        <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-zinc-800 text-rose-300 font-bold border border-zinc-700">
+                                        <span className={`text-xs font-mono px-2 py-0.5 rounded-full font-bold border ${
+                                            isLight 
+                                                ? 'bg-rose-50 text-rose-600 border-rose-200' 
+                                                : 'bg-zinc-800 text-rose-300 border-zinc-700'
+                                        }`}>
                                             %{progressPercent}
                                         </span>
                                     )}
@@ -1934,15 +2164,19 @@ export default function EventDrawer({
                                         <button
                                             type="button"
                                             onClick={handleToggleAllSubtasks}
-                                            className="text-zinc-400 hover:text-white transition-colors text-[11px]"
+                                            className={`transition-colors text-[11px] ${
+                                                isLight ? 'text-slate-500 hover:text-slate-900' : 'text-zinc-400 hover:text-white'
+                                            }`}
                                         >
                                             {subtasks.every(s => s.is_completed) ? 'İşaretleri Kaldır' : 'Tümünü Tamamla'}
                                         </button>
-                                        <span className="text-zinc-600">•</span>
+                                        <span className={isLight ? 'text-slate-300' : 'text-zinc-600'}>•</span>
                                         <button
                                             type="button"
                                             onClick={handleClearCompletedSubtasks}
-                                            className="text-zinc-400 hover:text-rose-400 transition-colors text-[11px]"
+                                            className={`transition-colors text-[11px] ${
+                                                isLight ? 'text-slate-500 hover:text-rose-600' : 'text-zinc-400 hover:text-rose-400'
+                                            }`}
                                         >
                                             Bitenleri Temizle
                                         </button>
@@ -1952,7 +2186,9 @@ export default function EventDrawer({
 
                             {/* İlerleme Çubuğu */}
                             {subtasks.length > 0 && (
-                                <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+                                <div className={`w-full h-2 rounded-full overflow-hidden ${
+                                    isLight ? 'bg-slate-200' : 'bg-zinc-800'
+                                }`}>
                                     <div
                                         className="h-full bg-gradient-to-r from-rose-600 to-rose-400 transition-all duration-300"
                                         style={{ width: `${progressPercent}%` }}
@@ -1962,25 +2198,39 @@ export default function EventDrawer({
 
                             {/* Hazır Görev Setleri Ekleme Butonları */}
                             <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                                <span className="text-[11px] font-semibold text-zinc-400 mr-1">Hazır Maddeler Ekle:</span>
+                                <span className={`text-[11px] font-semibold mr-1 ${
+                                    isLight ? 'text-slate-500' : 'text-zinc-400'
+                                }`}>Hazır Maddeler Ekle:</span>
                                 <button
                                     type="button"
                                     onClick={() => handleAddPresetChecklist('tech')}
-                                    className="px-2 py-0.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-medium"
+                                    className={`px-2 py-0.5 rounded-lg text-[11px] font-medium border transition-colors ${
+                                        isLight 
+                                            ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200 shadow-xs' 
+                                            : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-transparent'
+                                    }`}
                                 >
                                     + Kod/Teknik
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => handleAddPresetChecklist('event')}
-                                    className="px-2 py-0.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-medium"
+                                    className={`px-2 py-0.5 rounded-lg text-[11px] font-medium border transition-colors ${
+                                        isLight 
+                                            ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200 shadow-xs' 
+                                            : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-transparent'
+                                    }`}
                                 >
                                     + Lojistik/Salon
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => handleAddPresetChecklist('social')}
-                                    className="px-2 py-0.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-medium"
+                                    className={`px-2 py-0.5 rounded-lg text-[11px] font-medium border transition-colors ${
+                                        isLight 
+                                            ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200 shadow-xs' 
+                                            : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-transparent'
+                                    }`}
                                 >
                                     + Medya/Duyuru
                                 </button>
@@ -1993,11 +2243,19 @@ export default function EventDrawer({
                                     value={newSubtaskTitle}
                                     onChange={(e) => setNewSubtaskTitle(e.target.value)}
                                     placeholder="+ Yeni kontrol maddesi ekle (örn: Konuşmacı slaytı kontrol edildi)..."
-                                    className="flex-1 bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-xs font-medium text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-rose-500"
+                                    className={`flex-1 border rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-rose-500 ${
+                                        isLight
+                                            ? 'bg-white border-slate-300 text-slate-800 placeholder-slate-400'
+                                            : 'bg-zinc-950 border-zinc-700 text-zinc-100 placeholder-zinc-500'
+                                    }`}
                                 />
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-white transition-colors shrink-0"
+                                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors shrink-0 ${
+                                        isLight
+                                            ? 'bg-slate-800 hover:bg-slate-900 text-white shadow-xs'
+                                            : 'bg-zinc-800 hover:bg-zinc-700 text-white'
+                                    }`}
                                 >
                                     Ekle
                                 </button>
@@ -2008,23 +2266,35 @@ export default function EventDrawer({
                                 {subtasks.map(task => (
                                     <div
                                         key={task.id}
-                                        className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-zinc-700 transition-colors group"
+                                        className={`flex items-center justify-between p-2.5 rounded-xl border transition-colors group ${
+                                            isLight
+                                                ? 'bg-white border-slate-200 hover:border-slate-300'
+                                                : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'
+                                        }`}
                                     >
                                         <label className="flex items-center gap-3 cursor-pointer flex-1 text-xs">
                                             <input
                                                 type="checkbox"
                                                 checked={task.is_completed}
                                                 onChange={() => handleToggleSubtask(task.id, task.is_completed)}
-                                                className="w-4 h-4 rounded border-zinc-700 text-rose-600 focus:ring-0 bg-zinc-800 cursor-pointer"
+                                                className={`w-4 h-4 rounded text-rose-600 focus:ring-0 cursor-pointer ${
+                                                    isLight ? 'border-slate-300 bg-white' : 'border-zinc-700 bg-zinc-800'
+                                                }`}
                                             />
-                                            <span className={`font-semibold ${task.is_completed ? 'line-through text-zinc-500' : 'text-zinc-100'}`}>
+                                            <span className={`font-semibold ${
+                                                task.is_completed 
+                                                    ? isLight ? 'line-through text-slate-400' : 'line-through text-zinc-500'
+                                                    : isLight ? 'text-slate-800' : 'text-zinc-100'
+                                            }`}>
                                                 {task.title}
                                             </span>
                                         </label>
                                         <button
                                             type="button"
                                             onClick={() => handleDeleteSubtask(task.id)}
-                                            className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-rose-400 p-1 text-xs transition-opacity"
+                                            className={`opacity-0 group-hover:opacity-100 p-1 text-xs transition-opacity ${
+                                                isLight ? 'text-slate-400 hover:text-rose-600' : 'text-zinc-500 hover:text-rose-400'
+                                            }`}
                                             title="Görevi Sil"
                                         >
                                             ✕
@@ -2035,12 +2305,24 @@ export default function EventDrawer({
                         </div>
 
                         {/* ── BÖLÜM 8: DOSYA EKLERİ (25MB DOĞRULAMA) ── */}
-                        <div className="p-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-3">
-                            <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-                                <span className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
+                        <div className={`p-4 rounded-2xl ${
+                            isLight 
+                                ? 'bg-slate-50/80 border border-slate-200' 
+                                : 'bg-zinc-900/70 border border-zinc-800'
+                        } space-y-3`}>
+                            <div className={`flex items-center justify-between border-b pb-2 ${
+                                isLight ? 'border-slate-200' : 'border-zinc-800'
+                            }`}>
+                                <span className={`text-xs font-bold uppercase tracking-wider ${
+                                    isLight ? 'text-slate-700' : 'text-zinc-200'
+                                }`}>
                                     Dosya Ekleri (Maks. 25MB)
                                 </span>
-                                <label className="cursor-pointer px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-100 border border-zinc-700 transition-colors">
+                                <label className={`cursor-pointer px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
+                                    isLight
+                                        ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200 shadow-xs'
+                                        : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border-zinc-700'
+                                }`}>
                                     {isUploading ? 'Yükleniyor...' : '+ Dosya Yükle'}
                                     <input
                                         type="file"
@@ -2056,49 +2338,77 @@ export default function EventDrawer({
                                     {attachments.map(att => (
                                         <div
                                             key={att.id}
-                                            className="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs"
+                                            className={`flex items-center justify-between p-3 rounded-xl border text-xs ${
+                                                isLight
+                                                    ? 'bg-white border-slate-200'
+                                                    : 'bg-zinc-950 border-zinc-800'
+                                            }`}
                                         >
                                             <div className="flex items-center gap-2.5 overflow-hidden">
-                                                <span className="p-1.5 rounded-lg bg-zinc-800 text-zinc-200 text-sm">📄</span>
+                                                <span className={`p-1.5 rounded-lg text-sm ${
+                                                    isLight ? 'bg-slate-100 text-slate-700' : 'bg-zinc-800 text-zinc-200'
+                                                }`}>📄</span>
                                                 <div className="truncate">
-                                                    <p className="font-bold text-zinc-200 truncate">{att.file_name}</p>
-                                                    <p className="text-[11px] text-zinc-400">
+                                                    <p className={`font-bold truncate ${isLight ? 'text-slate-800' : 'text-zinc-200'}`}>{att.file_name}</p>
+                                                    <p className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
                                                         {(att.file_size / 1024 / 1024).toFixed(2)} MB • {att.uploaded_by}
                                                     </p>
                                                 </div>
                                             </div>
-                                            <span className="text-[10px] text-emerald-400 font-mono px-2 py-0.5 rounded bg-emerald-950/40 border border-emerald-900/50">
+                                            <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                                                isLight 
+                                                    ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
+                                                    : 'text-emerald-400 bg-emerald-950/40 border-emerald-900/50'
+                                            }`}>
                                                 Doğrulandı
                                             </span>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-xs text-zinc-500 italic">Bu etkinliğe henüz dosya eklenmedi.</p>
+                                <p className={`text-xs italic ${isLight ? 'text-slate-400' : 'text-zinc-500'}`}>Bu etkinliğe henüz dosya eklenmedi.</p>
                             )}
                         </div>
 
                         {/* ── BÖLÜM 9: ⚡ ANLIK DUYURU & EKİP BİLDİRİMİ DAĞITIMI ── */}
-                        <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-900/50 space-y-3.5">
-                            <div className="flex items-center justify-between border-b border-rose-900/40 pb-2">
+                        <div className={`p-4 rounded-2xl ${
+                            isLight 
+                                ? 'bg-gradient-to-br from-rose-50/60 to-rose-100/30 border border-rose-200' 
+                                : 'bg-rose-950/20 border border-rose-900/50'
+                        } space-y-3.5`}>
+                            <div className={`flex items-center justify-between border-b pb-2 ${
+                                isLight ? 'border-rose-200/80' : 'border-rose-900/40'
+                            }`}>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-rose-400 text-base">⚡</span>
-                                    <span className="text-xs font-bold uppercase tracking-wider text-rose-200">
+                                    <span className="text-rose-500 text-base">⚡</span>
+                                    <span className={`text-xs font-bold uppercase tracking-wider ${
+                                        isLight ? 'text-rose-950' : 'text-rose-200'
+                                    }`}>
                                         Anlık Duyuru & Ekip Bildirimi (Canlı Dağıtım)
                                     </span>
                                 </div>
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-900/60 text-rose-300 border border-rose-800 font-mono font-bold">
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border ${
+                                    isLight 
+                                        ? 'bg-rose-100 text-rose-700 border-rose-200' 
+                                        : 'bg-rose-900/60 text-rose-300 border border-rose-800'
+                                }`}>
                                     Anlık Bildirim
                                 </span>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                                 <div>
-                                    <label className="block text-zinc-300 mb-1 font-bold">Hedef Kitle</label>
+                                    <label className={`block mb-1 font-bold ${
+                                        isLight ? 'text-slate-700' : 'text-zinc-300'
+                                    }`}>Hedef Kitle</label>
                                     <select
                                         value={announcementAudience}
                                         onChange={(e) => setAnnouncementAudience(e.target.value as any)}
-                                        className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-zinc-200 font-medium"
+                                        className={`w-full border rounded-xl px-3 py-2 font-medium ${
+                                            isLight 
+                                                ? 'bg-white border-slate-300 text-slate-800' 
+                                                : 'bg-zinc-900 border-zinc-700 text-zinc-200'
+                                        }`}
                                     >
                                         <option value="group">Özel Komite / Ekip</option>
                                         <option value="all">Tüm Topluluk Üyeleri</option>
@@ -2108,11 +2418,17 @@ export default function EventDrawer({
 
                                 {announcementAudience === 'group' && (
                                     <div>
-                                        <label className="block text-zinc-300 mb-1 font-bold">Komite Seç</label>
+                                        <label className={`block mb-1 font-bold ${
+                                            isLight ? 'text-slate-700' : 'text-zinc-300'
+                                        }`}>Komite Seç</label>
                                         <select
                                             value={selectedGroupId}
                                             onChange={(e) => setSelectedGroupId(e.target.value)}
-                                            className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-zinc-200 font-medium"
+                                            className={`w-full border rounded-xl px-3 py-2 font-medium ${
+                                                isLight 
+                                                    ? 'bg-white border-slate-300 text-slate-800' 
+                                                    : 'bg-zinc-900 border-zinc-700 text-zinc-200'
+                                            }`}
                                         >
                                             {groups.map(g => (
                                                 <option key={g.id} value={g.id}>{g.name}</option>
@@ -2123,11 +2439,17 @@ export default function EventDrawer({
 
                                 {announcementAudience === 'role' && (
                                     <div>
-                                        <label className="block text-zinc-300 mb-1 font-bold">Rol Seç</label>
+                                        <label className={`block mb-1 font-bold ${
+                                            isLight ? 'text-slate-700' : 'text-zinc-300'
+                                        }`}>Rol Seç</label>
                                         <select
                                             value={selectedRole}
                                             onChange={(e) => setSelectedRole(e.target.value as any)}
-                                            className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-zinc-200 font-medium"
+                                            className={`w-full border rounded-xl px-3 py-2 font-medium ${
+                                                isLight 
+                                                    ? 'bg-white border-slate-300 text-slate-800' 
+                                                    : 'bg-zinc-900 border-zinc-700 text-zinc-200'
+                                            }`}
                                         >
                                             <option value="super_admin">Super Admin</option>
                                             <option value="workspace_admin">Workspace Admin</option>
@@ -2144,7 +2466,11 @@ export default function EventDrawer({
                                 value={announcementMsg}
                                 onChange={(e) => setAnnouncementMsg(e.target.value)}
                                 placeholder="Özel duyuru notu (boş bırakılırsa etkinlik özeti iletilir)..."
-                                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-rose-500 font-medium"
+                                className={`w-full border rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-rose-500 font-medium ${
+                                    isLight 
+                                        ? 'bg-white border-slate-300 text-slate-800 placeholder-slate-400' 
+                                        : 'bg-zinc-900 border-zinc-800 text-zinc-100 placeholder-zinc-500'
+                                }`}
                             />
 
                             <div className="flex items-center justify-between pt-1">
@@ -2157,7 +2483,9 @@ export default function EventDrawer({
                                     {isSendingAnnouncement ? 'Gönderiliyor...' : '⚡ Anlık Duyur'}
                                 </button>
                                 {announcementSuccess && (
-                                    <span className="text-xs text-emerald-400 font-bold animate-in fade-in">
+                                    <span className={`text-xs font-bold animate-in fade-in ${
+                                        isLight ? 'text-emerald-700' : 'text-emerald-400'
+                                    }`}>
                                         ✓ Ekip Bildirimi Başarıyla Dağıtıldı!
                                     </span>
                                 )}
@@ -2165,15 +2493,25 @@ export default function EventDrawer({
                         </div>
 
                         {/* ── BÖLÜM 10: YORUMLAR & EKİP NOTLARI (KURUMSAL SEVİYE) ── */}
-                        <div className="p-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-4">
-                            <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                        <div className={`p-4 rounded-2xl ${
+                            isLight 
+                                ? 'bg-slate-50/80 border border-slate-200' 
+                                : 'bg-zinc-900/70 border border-zinc-800'
+                        } space-y-4`}>
+                            <div className={`flex items-center justify-between border-b pb-2 ${
+                                isLight ? 'border-slate-200' : 'border-zinc-800'
+                            }`}>
                                 <div className="flex items-center gap-2">
                                     <span className="text-sm">💬</span>
-                                    <span className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
+                                    <span className={`text-xs font-bold uppercase tracking-wider ${
+                                        isLight ? 'text-slate-700' : 'text-zinc-200'
+                                    }`}>
                                         Yorumlar & Ekip Notları ({comments.length})
                                     </span>
                                 </div>
-                                <span className="text-[10px] text-zinc-400 font-mono">
+                                <span className={`text-[10px] font-mono ${
+                                    isLight ? 'text-slate-500' : 'text-zinc-400'
+                                }`}>
                                     {comments.filter(c => c.is_pinned).length > 0 && `${comments.filter(c => c.is_pinned).length} Sabitlendi • `}
                                     Kurumsal İşbirliği
                                 </span>
@@ -2185,7 +2523,11 @@ export default function EventDrawer({
                                     <select
                                         value={newCommentTag}
                                         onChange={(e) => setNewCommentTag(e.target.value as any)}
-                                        className="bg-zinc-950 border border-zinc-700 rounded-xl px-2.5 py-2 text-xs font-semibold text-zinc-200 focus:outline-none focus:border-rose-500 shrink-0"
+                                        className={`border rounded-xl px-2.5 py-2 text-xs font-semibold focus:outline-none focus:border-rose-500 shrink-0 ${
+                                            isLight 
+                                                ? 'bg-white border-slate-300 text-slate-800' 
+                                                : 'bg-zinc-950 border-zinc-700 text-zinc-200'
+                                        }`}
                                     >
                                         <option value="general">💬 Genel</option>
                                         <option value="idea">💡 Fikir</option>
@@ -2198,11 +2540,15 @@ export default function EventDrawer({
                                         value={newCommentText}
                                         onChange={(e) => setNewCommentText(e.target.value)}
                                         placeholder="Bir güncelleme, karar veya ekip notu yazın..."
-                                        className="flex-1 bg-zinc-950 border border-zinc-700 rounded-xl px-3.5 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-rose-500 font-medium"
+                                        className={`flex-1 border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-rose-500 font-medium ${
+                                            isLight 
+                                                ? 'bg-white border-slate-300 text-slate-800 placeholder-slate-400' 
+                                                : 'bg-zinc-950 border-zinc-700 text-zinc-100 placeholder-zinc-500'
+                                        }`}
                                     />
                                     <button
                                         type="submit"
-                                        className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white transition-colors shrink-0 shadow-md shadow-rose-950/30"
+                                        className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white transition-colors shrink-0 shadow-sm"
                                     >
                                         Ekle
                                     </button>
@@ -2212,7 +2558,9 @@ export default function EventDrawer({
                             {/* Yorumlar Listesi (Sabitlenenler En Üstte) */}
                             <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
                                 {comments.length === 0 ? (
-                                    <p className="text-xs text-zinc-500 italic text-center py-4">
+                                    <p className={`text-xs italic text-center py-4 ${
+                                        isLight ? 'text-slate-400' : 'text-zinc-500'
+                                    }`}>
                                         Henüz bir ekip notu veya değerlendirme eklenmedi. İlk notu siz ekleyin.
                                     </p>
                                 ) : (
@@ -2225,11 +2573,26 @@ export default function EventDrawer({
                                                 c.user_id === currentMember?.id;
 
                                             const tagBadge = {
-                                                idea: { label: '💡 Fikir', color: 'bg-purple-950/70 border-purple-800 text-purple-300' },
-                                                decision: { label: '✅ Karar', color: 'bg-emerald-950/70 border-emerald-800 text-emerald-300' },
-                                                blocker: { label: '⚠️ Engel', color: 'bg-rose-950/70 border-rose-800 text-rose-300' },
-                                                info: { label: '📌 Bilgi', color: 'bg-sky-950/70 border-sky-800 text-sky-300' },
-                                                general: { label: '💬 Not', color: 'bg-zinc-800 border-zinc-700 text-zinc-400' },
+                                                idea: { 
+                                                    label: '💡 Fikir', 
+                                                    color: isLight ? 'bg-purple-50 border-purple-200 text-purple-700' : 'bg-purple-950/70 border-purple-800 text-purple-300' 
+                                                },
+                                                decision: { 
+                                                    label: '✅ Karar', 
+                                                    color: isLight ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-emerald-950/70 border-emerald-800 text-emerald-300' 
+                                                },
+                                                blocker: { 
+                                                    label: '⚠️ Engel', 
+                                                    color: isLight ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-rose-950/70 border-rose-800 text-rose-300' 
+                                                },
+                                                info: { 
+                                                    label: '📌 Bilgi', 
+                                                    color: isLight ? 'bg-sky-50 border-sky-200 text-sky-700' : 'bg-sky-950/70 border-sky-800 text-sky-300' 
+                                                },
+                                                general: { 
+                                                    label: '💬 Not', 
+                                                    color: isLight ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-zinc-800 border-zinc-700 text-zinc-400' 
+                                                },
                                             }[c.tag || 'general'];
 
                                             return (
@@ -2237,29 +2600,45 @@ export default function EventDrawer({
                                                     key={c.id}
                                                     className={`p-3 rounded-xl border text-xs space-y-2 transition-all ${
                                                         isPinned
-                                                            ? 'bg-amber-950/20 border-amber-600/60 shadow-sm'
-                                                            : 'bg-zinc-950/80 border-zinc-800/90 hover:border-zinc-700'
+                                                            ? isLight 
+                                                                ? 'bg-amber-50/70 border-amber-300 shadow-xs' 
+                                                                : 'bg-amber-950/20 border-amber-600/60 shadow-sm'
+                                                            : isLight 
+                                                                ? 'bg-white border-slate-200 hover:border-slate-300' 
+                                                                : 'bg-zinc-950/80 border-zinc-800/90 hover:border-zinc-700'
                                                     }`}
                                                 >
                                                     {/* Üst Bilgi: Yazar, Tag, Zaman & Eylemler */}
                                                     <div className="flex items-center justify-between gap-2">
                                                         <div className="flex items-center gap-2 min-w-0">
-                                                            <div className="w-5 h-5 rounded-full bg-rose-600/30 border border-rose-500/40 text-[10px] font-bold text-rose-300 flex items-center justify-center shrink-0">
+                                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold ${
+                                                                isLight 
+                                                                    ? 'bg-rose-100 border border-rose-200 text-rose-700' 
+                                                                    : 'bg-rose-600/30 border border-rose-500/40 text-rose-300'
+                                                            }`}>
                                                                 {c.user_name.charAt(0).toUpperCase()}
                                                             </div>
-                                                            <span className="font-bold text-zinc-200 truncate">{c.user_name}</span>
+                                                            <span className={`font-bold truncate ${
+                                                                isLight ? 'text-slate-800' : 'text-zinc-200'
+                                                            }`}>{c.user_name}</span>
                                                             <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${tagBadge.color}`}>
                                                                 {tagBadge.label}
                                                             </span>
                                                             {isPinned && (
-                                                                <span className="text-[10px] font-bold text-amber-400 font-mono bg-amber-950/60 border border-amber-800/80 px-1.5 py-0.5 rounded">
+                                                                <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border ${
+                                                                    isLight 
+                                                                        ? 'text-amber-800 bg-amber-100 border-amber-300' 
+                                                                        : 'text-amber-400 bg-amber-950/60 border-amber-800/80'
+                                                                }`}>
                                                                     📌 Sabitlendi
                                                                 </span>
                                                             )}
                                                         </div>
 
                                                         <div className="flex items-center gap-2 shrink-0">
-                                                            <span className="text-[10px] text-zinc-500 font-mono">
+                                                            <span className={`text-[10px] font-mono ${
+                                                                isLight ? 'text-slate-400' : 'text-zinc-500'
+                                                            }`}>
                                                                 {new Date(c.created_at).toLocaleString('tr-TR', {
                                                                     day: '2-digit',
                                                                     month: '2-digit',
@@ -2271,7 +2650,9 @@ export default function EventDrawer({
                                                                 type="button"
                                                                 onClick={() => handleToggleCommentPin(c.id)}
                                                                 className={`p-1 rounded text-xs transition-colors ${
-                                                                    isPinned ? 'text-amber-400 hover:text-amber-300' : 'text-zinc-500 hover:text-zinc-300'
+                                                                    isPinned 
+                                                                        ? isLight ? 'text-amber-600 hover:text-amber-500' : 'text-amber-400 hover:text-amber-300'
+                                                                        : isLight ? 'text-slate-400 hover:text-slate-600' : 'text-zinc-500 hover:text-zinc-300'
                                                                 }`}
                                                                 title={isPinned ? 'Sabitlemeyi Kaldır' : 'Yorumu Sabitle'}
                                                             >
@@ -2281,7 +2662,9 @@ export default function EventDrawer({
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => handleDeleteComment(c.id)}
-                                                                    className="p-1 rounded text-zinc-500 hover:text-rose-400 text-xs transition-colors"
+                                                                    className={`p-1 rounded text-xs transition-colors ${
+                                                                        isLight ? 'text-slate-400 hover:text-rose-600' : 'text-zinc-500 hover:text-rose-400'
+                                                                    }`}
                                                                     title="Yorumu Sil"
                                                                 >
                                                                     ✕
@@ -2291,10 +2674,14 @@ export default function EventDrawer({
                                                     </div>
 
                                                     {/* Yorum İçeriği */}
-                                                    <p className="text-zinc-200 leading-relaxed font-sans pl-1">{c.content}</p>
+                                                    <p className={`leading-relaxed font-sans pl-1 ${
+                                                        isLight ? 'text-slate-800' : 'text-zinc-200'
+                                                    }`}>{c.content}</p>
 
                                                     {/* Reaksiyon Çubuğu */}
-                                                    <div className="flex items-center gap-1.5 pt-1 border-t border-zinc-900/60">
+                                                    <div className={`flex items-center gap-1.5 pt-1 border-t ${
+                                                        isLight ? 'border-slate-100' : 'border-zinc-900/60'
+                                                    }`}>
                                                         {['👍', '🚀', '❤️', '👀'].map(emoji => {
                                                             const users = (c.reactions && c.reactions[emoji]) || [];
                                                             const hasReacted = users.includes(currentMember?.id || 'anon');
@@ -2306,8 +2693,12 @@ export default function EventDrawer({
                                                                     onClick={() => handleToggleCommentReaction(c.id, emoji)}
                                                                     className={`px-2 py-0.5 rounded-lg text-xs font-mono transition-all flex items-center gap-1 ${
                                                                         hasReacted
-                                                                            ? 'bg-rose-950/80 border border-rose-700 text-rose-200'
-                                                                            : 'bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                                                                            ? isLight
+                                                                                ? 'bg-rose-50 border border-rose-300 text-rose-700'
+                                                                                : 'bg-rose-950/80 border border-rose-700 text-rose-200'
+                                                                            : isLight
+                                                                                ? 'bg-slate-100 hover:bg-slate-200/70 text-slate-600 border border-slate-200'
+                                                                                : 'bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
                                                                     }`}
                                                                 >
                                                                     <span>{emoji}</span>
@@ -2326,14 +2717,20 @@ export default function EventDrawer({
                     </div>
 
                     {/* ── 3. FOOTER ACTIONS ── */}
-                    <div className="p-4 border-t border-zinc-800 bg-zinc-900/90 flex items-center justify-between backdrop-blur-md shrink-0">
+                    <div className={`p-4 border-t flex items-center justify-between backdrop-blur-md shrink-0 ${
+                        isLight ? 'border-slate-200 bg-slate-50/95' : 'border-zinc-800 bg-zinc-900/90'
+                    }`}>
                         <div>
                             {event && canEditPast && (
                                 <button
                                     type="button"
                                     onClick={handleDelete}
                                     disabled={isDeleting}
-                                    className="px-4 py-2 rounded-xl text-xs font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-950/60 border border-rose-900/50 transition-colors"
+                                    className={`px-4 py-2 rounded-xl text-xs font-bold border transition-colors ${
+                                        isLight 
+                                            ? 'text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200' 
+                                            : 'text-rose-400 hover:text-rose-300 hover:bg-rose-950/60 border border-rose-900/50'
+                                    }`}
                                 >
                                     {isDeleting ? 'Siliniyor...' : 'Etkinliği Sil'}
                                 </button>
@@ -2344,7 +2741,11 @@ export default function EventDrawer({
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
+                                    isLight 
+                                        ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/80' 
+                                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+                                }`}
                             >
                                 {isEventPast && !canEditPast ? 'Kapat' : 'İptal'}
                             </button>

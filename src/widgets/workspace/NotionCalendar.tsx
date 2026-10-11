@@ -795,7 +795,11 @@ export default function NotionCalendar({
                             <button
                                 type="button"
                                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                                className="flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 hover:border-rose-500/50 hover:bg-zinc-850/90 transition-all cursor-pointer group shadow-sm"
+                                className={`flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-2xl border transition-all cursor-pointer group shadow-sm ${
+                                    workspaceTheme === 'light'
+                                        ? 'bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-800'
+                                        : 'bg-zinc-900/90 border-zinc-800 hover:border-rose-500/50 hover:bg-zinc-850/90 text-zinc-100'
+                                }`}
                                 title="Kullanıcı Menüsü"
                             >
                                 {/* PP: /ekip Eşleşen Fotoğrafı veya Monogram Baş Harfi */}
@@ -804,7 +808,11 @@ export default function NotionCalendar({
                                         <img
                                             src={activeAvatar}
                                             alt={currentUser.display_name}
-                                            className="w-7 h-7 rounded-xl object-cover border border-zinc-700/80 group-hover:border-rose-500/70 shadow-sm"
+                                            className={`w-7 h-7 rounded-xl object-cover shadow-sm ${
+                                                workspaceTheme === 'light'
+                                                    ? 'border border-slate-200 group-hover:border-rose-400'
+                                                    : 'border border-zinc-700/80 group-hover:border-rose-500/70'
+                                            }`}
                                         />
                                     ) : (
                                         <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-rose-600 via-rose-500 to-amber-500 flex items-center justify-center text-[10px] font-bold text-white shadow-sm border border-rose-400/30">
@@ -812,24 +820,32 @@ export default function NotionCalendar({
                                         </div>
                                     )}
                                     {/* Çevrimiçi Durum Göstergesi */}
-                                    <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-zinc-950 rounded-full" />
+                                    <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 rounded-full ${
+                                        workspaceTheme === 'light' ? 'border-white' : 'border-zinc-950'
+                                    }`} />
                                 </div>
 
                                 <div className="flex flex-col items-start text-left leading-tight hidden sm:flex">
-                                    <span className="text-xs font-semibold text-zinc-100 group-hover:text-white transition-colors max-w-[110px] truncate">
+                                    <span className={`text-xs font-semibold transition-colors max-w-[110px] truncate ${
+                                        workspaceTheme === 'light'
+                                            ? 'text-slate-900 group-hover:text-rose-600'
+                                            : 'text-zinc-100 group-hover:text-white'
+                                    }`}>
                                         {currentUser.display_name}
                                     </span>
-                                    <span className="text-[10px] text-zinc-400 font-mono flex items-center gap-1">
+                                    <span className={`text-[10px] font-mono flex items-center gap-1 ${
+                                        workspaceTheme === 'light' ? 'text-slate-500' : 'text-zinc-400'
+                                    }`}>
                                         {isTeamMatched ? (
-                                            <span className="text-emerald-400 font-medium flex items-center gap-0.5">
+                                            <span className="text-emerald-500 font-medium flex items-center gap-0.5">
                                                 <span>✓</span> Ekip
                                             </span>
                                         ) : currentUser.role === 'super_admin' ? (
-                                            <span className="text-amber-400 font-medium">👑 Admin</span>
+                                            <span className="text-amber-500 font-medium">👑 Admin</span>
                                         ) : currentUser.role === 'workspace_admin' ? (
-                                            <span className="text-rose-400 font-medium">🛡️ Yönetici</span>
+                                            <span className="text-rose-500 font-medium">🛡️ Yönetici</span>
                                         ) : currentUser.role === 'editor' ? (
-                                            <span className="text-blue-400 font-medium">✍️ Editör</span>
+                                            <span className="text-blue-500 font-medium">✍️ Editör</span>
                                         ) : (
                                             'Üye'
                                         )}
@@ -837,7 +853,9 @@ export default function NotionCalendar({
                                 </div>
 
                                 <svg
-                                    className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`}
+                                    className={`w-3.5 h-3.5 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''} ${
+                                        workspaceTheme === 'light' ? 'text-slate-400 group-hover:text-slate-600' : 'text-zinc-400'
+                                    }`}
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -848,9 +866,15 @@ export default function NotionCalendar({
 
                             {/* Açılır Kullanıcı Menüsü Popover */}
                             {isUserMenuOpen && (
-                                <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-zinc-950/95 border border-zinc-800 shadow-2xl p-3.5 z-50 animate-in fade-in slide-in-from-top-2 backdrop-blur-2xl">
+                                <div className={`absolute right-0 mt-2 w-72 rounded-2xl shadow-2xl p-3.5 z-50 animate-in fade-in slide-in-from-top-2 backdrop-blur-2xl border ${
+                                    workspaceTheme === 'light'
+                                        ? 'bg-white/98 border-slate-200 text-slate-900'
+                                        : 'bg-zinc-950/95 border-zinc-800 text-zinc-100'
+                                }`}>
                                     {/* Profil Başlığı */}
-                                    <div className="flex items-center gap-3 pb-3 border-b border-zinc-800/80">
+                                    <div className={`flex items-center gap-3 pb-3 border-b ${
+                                        workspaceTheme === 'light' ? 'border-slate-100' : 'border-zinc-800/80'
+                                    }`}>
                                         <div className="relative shrink-0">
                                             {activeAvatar ? (
                                                 <img
@@ -863,24 +887,38 @@ export default function NotionCalendar({
                                                     {currentUser.display_name.substring(0, 2).toUpperCase()}
                                                 </div>
                                             )}
-                                            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-zinc-950 rounded-full" />
+                                            <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 rounded-full ${
+                                                workspaceTheme === 'light' ? 'border-white' : 'border-zinc-950'
+                                            }`} />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <h4 className="text-sm font-bold text-white truncate flex items-center gap-1.5">
+                                            <h4 className={`text-sm font-bold truncate flex items-center gap-1.5 ${
+                                                workspaceTheme === 'light' ? 'text-slate-900' : 'text-white'
+                                            }`}>
                                                 <span>{currentUser.display_name}</span>
                                                 {isTeamMatched && (
-                                                    <span className="text-[10px] text-emerald-400" title="Ekip Listesiyle Eşleşti">✓</span>
+                                                    <span className="text-[10px] text-emerald-500 font-bold" title="Ekip Listesiyle Eşleşti">✓</span>
                                                 )}
                                             </h4>
-                                            <p className="text-[11px] text-zinc-400 font-mono truncate">
+                                            <p className={`text-[11px] font-mono truncate ${
+                                                workspaceTheme === 'light' ? 'text-slate-500' : 'text-zinc-400'
+                                            }`}>
                                                 {currentUser.email}
                                             </p>
                                             {teamRoleTitle ? (
-                                                <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-rose-950/80 text-rose-300 border border-rose-800/60 font-medium truncate max-w-[190px]">
+                                                <span className={`inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full font-medium truncate max-w-[190px] ${
+                                                    workspaceTheme === 'light'
+                                                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                                        : 'bg-rose-950/80 text-rose-300 border border-rose-800/60'
+                                                }`}>
                                                     {teamRoleTitle}
                                                 </span>
                                             ) : (
-                                                <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-zinc-900 text-zinc-300 border border-zinc-800 font-medium">
+                                                <span className={`inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                                                    workspaceTheme === 'light'
+                                                        ? 'bg-slate-100 text-slate-700 border border-slate-200'
+                                                        : 'bg-zinc-900 text-zinc-300 border border-zinc-800'
+                                                }`}>
                                                     {currentUser.role === 'super_admin' ? '👑 Süper Yönetici' :
                                                      currentUser.role === 'workspace_admin' ? '🛡️ Topluluk Yöneticisi' :
                                                      currentUser.role === 'editor' ? '✍️ Çekirdek Editör' : '👥 Topluluk Üyesi'}
@@ -894,7 +932,11 @@ export default function NotionCalendar({
                                         <Link
                                             href="/ekip"
                                             onClick={() => setIsUserMenuOpen(false)}
-                                            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-900 transition-colors"
+                                            className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                                                workspaceTheme === 'light'
+                                                    ? 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+                                                    : 'text-zinc-300 hover:text-white hover:bg-zinc-900'
+                                            }`}
                                         >
                                             <span className="text-sm">🌟</span>
                                             <span>HSD Ekip Sayfası (/ekip)</span>
@@ -905,7 +947,11 @@ export default function NotionCalendar({
                                                 <Link
                                                     href="/admin/workspace"
                                                     onClick={() => setIsUserMenuOpen(false)}
-                                                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-900 transition-colors"
+                                                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                                                        workspaceTheme === 'light'
+                                                            ? 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+                                                            : 'text-zinc-300 hover:text-white hover:bg-zinc-900'
+                                                    }`}
                                                 >
                                                     <span className="text-sm">⚙️</span>
                                                     <span>Workspace Yönetim Paneli</span>
@@ -913,7 +959,11 @@ export default function NotionCalendar({
                                                 <Link
                                                     href="/admin/ekip"
                                                     onClick={() => setIsUserMenuOpen(false)}
-                                                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-900 transition-colors"
+                                                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                                                        workspaceTheme === 'light'
+                                                            ? 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+                                                            : 'text-zinc-300 hover:text-white hover:bg-zinc-900'
+                                                    }`}
                                                 >
                                                     <span className="text-sm">👥</span>
                                                     <span>Ekip Üyeleri (Profil Fotoğrafları)</span>
@@ -924,14 +974,20 @@ export default function NotionCalendar({
 
                                     {/* Çıkış Yap Butonu */}
                                     {onLogout && (
-                                        <div className="pt-2 border-t border-zinc-800/80">
+                                        <div className={`pt-2 border-t ${
+                                            workspaceTheme === 'light' ? 'border-slate-100' : 'border-zinc-800/80'
+                                        }`}>
                                             <button
                                                 type="button"
                                                 onClick={() => {
                                                     setIsUserMenuOpen(false);
                                                     onLogout();
                                                 }}
-                                                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:text-white hover:bg-rose-950/50 border border-rose-900/40 transition-colors cursor-pointer"
+                                                className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                                                    workspaceTheme === 'light'
+                                                        ? 'text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200'
+                                                        : 'text-rose-400 hover:text-white hover:bg-rose-950/50 border border-rose-900/40'
+                                                }`}
                                             >
                                                 <span>⎋</span>
                                                 <span>Güvenli Çıkış Yap</span>
@@ -1028,6 +1084,7 @@ export default function NotionCalendar({
                         <MonthView
                             currentDate={currentDate}
                             events={filteredEvents}
+                            theme={workspaceTheme}
                             onEventClick={handleOpenEditEvent}
                             onDayClick={(dateStr) => {
                                 const todayStr = new Date().toISOString().split('T')[0];
@@ -1054,6 +1111,7 @@ export default function NotionCalendar({
                             startDate={currentDate}
                             monthsCount={3}
                             events={filteredEvents}
+                            theme={workspaceTheme}
                             onEventClick={handleOpenEditEvent}
                             onDaySelect={(d) => {
                                 setCurrentDate(d);
@@ -1067,6 +1125,7 @@ export default function NotionCalendar({
                             startDate={currentDate}
                             monthsCount={6}
                             events={filteredEvents}
+                            theme={workspaceTheme}
                             onEventClick={handleOpenEditEvent}
                             onDaySelect={(d) => {
                                 setCurrentDate(d);
@@ -1079,6 +1138,7 @@ export default function NotionCalendar({
                         <WeekView
                             currentDate={currentDate}
                             events={filteredEvents}
+                            theme={workspaceTheme}
                             onEventClick={handleOpenEditEvent}
                             onDropOnDate={handleDropOnDate}
                             onDragStart={(id) => setDraggedEventId(id)}
@@ -1089,6 +1149,7 @@ export default function NotionCalendar({
                         <DayView
                             currentDate={currentDate}
                             events={filteredEvents}
+                            theme={workspaceTheme}
                             onEventClick={handleOpenEditEvent}
                         />
                     )}
@@ -1097,6 +1158,7 @@ export default function NotionCalendar({
                         <ListView
                             currentDate={currentDate}
                             events={filteredEvents}
+                            theme={workspaceTheme}
                             onEventClick={handleOpenEditEvent}
                         />
                     )}
@@ -1113,6 +1175,7 @@ export default function NotionCalendar({
                 groups={groups}
                 members={members}
                 currentMember={currentUser}
+                theme={workspaceTheme}
                 onEventSaved={(savedEv) => {
                     const idx = events.findIndex(e => e.id === savedEv.id);
                     if (idx >= 0) {
@@ -1135,6 +1198,7 @@ export default function NotionCalendar({
 interface MonthViewProps {
     currentDate: Date;
     events: WorkspaceEvent[];
+    theme?: 'light' | 'dark';
     onEventClick: (event: WorkspaceEvent) => void;
     onDayClick: (dateStr: string) => void;
     onDropOnDate: (dateStr: string) => void;
@@ -1144,11 +1208,13 @@ interface MonthViewProps {
 function MonthView({
     currentDate,
     events,
+    theme = 'dark',
     onEventClick,
     onDayClick,
     onDropOnDate,
     onDragStart,
 }: MonthViewProps) {
+    const isLight = theme === 'light';
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
 
@@ -1203,16 +1269,30 @@ function MonthView({
     }, [events]);
 
     return (
-        <div className="flex-1 flex flex-col h-full bg-zinc-900/30 border border-zinc-800/80 rounded-2xl overflow-hidden shadow-inner">
-            {/* Day of Week Headers (Yüksek Kontrast) */}
-            <div className="grid grid-cols-7 border-b border-zinc-800 bg-zinc-900/80 text-xs font-bold text-zinc-200 py-3 text-center uppercase tracking-wider">
+        <div className={`flex-1 flex flex-col h-full rounded-2xl overflow-hidden transition-colors ${
+            isLight
+                ? 'bg-white border border-slate-200 shadow-sm'
+                : 'bg-zinc-900/30 border border-zinc-800/80 shadow-inner'
+        }`}>
+            {/* Day of Week Headers (Yüksek Kontrast & Göz Yormayan) */}
+            <div className={`grid grid-cols-7 border-b py-3 text-center uppercase tracking-wider text-xs font-bold ${
+                isLight
+                    ? 'bg-slate-100/90 border-slate-200 text-slate-700'
+                    : 'bg-zinc-900/80 border-zinc-800 text-zinc-200'
+            }`}>
                 {DAYS_SHORT_TR.map(d => (
-                    <div key={d}>{d}</div>
+                    <div key={d} className={isLight ? 'text-slate-700 font-bold tracking-wider' : 'text-zinc-200'}>
+                        {d}
+                    </div>
                 ))}
             </div>
 
             {/* Days Grid */}
-            <div className="grid grid-cols-7 flex-1 grid-rows-5 md:grid-rows-6 divide-x divide-y divide-zinc-800/60 bg-zinc-950/40">
+            <div className={`grid grid-cols-7 flex-1 grid-rows-5 md:grid-rows-6 divide-x divide-y ${
+                isLight
+                    ? 'divide-slate-200/80 bg-white'
+                    : 'divide-zinc-800/60 bg-zinc-950/40'
+            }`}>
                 {calendarCells.map((cell) => {
                     const cellEvents = eventsByDate.get(cell.dateStr) || [];
 
@@ -1222,8 +1302,11 @@ function MonthView({
                             onDragOver={(e) => e.preventDefault()}
                             onDrop={() => onDropOnDate(cell.dateStr)}
                             onClick={() => onDayClick(cell.dateStr)}
-                            className={`min-h-[96px] p-2 flex flex-col justify-between transition-colors cursor-pointer group hover:bg-zinc-900/50 ${cell.isCurrentMonth ? 'bg-transparent' : 'bg-zinc-950/80 opacity-40'
-                                }`}
+                            className={`min-h-[96px] p-2 flex flex-col justify-between transition-colors cursor-pointer group ${
+                                cell.isCurrentMonth
+                                    ? (isLight ? 'bg-white hover:bg-slate-50' : 'bg-transparent hover:bg-zinc-900/50')
+                                    : (isLight ? 'bg-slate-50/70 opacity-60' : 'bg-zinc-950/80 opacity-40')
+                            }`}
                         >
                             {/* Day Header */}
                             <div className="flex items-center justify-between">
@@ -1231,14 +1314,16 @@ function MonthView({
                                     className={`text-xs w-6 h-6 rounded-full flex items-center justify-center transition-all ${cell.isToday
                                             ? 'bg-rose-600 text-white font-extrabold shadow-md shadow-rose-950/80 ring-2 ring-rose-400/30'
                                             : cell.isCurrentMonth
-                                                ? 'text-zinc-200 font-semibold group-hover:text-white'
-                                                : 'text-zinc-600 font-medium'
+                                                ? (isLight ? 'text-slate-800 font-bold group-hover:text-rose-600' : 'text-zinc-200 font-semibold group-hover:text-white')
+                                                : (isLight ? 'text-slate-400 font-medium' : 'text-zinc-600 font-medium')
                                         }`}
                                 >
                                     {cell.dayNum}
                                 </span>
                                 {cellEvents.length > 3 && (
-                                    <span className="text-[11px] text-rose-300 font-mono font-bold px-1.5 py-0.2 rounded bg-zinc-800/80">
+                                    <span className={`text-[11px] font-mono font-bold px-1.5 py-0.2 rounded ${
+                                        isLight ? 'bg-slate-100 text-rose-600 border border-slate-200' : 'bg-zinc-800/80 text-rose-300'
+                                    }`}>
                                         +{cellEvents.length - 3}
                                     </span>
                                 )}
@@ -1292,6 +1377,7 @@ interface MultiMonthViewProps {
     startDate: Date;
     monthsCount: 3 | 6;
     events: WorkspaceEvent[];
+    theme?: 'light' | 'dark';
     onEventClick: (event: WorkspaceEvent) => void;
     onDaySelect: (date: Date) => void;
 }
@@ -1300,9 +1386,11 @@ function MultiMonthView({
     startDate,
     monthsCount,
     events,
+    theme = 'dark',
     onEventClick,
     onDaySelect,
 }: MultiMonthViewProps) {
+    const isLight = theme === 'light';
     const monthOffsets = Array.from({ length: monthsCount }, (_, i) => i);
 
     return (
@@ -1323,20 +1411,32 @@ function MultiMonthView({
                 return (
                     <div
                         key={`${year}-${month}`}
-                        className="p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800 flex flex-col justify-between shadow-sm"
+                        className={`p-4 rounded-2xl flex flex-col justify-between shadow-sm transition-colors ${
+                            isLight
+                                ? 'bg-white border border-slate-200 shadow-xs'
+                                : 'bg-zinc-900/40 border border-zinc-800'
+                        }`}
                     >
                         <div>
-                            <div className="flex items-center justify-between mb-3 border-b border-zinc-800/80 pb-2">
-                                <h3 className="text-sm font-bold text-white tracking-tight">
+                            <div className={`flex items-center justify-between mb-3 pb-2 border-b ${
+                                isLight ? 'border-slate-100' : 'border-zinc-800/80'
+                            }`}>
+                                <h3 className={`text-sm font-bold tracking-tight ${
+                                    isLight ? 'text-slate-800' : 'text-white'
+                                }`}>
                                     {MONTHS_TR[month]} {year}
                                 </h3>
-                                <span className="text-[11px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 font-mono">
+                                <span className={`text-[11px] px-2 py-0.5 rounded-full font-mono ${
+                                    isLight ? 'bg-slate-100 text-slate-600' : 'bg-zinc-800 text-zinc-400'
+                                }`}>
                                     {monthEvents.length} Etkinlik
                                 </span>
                             </div>
 
                             {/* Mini Day Header */}
-                            <div className="grid grid-cols-7 text-[10px] font-semibold text-zinc-500 text-center mb-1">
+                            <div className={`grid grid-cols-7 text-[10px] font-semibold text-center mb-1 ${
+                                isLight ? 'text-slate-500 font-bold' : 'text-zinc-500'
+                            }`}>
                                 {DAYS_SHORT_TR.map(d => <span key={d}>{d[0]}</span>)}
                             </div>
 
@@ -1399,6 +1499,7 @@ function MultiMonthView({
 interface WeekViewProps {
     currentDate: Date;
     events: WorkspaceEvent[];
+    theme?: 'light' | 'dark';
     onEventClick: (event: WorkspaceEvent) => void;
     onDropOnDate: (dateStr: string) => void;
     onDragStart: (id: string) => void;
@@ -1407,10 +1508,12 @@ interface WeekViewProps {
 function WeekView({
     currentDate,
     events,
+    theme = 'dark',
     onEventClick,
     onDropOnDate,
     onDragStart,
 }: WeekViewProps) {
+    const isLight = theme === 'light';
     const hours = Array.from({ length: 15 }, (_, i) => i + 8); // 08:00 to 22:00
 
     // Get 7 days of the week starting from Monday
@@ -1434,24 +1537,42 @@ function WeekView({
     }, [currentDate]);
 
     return (
-        <div className="flex-1 flex flex-col h-full bg-zinc-900/30 border border-zinc-800 rounded-2xl overflow-hidden shadow-inner">
-            {/* Week Headers */}
-            <div className="grid grid-cols-8 border-b border-zinc-800 bg-zinc-900/80 text-xs font-bold py-3">
-                <div className="text-center text-zinc-400 font-mono">Saat</div>
+        <div className={`flex-1 flex flex-col h-full rounded-2xl overflow-hidden transition-colors ${
+            isLight
+                ? 'bg-white border border-slate-200 shadow-sm'
+                : 'bg-zinc-900/30 border border-zinc-800 shadow-inner'
+        }`}>
+            {/* Week Headers (Yüksek Kontrast & Göz Yormayan) */}
+            <div className={`grid grid-cols-8 border-b py-3 text-xs font-bold ${
+                isLight
+                    ? 'bg-slate-100/90 border-slate-200 text-slate-700'
+                    : 'bg-zinc-900/80 border-zinc-800 text-zinc-200'
+            }`}>
+                <div className={`text-center font-mono ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>Saat</div>
                 {weekDays.map(w => (
                     <div key={w.dateStr} className="text-center">
-                        <span className="text-zinc-300 block text-[11px] uppercase tracking-wider font-semibold">{w.name}</span>
-                        <span className="text-white font-extrabold text-sm">{w.dayNum}</span>
+                        <span className={`block text-[11px] uppercase tracking-wider font-semibold ${
+                            isLight ? 'text-slate-500' : 'text-zinc-300'
+                        }`}>{w.name}</span>
+                        <span className={`font-extrabold text-sm ${
+                            isLight ? 'text-slate-900' : 'text-white'
+                        }`}>{w.dayNum}</span>
                     </div>
                 ))}
             </div>
 
             {/* Time Grid */}
-            <div className="flex-1 overflow-y-auto divide-y divide-zinc-800/40">
+            <div className={`flex-1 overflow-y-auto divide-y ${
+                isLight ? 'divide-slate-200/80 bg-white' : 'divide-zinc-800/40'
+            }`}>
                 {hours.map(h => (
-                    <div key={h} className="grid grid-cols-8 min-h-[58px] divide-x divide-zinc-800/40">
+                    <div key={h} className={`grid grid-cols-8 min-h-[58px] divide-x ${
+                        isLight ? 'divide-slate-200/80' : 'divide-zinc-800/40'
+                    }`}>
                         {/* Time Ruler */}
-                        <div className="text-xs font-mono font-bold text-zinc-400 flex items-start justify-center pt-2 bg-zinc-950/40">
+                        <div className={`text-xs font-mono font-bold flex items-start justify-center pt-2 ${
+                            isLight ? 'text-slate-500 bg-slate-50/50' : 'text-zinc-400 bg-zinc-950/40'
+                        }`}>
                             {String(h).padStart(2, '0')}:00
                         </div>
 
@@ -1509,34 +1630,50 @@ function WeekView({
 interface DayViewProps {
     currentDate: Date;
     events: WorkspaceEvent[];
+    theme?: 'light' | 'dark';
     onEventClick: (event: WorkspaceEvent) => void;
 }
 
-function DayView({ currentDate, events, onEventClick }: DayViewProps) {
+function DayView({ currentDate, events, theme = 'dark', onEventClick }: DayViewProps) {
+    const isLight = theme === 'light';
     const dateStr = currentDate.toISOString().split('T')[0];
     const dayEvents = events.filter(e => e.start_time.startsWith(dateStr));
     const hours = Array.from({ length: 16 }, (_, i) => i + 8); // 08:00 - 23:00
 
     return (
-        <div className="flex-1 flex flex-col h-full bg-zinc-900/30 border border-zinc-800 rounded-2xl overflow-hidden shadow-inner">
-            <div className="px-6 py-4 border-b border-zinc-800 bg-zinc-900/70 flex items-center justify-between">
+        <div className={`flex-1 flex flex-col h-full rounded-2xl overflow-hidden transition-colors ${
+            isLight
+                ? 'bg-white border border-slate-200 shadow-sm'
+                : 'bg-zinc-900/30 border border-zinc-800 shadow-inner'
+        }`}>
+            <div className={`px-6 py-4 border-b flex items-center justify-between ${
+                isLight ? 'border-slate-200 bg-slate-50/80' : 'border-zinc-800 bg-zinc-900/70'
+            }`}>
                 <div>
-                    <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                    <h2 className={`text-base sm:text-lg font-bold tracking-tight ${
+                        isLight ? 'text-slate-900' : 'text-white'
+                    }`}>
                         {currentDate.getDate()} {MONTHS_TR[currentDate.getMonth()]} {currentDate.getFullYear()}
                     </h2>
-                    <p className="text-xs text-zinc-300 font-medium mt-0.5">
-                        {DAYS_TR[(currentDate.getDay() + 6) % 7]} • <span className="text-rose-400 font-bold">{dayEvents.length}</span> Planlı Etkinlik
+                    <p className={`text-xs font-medium mt-0.5 ${
+                        isLight ? 'text-slate-500' : 'text-zinc-300'
+                    }`}>
+                        {DAYS_TR[(currentDate.getDay() + 6) % 7]} • <span className="text-rose-500 font-bold">{dayEvents.length}</span> Planlı Etkinlik
                     </p>
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto divide-y divide-zinc-800/40 p-4 space-y-2.5">
+            <div className={`flex-1 overflow-y-auto divide-y p-4 space-y-2.5 ${
+                isLight ? 'divide-slate-200/80' : 'divide-zinc-800/40'
+            }`}>
                 {hours.map(h => {
                     const hourEvents = dayEvents.filter(e => new Date(e.start_time).getHours() === h);
 
                     return (
                         <div key={h} className="flex gap-4 min-h-[64px] pt-2">
-                            <span className="w-16 text-xs font-mono font-bold text-zinc-400 pt-1 shrink-0">
+                            <span className={`w-16 text-xs font-mono font-bold pt-1 shrink-0 ${
+                                isLight ? 'text-slate-400' : 'text-zinc-400'
+                            }`}>
                                 {String(h).padStart(2, '0')}:00
                             </span>
 
@@ -1545,25 +1682,31 @@ function DayView({ currentDate, events, onEventClick }: DayViewProps) {
                                     <div
                                         key={ev.id}
                                         onClick={() => onEventClick(ev)}
-                                        className="p-3.5 rounded-2xl bg-zinc-900/95 border border-zinc-700/80 hover:border-zinc-500 cursor-pointer shadow-md flex items-start justify-between transition-all hover:scale-[1.01]"
+                                        className={`p-3.5 rounded-2xl cursor-pointer shadow-sm flex items-start justify-between transition-all hover:scale-[1.01] ${
+                                            isLight
+                                                ? 'bg-slate-50/80 border border-slate-200 hover:border-slate-300'
+                                                : 'bg-zinc-900/95 border border-zinc-700/80 hover:border-zinc-500'
+                                        }`}
                                         style={{ borderLeft: `4px solid ${ev.color}` }}
                                     >
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-sm font-bold text-white">{ev.title}</span>
-                                                <span className="text-xs px-2.5 py-0.5 rounded-full bg-zinc-800 text-rose-300 font-semibold border border-zinc-700">
+                                                <span className={`text-sm font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>{ev.title}</span>
+                                                <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
+                                                    isLight ? 'bg-white text-rose-600 border-slate-200' : 'bg-zinc-800 text-rose-300 border-zinc-700'
+                                                }`}>
                                                     {ev.category}
                                                 </span>
                                             </div>
                                             {ev.description && (
-                                                <p className="text-xs text-zinc-300 line-clamp-1 font-medium">{ev.description}</p>
+                                                <p className={`text-xs line-clamp-1 font-medium ${isLight ? 'text-slate-600' : 'text-zinc-300'}`}>{ev.description}</p>
                                             )}
                                         </div>
 
-                                        <div className="text-right shrink-0 text-xs font-mono font-bold text-zinc-200">
+                                        <div className={`text-right shrink-0 text-xs font-mono font-bold ${isLight ? 'text-slate-700' : 'text-zinc-200'}`}>
                                             {ev.start_time.substring(11, 16)} - {ev.end_time.substring(11, 16)}
                                             {ev.location && (
-                                                <p className="text-[11px] text-zinc-400 font-sans mt-0.5 font-medium">{ev.location}</p>
+                                                <p className={`text-[11px] font-sans mt-0.5 font-medium ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>{ev.location}</p>
                                             )}
                                         </div>
                                     </div>
@@ -1583,17 +1726,25 @@ function DayView({ currentDate, events, onEventClick }: DayViewProps) {
 interface ListViewProps {
     currentDate: Date;
     events: WorkspaceEvent[];
+    theme?: 'light' | 'dark';
     onEventClick: (event: WorkspaceEvent) => void;
 }
 
-function ListView({ currentDate, events, onEventClick }: ListViewProps) {
+function ListView({ currentDate, events, theme = 'dark', onEventClick }: ListViewProps) {
+    const isLight = theme === 'light';
     const sorted = [...events].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
     return (
-        <div className="flex-1 flex flex-col h-full bg-zinc-900/30 border border-zinc-800 rounded-2xl overflow-hidden shadow-inner p-5">
-            <h2 className="text-sm font-bold text-zinc-200 uppercase tracking-wider mb-4 border-b border-zinc-800 pb-2 flex items-center justify-between">
+        <div className={`flex-1 flex flex-col h-full rounded-2xl overflow-hidden p-5 transition-colors ${
+            isLight ? 'bg-white border border-slate-200 shadow-sm' : 'bg-zinc-900/30 border border-zinc-800 shadow-inner'
+        }`}>
+            <h2 className={`text-sm font-bold uppercase tracking-wider mb-4 border-b pb-2 flex items-center justify-between ${
+                isLight ? 'text-slate-800 border-slate-200' : 'text-zinc-200 border-zinc-800'
+            }`}>
                 <span>Tüm Topluluk Etkinlikleri & Ajanda</span>
-                <span className="text-xs font-mono text-rose-400 font-bold px-2 py-0.5 rounded bg-zinc-800">
+                <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
+                    isLight ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-zinc-800 text-rose-400'
+                }`}>
                     {sorted.length} Etkinlik
                 </span>
             </h2>
