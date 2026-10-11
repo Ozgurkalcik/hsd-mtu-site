@@ -16,7 +16,8 @@ export async function GET(req: Request) {
         const { searchParams } = new URL(req.url);
         const calendarId = searchParams.get('calendar_id') || undefined;
 
-        const events = await WorkspaceRepository.getEvents(calendarId);
+        // Görünürlük filtresi için aktif kullanıcı oturumu parametre olarak iletilir
+        const events = await WorkspaceRepository.getEvents(calendarId, session.member);
         const calendars = await WorkspaceRepository.getCalendars();
         const groups = await WorkspaceRepository.getGroups();
         const allMembers = await WorkspaceRepository.getMembers();
@@ -68,7 +69,22 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { title, calendar_id, start_time, end_time, category, color, description, is_all_day, assignees, location, meeting_link } = body;
+        const {
+            title,
+            calendar_id,
+            start_time,
+            end_time,
+            category,
+            color,
+            description,
+            is_all_day,
+            assignees,
+            location,
+            meeting_link,
+            visibility,
+            subtasks,
+            reminders
+        } = body;
 
         if (!title || !start_time || !end_time) {
             return NextResponse.json(
@@ -76,6 +92,11 @@ export async function POST(req: Request) {
                 { status: 400 }
             );
         }
+
+        // Görünürlük Seviyesi Doğrulama
+        const validVisibility = (visibility === 'admin_only' || visibility === 'private')
+            ? visibility
+            : 'public';
 
         const newEvent: WorkspaceEvent = {
             id: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -91,14 +112,39 @@ export async function POST(req: Request) {
             location: location || '',
             meeting_link: meeting_link || '',
             status: 'scheduled',
+            visibility: validVisibility,
+            created_by: session.member.id,
             version: 1,
-            subtasks: [],
+            subtasks: Array.isArray(subtasks) ? subtasks : [],
             comments: [],
             attachments: [],
-            reminders: []
+            reminders: Array.isArray(reminders) ? reminders : []
         };
 
         const created = await WorkspaceRepository.createEvent(newEvent);
+
+        // 📢 Otomatik Komite ve Topluluk Bildirimi Dağıtımı
+        // Bir komite ile ilgili etkinlik eklendiğinde veya herkese açık duyurulduğunda diğer tüm üyelere otomatik bildirim iletilir
+        try {
+            const calendars = await WorkspaceRepository.getCalendars();
+            const cal = calendars.find(c => c.id === (calendar_id || 'cal_core'));
+            const committeeTitle = cal ? cal.title : 'Topluluk';
+
+            if (validVisibility === 'public' || validVisibility === 'admin_only') {
+                const targetAudience = validVisibility === 'admin_only' ? 'role' : 'all';
+                await WorkspaceRepository.dispatchInstantNotification({
+                    eventId: created.id,
+                    eventTitle: created.title,
+                    title: `📢 [${committeeTitle}] Yeni Etkinlik: ${created.title}`,
+                    message: `${session.member.display_name} tarafından yeni bir etkinlik oluşturuldu: "${created.title}". (${new Date(start_time).toLocaleDateString('tr-TR')}${location ? ` - ${location}` : ''})`,
+                    targetAudience: targetAudience as any,
+                    targetRole: validVisibility === 'admin_only' ? 'workspace_admin' : undefined,
+                    type: 'announcement'
+                });
+            }
+        } catch (notifErr) {
+            console.warn('Otomatik komite bildirimi tetikleme uyarısı:', notifErr);
+        }
 
         return NextResponse.json({ success: true, event: created }, { status: 201 });
     } catch (err: any) {

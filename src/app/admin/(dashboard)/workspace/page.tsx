@@ -55,6 +55,16 @@ export default function AdminWorkspacePage() {
     const [selectedGroup, setSelectedGroup] = useState<WorkspaceGroup | null>(null);
     const [memberSearchQuery, setMemberSearchQuery] = useState('');
 
+    // Member Notes & Evaluation Modal
+    const [notesModalMember, setNotesModalMember] = useState<WorkspaceMember | null>(null);
+    const [newMemberNoteText, setNewMemberNoteText] = useState('');
+    const [noteCategory, setNoteCategory] = useState('Performans');
+    const [isSavingNote, setIsSavingNote] = useState(false);
+
+    // Audit Log Clear State
+    const [isClearAuditModalOpen, setIsClearAuditModalOpen] = useState(false);
+    const [isClearingAudit, setIsClearingAudit] = useState(false);
+
     const showNotification = (type: 'success' | 'error', text: string) => {
         setStatusMsg({ type, text });
         setTimeout(() => setStatusMsg(null), 4000);
@@ -194,6 +204,102 @@ export default function AdminWorkspacePage() {
             }
         } catch {
             showNotification('error', 'İşlem başarısız.');
+        }
+    };
+
+    // Hızlı Rol Güncelleme
+    const handleUpdateMemberRole = async (memberId: string, nextRole: WorkspaceRole) => {
+        try {
+            const res = await fetch('/api/workspace/admin/members', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: memberId, role: nextRole }),
+            });
+            const data = await res.json();
+            if (res.ok && data.member) {
+                setMembers(prev => prev.map(m => m.id === memberId ? data.member : m));
+                showNotification('success', `✓ Rol güncellendi: ${nextRole}`);
+            } else {
+                showNotification('error', data.error || 'Rol güncellenemedi.');
+            }
+        } catch {
+            showNotification('error', 'Rol güncellenirken hata oluştu.');
+        }
+    };
+
+    // Üyeye Not / Değerlendirme Yorumu Ekleme
+    const handleAddMemberNote = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (!notesModalMember || !newMemberNoteText.trim()) return;
+        setIsSavingNote(true);
+        try {
+            const res = await fetch('/api/workspace/admin/members', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: notesModalMember.id,
+                    newNote: { content: newMemberNoteText.trim(), category: noteCategory },
+                }),
+            });
+            const data = await res.json();
+            if (res.ok && data.member) {
+                setMembers(prev => prev.map(m => m.id === notesModalMember.id ? data.member : m));
+                setNotesModalMember(data.member);
+                setNewMemberNoteText('');
+                showNotification('success', '✓ Ekip değerlendirme notu eklendi.');
+            } else {
+                showNotification('error', data.error || 'Not kaydedilemedi.');
+            }
+        } catch {
+            showNotification('error', 'İşlem başarısız.');
+        } finally {
+            setIsSavingNote(false);
+        }
+    };
+
+    // Üye Notunu Silme
+    const handleDeleteMemberNote = async (noteId: string) => {
+        if (!notesModalMember) return;
+        try {
+            const res = await fetch('/api/workspace/admin/members', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: notesModalMember.id,
+                    deleteNoteId: noteId,
+                }),
+            });
+            const data = await res.json();
+            if (res.ok && data.member) {
+                setMembers(prev => prev.map(m => m.id === notesModalMember.id ? data.member : m));
+                setNotesModalMember(data.member);
+                showNotification('success', '✓ Not silindi.');
+            } else {
+                showNotification('error', data.error || 'Not silinemedi.');
+            }
+        } catch {
+            showNotification('error', 'Not silinemedi.');
+        }
+    };
+
+    // Denetim Günlüğü Temizleme (Clear Audit Logs)
+    const handleConfirmClearAuditLogs = async () => {
+        setIsClearingAudit(true);
+        try {
+            const res = await fetch('/api/workspace/admin/audit-logs', { method: 'DELETE' });
+            const data = await res.json();
+            if (res.ok) {
+                setAuditLogs([]);
+                setIsClearAuditModalOpen(false);
+                showNotification('success', '✓ Denetim izi geçmişi başarıyla temizlendi.');
+                loadData();
+            } else {
+                showNotification('error', data.error || 'Denetim izi temizlenemedi.');
+            }
+        } catch {
+            showNotification('error', 'İşlem başarısız.');
+        } finally {
+            setIsClearingAudit(false);
         }
     };
 
@@ -465,9 +571,17 @@ export default function AdminWorkspacePage() {
                                                     </td>
                                                     <td className="py-3 px-3 font-mono text-zinc-300 font-medium">{m.email}</td>
                                                     <td className="py-3 px-3">
-                                                        <span className="px-2.5 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-200 font-mono text-[10px] font-bold">
-                                                            {m.role}
-                                                        </span>
+                                                        <select
+                                                            value={m.role}
+                                                            onChange={(e) => handleUpdateMemberRole(m.id, e.target.value as WorkspaceRole)}
+                                                            className="bg-zinc-900 border border-zinc-700/80 hover:border-rose-500 rounded-lg px-2.5 py-1 text-[11px] text-zinc-100 font-mono font-bold focus:outline-none focus:border-rose-500 transition-colors cursor-pointer"
+                                                        >
+                                                            <option value="super_admin">👑 super_admin</option>
+                                                            <option value="workspace_admin">🛡️ workspace_admin</option>
+                                                            <option value="editor">✍️ editor</option>
+                                                            <option value="contributor">🤝 contributor</option>
+                                                            <option value="viewer">👁️ viewer</option>
+                                                        </select>
                                                     </td>
                                                     <td className="py-3 px-3">
                                                         <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${m.status === 'active' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
@@ -480,6 +594,19 @@ export default function AdminWorkspacePage() {
                                                         {m.last_active_at ? new Date(m.last_active_at).toLocaleDateString('tr-TR') : '-'}
                                                     </td>
                                                     <td className="py-3 px-3 text-right space-x-1.5 whitespace-nowrap">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setNotesModalMember(m)}
+                                                            className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-amber-300 text-xs border border-zinc-800 hover:border-amber-700 transition-colors inline-flex items-center gap-1"
+                                                            title="Ekip Notları & Yorum Yaz"
+                                                        >
+                                                            <span>📝</span>
+                                                            {(m.member_notes?.length || 0) > 0 && (
+                                                                <span className="px-1.5 py-0.2 rounded-full bg-amber-950 text-[10px] text-amber-300 border border-amber-800 font-bold font-mono">
+                                                                    {m.member_notes?.length}
+                                                                </span>
+                                                            )}
+                                                        </button>
                                                         <button
                                                             type="button"
                                                             onClick={() => {
@@ -655,6 +782,59 @@ export default function AdminWorkspacePage() {
                                     </tbody>
                                 </table>
                             </div>
+
+                            {/* Üyeler ve Rol Ayarlama + Yorum/Not Yazma Bölümü */}
+                            <div className="pt-6 border-t border-zinc-800 space-y-4">
+                                <div>
+                                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                        <span>👥</span>
+                                        <span>Topluluk Üyeleri Rol Ayarlama & Ekip Değerlendirme Notları</span>
+                                    </h3>
+                                    <p className="text-xs text-zinc-400 mt-0.5">
+                                        Üyelerin rollerini hızlıca değiştirin, üye profiline özel ekip değerlendirme ve iç notlar ekleyin.
+                                    </p>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {members.map(member => (
+                                        <div key={member.id} className="p-3.5 rounded-xl bg-zinc-900/50 border border-zinc-800 space-y-3 hover:border-zinc-700 transition-colors">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="min-w-0">
+                                                    <p className="font-semibold text-white text-xs truncate">{member.display_name}</p>
+                                                    <p className="text-[11px] text-zinc-400 font-mono truncate">{member.email}</p>
+                                                    {member.username && (
+                                                        <span className="text-[10px] text-rose-400 font-mono">@{member.username}</span>
+                                                    )}
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setNotesModalMember(member)}
+                                                    className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1 transition-colors shrink-0"
+                                                    title="Ekip / Admin Notları"
+                                                >
+                                                    <span>📝</span>
+                                                    <span>Notlar {(member.member_notes && member.member_notes.length > 0) ? `(${member.member_notes.length})` : ''}</span>
+                                                </button>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-[10px] uppercase font-bold text-zinc-400 mb-1">Rolü Değiştir:</label>
+                                                <select
+                                                    value={member.role}
+                                                    onChange={(e) => handleUpdateMemberRole(member.id, e.target.value as WorkspaceRole)}
+                                                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-rose-500 font-medium"
+                                                >
+                                                    <option value="super_admin">Super Admin (Tam Yetki)</option>
+                                                    <option value="workspace_admin">Workspace Admin</option>
+                                                    <option value="editor">Editor (Etkinlik Yönetimi)</option>
+                                                    <option value="contributor">Contributor (Katkı/Yorum)</option>
+                                                    <option value="viewer">Viewer (Salt Okunur)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -705,7 +885,22 @@ export default function AdminWorkspacePage() {
                     {/* ── 5. DENETİM İZİ TABI (AUDIT LOGS) ── */}
                     {activeTab === 'audit' && (
                         <div className="space-y-4">
-                            <h2 className="text-sm font-semibold text-white">Güvenlik ve Denetim İzi Kayıtları</h2>
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-zinc-800/80 pb-3">
+                                <div>
+                                    <h2 className="text-sm font-semibold text-white">Güvenlik ve Denetim İzi Kayıtları</h2>
+                                    <p className="text-xs text-zinc-400 mt-0.5">
+                                        Tüm sistem güvenlik olayları, girişler ve yetki değişiklikleri değişmez log olarak saklanır.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsClearAuditModalOpen(true)}
+                                    className="px-3.5 py-1.5 rounded-xl bg-rose-950/70 border border-rose-800 text-rose-300 hover:bg-rose-900 text-xs font-semibold flex items-center gap-1.5 self-start sm:self-auto transition-colors"
+                                >
+                                    <span>🧹</span>
+                                    <span>Denetim Geçmişini Temizle</span>
+                                </button>
+                            </div>
 
                             <div className="overflow-x-auto max-h-[500px]">
                                 <table className="w-full text-left text-xs border-collapse">
@@ -720,22 +915,30 @@ export default function AdminWorkspacePage() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-zinc-900">
-                                        {auditLogs.map(log => (
-                                            <tr key={log.id} className="hover:bg-zinc-900/40">
-                                                <td className="py-2.5 px-3 font-mono text-[11px] text-zinc-500 whitespace-nowrap">
-                                                    {new Date(log.created_at).toLocaleString('tr-TR')}
+                                        {auditLogs.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={6} className="py-8 text-center text-zinc-500">
+                                                    Kayıt bulunamadı. Denetim geçmişi temiz veya henüz işlem yapılmadı.
                                                 </td>
-                                                <td className="py-2.5 px-3 font-medium text-zinc-300">{log.user_email}</td>
-                                                <td className="py-2.5 px-3">
-                                                    <span className="px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-rose-400 font-mono text-[10px]">
-                                                        {log.action}
-                                                    </span>
-                                                </td>
-                                                <td className="py-2.5 px-3 text-zinc-400 font-mono">{log.entity_type}</td>
-                                                <td className="py-2.5 px-3 font-mono text-zinc-500">{log.ip_address || '-'}</td>
-                                                <td className="py-2.5 px-3 text-zinc-300">{log.details || '-'}</td>
                                             </tr>
-                                        ))}
+                                        ) : (
+                                            auditLogs.map(log => (
+                                                <tr key={log.id} className="hover:bg-zinc-900/40">
+                                                    <td className="py-2.5 px-3 font-mono text-[11px] text-zinc-500 whitespace-nowrap">
+                                                        {new Date(log.created_at).toLocaleString('tr-TR')}
+                                                    </td>
+                                                    <td className="py-2.5 px-3 font-medium text-zinc-300">{log.user_email}</td>
+                                                    <td className="py-2.5 px-3">
+                                                        <span className="px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-rose-400 font-mono text-[10px]">
+                                                            {log.action}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-2.5 px-3 text-zinc-400 font-mono">{log.entity_type}</td>
+                                                    <td className="py-2.5 px-3 font-mono text-zinc-500">{log.ip_address || '-'}</td>
+                                                    <td className="py-2.5 px-3 text-zinc-300">{log.details || '-'}</td>
+                                                </tr>
+                                            ))
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
@@ -1100,6 +1303,145 @@ export default function AdminWorkspacePage() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal: Denetim Geçmişini Temizle Onayı */}
+            {isClearAuditModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="w-full max-w-md bg-zinc-950 border border-rose-900/60 rounded-2xl p-6 shadow-2xl space-y-4">
+                        <div className="flex items-center gap-3 text-rose-400">
+                            <span className="text-2xl">⚠️</span>
+                            <div>
+                                <h3 className="text-base font-bold text-white">Denetim Geçmişini Temizle</h3>
+                                <p className="text-xs text-rose-300/80">Kalıcı Güvenlik İşlemi</p>
+                            </div>
+                        </div>
+                        <p className="text-xs text-zinc-300 leading-relaxed">
+                            Tüm sistem denetim ve aktivite logları kalıcı olarak silinecektir. Bu işlem güvenlik denetim izini sıfırlar ve <strong className="text-rose-400">geri alınamaz</strong>. Onaylıyor musunuz?
+                        </p>
+                        <div className="flex justify-end gap-2.5 pt-3 border-t border-zinc-800">
+                            <button
+                                type="button"
+                                onClick={() => setIsClearAuditModalOpen(false)}
+                                className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                            >
+                                Vazgeç
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmClearAuditLogs}
+                                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md shadow-rose-950/40 transition-all flex items-center gap-1.5"
+                            >
+                                <span>🧹</span>
+                                <span>Evet, Geçmişi Temizle</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal: Üye Değerlendirme & Ekip Notları */}
+            {notesModalMember && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="w-full max-w-xl bg-zinc-950 border border-zinc-800 rounded-2xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+                        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                            <div>
+                                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                    <span>📝</span>
+                                    <span>Üye Ekip Değerlendirme Notları: {notesModalMember.display_name}</span>
+                                </h3>
+                                <p className="text-xs text-zinc-400 mt-0.5">
+                                    {notesModalMember.email} • Rol: <span className="text-rose-400 font-mono">{notesModalMember.role}</span>
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setNotesModalMember(null)}
+                                className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Yeni Not Ekleme Formu */}
+                        <div className="p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-2.5">
+                            <label className="block text-xs font-bold text-zinc-300">Yeni Ekip / Yönetici Değerlendirmesi Ekle</label>
+                            <div className="flex gap-2">
+                                <select
+                                    value={noteCategory}
+                                    onChange={(e) => setNoteCategory(e.target.value)}
+                                    className="bg-zinc-950 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-rose-500 shrink-0"
+                                >
+                                    <option value="Performans">Performans</option>
+                                    <option value="Gözlem">Gözlem</option>
+                                    <option value="Toplantı">Toplantı Notu</option>
+                                    <option value="Özel">Özel Not</option>
+                                </select>
+                                <input
+                                    type="text"
+                                    value={newMemberNoteText}
+                                    onChange={(e) => setNewMemberNoteText(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddMemberNote(); }}
+                                    placeholder="Üye hakkında değerlendirme veya ekip notu yazın..."
+                                    className="flex-1 bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-rose-500"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => handleAddMemberNote()}
+                                    disabled={isSavingNote}
+                                    className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shrink-0 transition-colors disabled:opacity-50"
+                                >
+                                    {isSavingNote ? 'Ekleniyor...' : 'Ekle'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Var Olan Notlar Listesi */}
+                        <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[160px]">
+                            {(!notesModalMember.member_notes || notesModalMember.member_notes.length === 0) ? (
+                                <div className="text-center py-8 text-xs text-zinc-500">
+                                    Bu üye için henüz eklenmiş bir değerlendirme notu bulunmuyor.
+                                </div>
+                            ) : (
+                                (notesModalMember.member_notes || []).map((n) => (
+                                    <div key={n.id} className="p-3 rounded-xl bg-zinc-900/40 border border-zinc-800 text-xs space-y-1.5 hover:border-zinc-700 transition-colors">
+                                        <div className="flex items-center justify-between text-[11px]">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono text-[10px]">
+                                                    {n.category || 'Not'}
+                                                </span>
+                                                <span className="text-zinc-400 font-semibold">{n.author_name}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-zinc-500 text-[10px] font-mono">
+                                                    {new Date(n.created_at).toLocaleString('tr-TR')}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDeleteMemberNote(n.id)}
+                                                    className="text-zinc-500 hover:text-rose-400 text-xs px-1"
+                                                    title="Notu Sil"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <p className="text-zinc-200 text-xs leading-relaxed">{n.content}</p>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        <div className="flex justify-end pt-2 border-t border-zinc-800">
+                            <button
+                                type="button"
+                                onClick={() => setNotesModalMember(null)}
+                                className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                            >
+                                Kapat
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

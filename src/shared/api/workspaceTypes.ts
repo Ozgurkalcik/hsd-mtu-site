@@ -1,5 +1,14 @@
 export type WorkspaceRole = 'super_admin' | 'workspace_admin' | 'editor' | 'contributor' | 'viewer';
 
+export interface WorkspaceMemberNote {
+    id: string;
+    author_id: string;
+    author_name: string;
+    content: string;
+    category?: string;
+    created_at: string;
+}
+
 export interface WorkspaceMember {
     id: string;
     email: string;
@@ -13,6 +22,8 @@ export interface WorkspaceMember {
     avatar_url?: string;
     group_id?: string;
     must_change_password?: boolean;
+    admin_notes?: string;
+    member_notes?: WorkspaceMemberNote[];
 }
 
 export interface RolePermissions {
@@ -51,6 +62,8 @@ export interface WorkspaceSubtask {
     created_at: string;
 }
 
+export type WorkspaceCommentTag = 'general' | 'idea' | 'blocker' | 'decision' | 'info';
+
 export interface WorkspaceComment {
     id: string;
     event_id: string;
@@ -59,6 +72,9 @@ export interface WorkspaceComment {
     user_avatar?: string;
     content: string;
     created_at: string;
+    is_pinned?: boolean;
+    tag?: WorkspaceCommentTag;
+    reactions?: Record<string, string[]>; // emoji -> [user_name]
 }
 
 export interface WorkspaceAttachment {
@@ -75,16 +91,24 @@ export interface WorkspaceAttachment {
 
 export interface WorkspaceReminder {
     id: string;
-    event_id: string;
-    type: 'notification' | 'email';
-    target_audience: 'all' | 'group' | 'role' | 'selected';
+    event_id?: string;
+    title?: string;
+    trigger_minutes_before?: number; // e.g. 0, 15, 60, 1440
+    minutes_before?: number; // alias for quick reminder chips
+    channel?: 'notification' | 'email' | 'all';
+    target?: 'all' | 'admins' | 'assignees';
+    target_audience?: 'all' | 'group' | 'role' | 'selected' | 'self';
     target_group_id?: string;
     target_role?: WorkspaceRole;
     target_users?: string[];
-    send_instant?: boolean;
-    status: 'pending' | 'sent';
-    created_at: string;
+    is_custom?: boolean;
+    custom_datetime?: string;
+    is_sent?: boolean;
+    status?: 'pending' | 'sent';
+    created_at?: string;
 }
+
+export type EventVisibility = 'public' | 'admin_only' | 'private';
 
 export interface WorkspaceEvent {
     id: string;
@@ -100,6 +124,8 @@ export interface WorkspaceEvent {
     location?: string;
     meeting_link?: string;
     status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+    visibility?: EventVisibility; // 'public' | 'admin_only' | 'private'
+    created_by?: string; // member id
     version: number; // Concurrency lock
     subtasks: WorkspaceSubtask[];
     comments: WorkspaceComment[];
@@ -116,7 +142,9 @@ export interface WorkspaceNotification {
     event_title?: string;
     title: string;
     message: string;
-    type: 'info' | 'warning' | 'reminder' | 'urgent' | 'announcement';
+    type: 'info' | 'warning' | 'reminder' | 'urgent' | 'announcement' | 'committee';
+    category?: 'general' | 'committee' | 'reminder' | 'security';
+    target_group_id?: string;
     is_read: boolean;
     created_at: string;
 }
@@ -150,3 +178,4 @@ export interface WorkspaceSecuritySettings {
     mfa_required: boolean;
     session_timeout_minutes: number;
 }
+

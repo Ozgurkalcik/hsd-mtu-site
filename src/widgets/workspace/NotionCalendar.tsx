@@ -56,9 +56,30 @@ export default function NotionCalendar({
     const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Notification Dropdown State
+    // Notification Dropdown State & Filter
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [desktopNotifAllowed, setDesktopNotifAllowed] = useState(false);
+    const [notifFilter, setNotifFilter] = useState<'all' | 'committee' | 'reminder' | 'urgent'>('all');
+
+    // Workspace Light/Dark Theme (Only for /workspace)
+    const [workspaceTheme, setWorkspaceTheme] = useState<'dark' | 'light'>('dark');
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('hsd_workspace_theme');
+            if (saved === 'light' || saved === 'dark') {
+                setWorkspaceTheme(saved);
+            }
+        }
+    }, []);
+
+    const handleToggleTheme = () => {
+        const next = workspaceTheme === 'dark' ? 'light' : 'dark';
+        setWorkspaceTheme(next);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('hsd_workspace_theme', next);
+        }
+    };
 
     // Event Drawer State
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -407,11 +428,87 @@ export default function NotionCalendar({
         setIsDrawerOpen(true);
     };
 
-    // Unread notifications count
+    // Unread notifications count & filtering
     const unreadCount = notifications.filter(n => !n.is_read).length;
 
+    const filteredNotifications = useMemo(() => {
+        if (notifFilter === 'all') return notifications;
+        if (notifFilter === 'urgent') return notifications.filter(n => n.type === 'urgent');
+        if (notifFilter === 'reminder') return notifications.filter(n => n.type === 'reminder' || n.title.includes('Hatırlatıcı'));
+        if (notifFilter === 'committee') return notifications.filter(n => n.type === 'committee' || n.title.includes('Komite') || n.target_group_id);
+        return notifications;
+    }, [notifications, notifFilter]);
+
     return (
-        <div className="flex flex-col h-[calc(100vh-2rem)] min-h-[750px] bg-zinc-950 text-zinc-100 rounded-2xl border border-zinc-800/80 shadow-2xl overflow-hidden font-sans">
+        <div className={`flex flex-col h-[calc(100vh-2rem)] min-h-[750px] rounded-2xl border shadow-2xl overflow-hidden font-sans transition-colors duration-200 ${
+            workspaceTheme === 'light'
+                ? 'workspace-light-mode bg-slate-50 text-slate-900 border-slate-200 shadow-slate-200/50'
+                : 'bg-zinc-950 text-zinc-100 border-zinc-800/80 shadow-2xl'
+        }`}>
+            {workspaceTheme === 'light' && (
+                <style jsx global>{`
+                    .workspace-light-mode {
+                        background-color: #f8fafc !important;
+                        color: #0f172a !important;
+                        border-color: #e2e8f0 !important;
+                    }
+                    .workspace-light-mode header {
+                        background-color: rgba(255, 255, 255, 0.96) !important;
+                        border-color: #e2e8f0 !important;
+                        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+                    }
+                    .workspace-light-mode aside {
+                        background-color: #ffffff !important;
+                        border-color: #e2e8f0 !important;
+                    }
+                    .workspace-light-mode main {
+                        background-color: #f8fafc !important;
+                    }
+                    .workspace-light-mode .text-white {
+                        color: #0f172a !important;
+                    }
+                    .workspace-light-mode .text-zinc-100,
+                    .workspace-light-mode .text-zinc-200 {
+                        color: #1e293b !important;
+                    }
+                    .workspace-light-mode .text-zinc-300,
+                    .workspace-light-mode .text-zinc-400 {
+                        color: #475569 !important;
+                    }
+                    .workspace-light-mode .text-zinc-500 {
+                        color: #64748b !important;
+                    }
+                    .workspace-light-mode .bg-zinc-950,
+                    .workspace-light-mode .bg-zinc-950\/90,
+                    .workspace-light-mode .bg-zinc-950\/70,
+                    .workspace-light-mode .bg-zinc-950\/40 {
+                        background-color: #ffffff !important;
+                    }
+                    .workspace-light-mode .bg-zinc-900,
+                    .workspace-light-mode .bg-zinc-900\/90,
+                    .workspace-light-mode .bg-zinc-900\/70,
+                    .workspace-light-mode .bg-zinc-900\/50,
+                    .workspace-light-mode .bg-zinc-900\/40 {
+                        background-color: #f1f5f9 !important;
+                    }
+                    .workspace-light-mode .bg-zinc-800,
+                    .workspace-light-mode .bg-zinc-800\/80,
+                    .workspace-light-mode .bg-zinc-800\/50 {
+                        background-color: #e2e8f0 !important;
+                    }
+                    .workspace-light-mode .border-zinc-800,
+                    .workspace-light-mode .border-zinc-800\/80,
+                    .workspace-light-mode .border-zinc-800\/90,
+                    .workspace-light-mode .border-zinc-700,
+                    .workspace-light-mode .border-zinc-900 {
+                        border-color: #e2e8f0 !important;
+                    }
+                    .workspace-light-mode .hover\:bg-zinc-800:hover,
+                    .workspace-light-mode .hover\:bg-zinc-900\/70:hover {
+                        background-color: #e2e8f0 !important;
+                    }
+                `}</style>
+            )}
             {/* ── TOP HEADER / TOOLBAR (PROFESYONEL PRO GLASSMORPHIC TASARIM) ── */}
             <header className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 px-4 sm:px-5 py-2.5 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-2xl sticky top-0 z-40 transition-all select-none">
                 {/* 1. Sol Alan: Ana Sayfa Bağlantısı, Marka & Akıllı Tarih Navigasyonu */}
@@ -538,7 +635,22 @@ export default function NotionCalendar({
                         )}
                     </div>
 
-                    {/* Bildirim Çanı */}
+                    {/* Aydınlık / Karanlık Tema Düğmesi (Sadece /workspace) */}
+                    <button
+                        type="button"
+                        onClick={handleToggleTheme}
+                        className={`p-1.5 px-2.5 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center gap-1.5 text-xs font-semibold shrink-0 ${
+                            workspaceTheme === 'light'
+                                ? 'bg-amber-100/90 border-amber-300 text-amber-900 hover:bg-amber-200/90 shadow-amber-950/10'
+                                : 'bg-zinc-900/90 border-zinc-800/90 text-zinc-300 hover:text-white hover:border-zinc-700'
+                        }`}
+                        title={workspaceTheme === 'light' ? 'Karanlık Temaya Geç' : 'Aydınlık Temaya Geç (Notion / Linear Görünümü)'}
+                    >
+                        <span>{workspaceTheme === 'light' ? '☀️' : '🌙'}</span>
+                        <span className="hidden sm:inline font-mono text-[11px]">{workspaceTheme === 'light' ? 'Aydınlık' : 'Karanlık'}</span>
+                    </button>
+
+                    {/* Kurumsal Bildirim Çanı */}
                     <div className="relative shrink-0">
                         <button
                             type="button"
@@ -557,12 +669,15 @@ export default function NotionCalendar({
                             )}
                         </button>
 
-                        {/* Açılır Bildirim Paneli */}
+                        {/* Açılır Profesyonel Bildirim Paneli */}
                         {isNotifOpen && (
                             <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-zinc-950/95 border border-zinc-800 shadow-2xl p-4 z-50 animate-in fade-in slide-in-from-top-2 backdrop-blur-2xl">
-                                <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5 mb-3">
+                                <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5 mb-2.5">
                                     <div className="flex items-center gap-2">
-                                        <h3 className="text-xs font-bold text-white uppercase tracking-wider">Bildirim Merkezi</h3>
+                                        <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                                            <span>🔔</span>
+                                            <span>Bildirim Merkezi</span>
+                                        </h3>
                                         {unreadCount > 0 && (
                                             <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-800 font-mono">
                                                 {unreadCount} yeni
@@ -580,6 +695,29 @@ export default function NotionCalendar({
                                     )}
                                 </div>
 
+                                {/* Bildirim Kategori Filtre Sekmeleri */}
+                                <div className="grid grid-cols-4 gap-1 mb-3">
+                                    {[
+                                        { id: 'all', label: 'Tümü' },
+                                        { id: 'committee', label: '📢 Komite' },
+                                        { id: 'reminder', label: '⏰ Hatırlatıcı' },
+                                        { id: 'urgent', label: '⚡ Acil' },
+                                    ].map(tab => (
+                                        <button
+                                            key={tab.id}
+                                            type="button"
+                                            onClick={() => setNotifFilter(tab.id as any)}
+                                            className={`px-1.5 py-1 rounded-lg text-[10px] font-bold text-center transition-all ${
+                                                notifFilter === tab.id
+                                                    ? 'bg-rose-600 text-white shadow-xs'
+                                                    : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800/80'
+                                            }`}
+                                        >
+                                            {tab.label}
+                                        </button>
+                                    ))}
+                                </div>
+
                                 {!desktopNotifAllowed && (
                                     <div className="p-2.5 mb-3 rounded-xl bg-rose-950/30 border border-rose-900/50 flex items-center justify-between text-xs">
                                         <span className="text-rose-200 text-[11px]">Masaüstü anlık bildirimleri</span>
@@ -594,35 +732,47 @@ export default function NotionCalendar({
                                 )}
 
                                 <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                                    {notifications.length > 0 ? (
-                                        notifications.map(n => (
-                                            <div
-                                                key={n.id}
-                                                className={`p-3 rounded-xl border transition-all text-xs ${
-                                                    n.is_read
-                                                        ? 'bg-zinc-900/40 border-zinc-900 text-zinc-400'
-                                                        : 'bg-zinc-900/90 border-zinc-800 text-zinc-200 shadow-xs'
-                                                }`}
-                                            >
-                                                <div className="flex items-center justify-between mb-1">
-                                                    <span className="font-semibold text-white flex items-center gap-1.5">
-                                                        {n.type === 'urgent' && <span className="text-rose-500">⚡</span>}
-                                                        {n.title}
-                                                    </span>
-                                                    <span className="text-[10px] text-zinc-500">
-                                                        {new Date(n.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
-                                                    </span>
-                                                </div>
-                                                <p className="text-zinc-300 leading-relaxed text-[11px]">{n.message}</p>
-                                                {n.event_title && (
-                                                    <div className="mt-1.5 inline-block text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">
-                                                        📅 {n.event_title}
+                                    {filteredNotifications.length > 0 ? (
+                                        filteredNotifications.map(n => {
+                                            const icon = n.type === 'urgent'
+                                                ? '⚡'
+                                                : n.type === 'committee' || n.title.includes('Komite')
+                                                    ? '📢'
+                                                    : n.type === 'reminder' || n.title.includes('Hatırlatıcı')
+                                                        ? '⏰'
+                                                        : '📌';
+
+                                            return (
+                                                <div
+                                                    key={n.id}
+                                                    className={`p-3 rounded-xl border transition-all text-xs space-y-1 ${
+                                                        n.is_read
+                                                            ? 'bg-zinc-900/40 border-zinc-900 text-zinc-400'
+                                                            : 'bg-zinc-900/90 border-zinc-800 text-zinc-200 shadow-xs'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className="font-semibold text-white flex items-center gap-1.5 truncate">
+                                                            <span className="shrink-0">{icon}</span>
+                                                            <span className="truncate">{n.title}</span>
+                                                        </span>
+                                                        <span className="text-[10px] text-zinc-500 font-mono shrink-0">
+                                                            {new Date(n.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                                                        </span>
                                                     </div>
-                                                )}
-                                            </div>
-                                        ))
+                                                    <p className="text-zinc-300 leading-relaxed text-[11px]">{n.message}</p>
+                                                    {n.event_title && (
+                                                        <div className="mt-1.5 inline-block text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-medium">
+                                                            📅 {n.event_title}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
                                     ) : (
-                                        <p className="text-center text-xs text-zinc-500 py-6 italic">Yeni bildirim bulunmuyor.</p>
+                                        <p className="text-center text-xs text-zinc-500 py-6 italic">
+                                            {notifFilter !== 'all' ? 'Bu kategoride bildirim bulunmuyor.' : 'Yeni bildirim bulunmuyor.'}
+                                        </p>
                                     )}
                                 </div>
                             </div>

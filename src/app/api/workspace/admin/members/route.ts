@@ -135,8 +135,24 @@ export async function PATCH(req: Request) {
             }
         }
 
-        if (Object.keys(updates).length > 0) {
-            await WorkspaceRepository.updateMember(id, updates);
+        if (body.newNote && body.newNote.content) {
+            await WorkspaceRepository.addMemberNote(id, {
+                author_id: session.member.id,
+                author_name: session.member.display_name,
+                content: body.newNote.content.trim()
+            });
+        }
+
+        if (body.deleteNoteId) {
+            await WorkspaceRepository.deleteMemberNote(id, body.deleteNoteId);
+        }
+
+        const cleanUpdates = { ...updates };
+        delete cleanUpdates.newNote;
+        delete cleanUpdates.deleteNoteId;
+
+        if (Object.keys(cleanUpdates).length > 0) {
+            await WorkspaceRepository.updateMember(id, cleanUpdates);
         }
 
         const updated = await WorkspaceRepository.getMemberById(id);

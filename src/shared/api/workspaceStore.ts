@@ -7,11 +7,13 @@ import {
     WorkspaceEvent,
     WorkspaceSubtask,
     WorkspaceComment,
+    WorkspaceCommentTag,
     WorkspaceAttachment,
     WorkspaceNotification,
     ActiveSession,
     AuditLogRecord,
-    WorkspaceSecuritySettings
+    WorkspaceSecuritySettings,
+    WorkspaceMemberNote
 } from './workspaceTypes';
 import { hashPassword, verifyPassword } from '@/shared/lib/security';
 
@@ -547,11 +549,29 @@ export class WorkspaceStoreManager {
     // ============================================
     // Etkinlik Yönetimi & Optimistic Lock (Events)
     // ============================================
-    public getEvents(calendarId?: string): WorkspaceEvent[] {
-        const list = Array.from(this.events.values());
+    public getEvents(calendarId?: string, viewerMember?: WorkspaceMember | null): WorkspaceEvent[] {
+        let list = Array.from(this.events.values());
         if (calendarId) {
-            return list.filter(e => e.calendar_id === calendarId);
+            list = list.filter(e => e.calendar_id === calendarId);
         }
+
+        // Görünürlük (Visibility) İzolasyonu
+        const isViewerAdmin = viewerMember?.role === 'super_admin' ||
+            viewerMember?.role === 'workspace_admin' ||
+            viewerMember?.role === 'editor';
+
+        list = list.filter(e => {
+            const vis = e.visibility || 'public';
+            if (vis === 'public') return true;
+            if (vis === 'admin_only') {
+                return isViewerAdmin;
+            }
+            if (vis === 'private') {
+                return viewerMember && (e.created_by === viewerMember.id || viewerMember.role === 'super_admin');
+            }
+            return true;
+        });
+
         return list;
     }
 
@@ -561,6 +581,7 @@ export class WorkspaceStoreManager {
 
     public addEvent(event: WorkspaceEvent): WorkspaceEvent {
         if (!event.version) event.version = 1;
+        if (!event.visibility) event.visibility = 'public';
         if (!event.subtasks) event.subtasks = [];
         if (!event.comments) event.comments = [];
         if (!event.attachments) event.attachments = [];
@@ -571,12 +592,12 @@ export class WorkspaceStoreManager {
         this.events.set(event.id, event);
         this.logAudit({
             id: `audit_${Date.now()}`,
-            user_id: 'user',
+            user_id: event.created_by || 'user',
             user_email: 'user',
             action: 'EVENT_CREATED',
             entity_type: 'EVENT',
             entity_id: event.id,
-            details: `Yeni etkinlik oluşturuldu: ${event.title}`,
+            details: `Yeni etkinlik oluşturuldu: ${event.title} [Erişim: ${event.visibility}]`,
             created_at: new Date().toISOString()
         });
         return event;
@@ -688,7 +709,15 @@ export class WorkspaceStoreManager {
     }
 
     // Comments
-    public addComment(eventId: string, userId: string, userName: string, content: string): WorkspaceComment {
+    public addComment(
+        eventId: string,
+        userId: string,
+        userName: string,
+        content: string,
+        tag: WorkspaceCommentTag = 'general',
+        isPinned: boolean = false,
+        userAvatar?: string
+    ): WorkspaceComment {
         const event = this.events.get(eventId);
         if (!event) throw new Error('Etkinlik bulunamadı');
         const comment: WorkspaceComment = {
@@ -696,13 +725,61 @@ export class WorkspaceStoreManager {
             event_id: eventId,
             user_id: userId,
             user_name: userName,
+            user_avatar: userAvatar,
             content,
+            is_pinned: isPinned,
+            tag,
+            reactions: {},
             created_at: new Date().toISOString()
         };
         event.comments.push(comment);
         event.version += 1;
         event.updated_at = new Date().toISOString();
         return comment;
+    }
+
+    public toggleCommentPin(eventId: string, commentId: string): WorkspaceComment | null {
+        const event = this.events.get(eventId);
+        if (!event) return null;
+        const comment = event.comments.find(c => c.id === commentId);
+        if (!comment) return null;
+        comment.is_pinned = !comment.is_pinned;
+        event.version += 1;
+        event.updated_at = new Date().toISOString();
+        return comment;
+    }
+
+    public toggleCommentReaction(eventId: string, commentId: string, emoji: string, userName: string): WorkspaceComment | null {
+        const event = this.events.get(eventId);
+        if (!event) return null;
+        const comment = event.comments.find(c => c.id === commentId);
+        if (!comment) return null;
+        if (!comment.reactions) comment.reactions = {};
+        const currentList = comment.reactions[emoji] || [];
+        if (currentList.includes(userName)) {
+            comment.reactions[emoji] = currentList.filter(u => u !== userName);
+            if (comment.reactions[emoji].length === 0) {
+                delete comment.reactions[emoji];
+            }
+        } else {
+            comment.reactions[emoji] = [...currentList, userName];
+        }
+        event.version += 1;
+        event.updated_at = new Date().toISOString();
+        return comment;
+    }
+
+    public deleteComment(eventId: string, commentId: string): boolean {
+        const event = this.events.get(eventId);
+        if (!event) return false;
+        const initLen = event.comments.length;
+        event.comments = event.comments.filter(c => c.id !== commentId);
+        if (event.comments.length !== initLen) {
+            event.version += 1;
+            event.updated_at = new Date().toISOString();
+            return true;
+        }
+        return false;
     }
 
     // Attachments
@@ -919,6 +996,50 @@ export class WorkspaceStoreManager {
         if (this.auditLogs.length > 500) {
             this.auditLogs.pop();
         }
+    }
+
+    public clearAuditLogs(clearedBy: string): void {
+        this.auditLogs = [];
+        this.logAudit({
+            id: `audit_clear_${Date.now()}`,
+            user_id: 'admin',
+            user_email: clearedBy,
+            action: 'AUDIT_LOGS_CLEARED',
+            entity_type: 'SECURITY',
+            details: `Denetim günlüğü geçmişi ${clearedBy} tarafından güvenle temizlendi.`,
+            created_at: new Date().toISOString()
+        });
+    }
+
+    public addMemberNote(memberId: string, note: { author_id: string; author_name: string; content: string }): WorkspaceMember | null {
+        const member = this.members.get(memberId);
+        if (!member) return null;
+        if (!member.member_notes) member.member_notes = [];
+        member.member_notes.unshift({
+            id: `mn_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            author_id: note.author_id,
+            author_name: note.author_name,
+            content: note.content,
+            created_at: new Date().toISOString()
+        });
+        this.logAudit({
+            id: `audit_${Date.now()}`,
+            user_id: note.author_id,
+            user_email: note.author_name,
+            action: 'MEMBER_NOTE_ADDED',
+            entity_type: 'MEMBER',
+            entity_id: memberId,
+            details: `Üye (@${member.username || member.email}) için değerlendirme notu eklendi.`,
+            created_at: new Date().toISOString()
+        });
+        return member;
+    }
+
+    public deleteMemberNote(memberId: string, noteId: string): WorkspaceMember | null {
+        const member = this.members.get(memberId);
+        if (!member || !member.member_notes) return null;
+        member.member_notes = member.member_notes.filter(n => n.id !== noteId);
+        return member;
     }
 
     // ============================================

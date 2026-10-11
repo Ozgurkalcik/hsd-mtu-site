@@ -9,7 +9,9 @@ import {
     WorkspaceSubtask,
     WorkspaceComment,
     WorkspaceAttachment,
-    WorkspaceRole
+    WorkspaceRole,
+    EventVisibility,
+    WorkspaceReminder
 } from '@/shared/api/workspaceTypes';
 
 interface EventDrawerProps {
@@ -510,6 +512,8 @@ export default function EventDrawer({
     const [meetingLink, setMeetingLink] = useState('');
     const [description, setDescription] = useState('');
     const [status, setStatus] = useState<'scheduled' | 'in_progress' | 'completed' | 'cancelled'>('scheduled');
+    const [visibility, setVisibility] = useState<EventVisibility>('public');
+    const [reminders, setReminders] = useState<WorkspaceReminder[]>([]);
     const [assignees, setAssignees] = useState<string[]>([]);
     const [subtasks, setSubtasks] = useState<WorkspaceSubtask[]>([]);
     const [comments, setComments] = useState<WorkspaceComment[]>([]);
@@ -551,8 +555,13 @@ export default function EventDrawer({
     // Subtask input
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
 
-    // Comment input
+    // Comment input & Tag
     const [newCommentText, setNewCommentText] = useState('');
+    const [newCommentTag, setNewCommentTag] = useState<'general' | 'idea' | 'blocker' | 'decision' | 'info'>('general');
+
+    // Professional Reminders State
+    const [isTestingReminder, setIsTestingReminder] = useState(false);
+    const [reminderTestSuccess, setReminderTestSuccess] = useState(false);
 
     // Instant Announcement State
     const [announcementAudience, setAnnouncementAudience] = useState<'all' | 'group' | 'role'>('group');
@@ -582,6 +591,8 @@ export default function EventDrawer({
             setMeetingLink(event.meeting_link || '');
             setDescription(event.description || '');
             setStatus(event.status || 'scheduled');
+            setVisibility(event.visibility || 'public');
+            setReminders(event.reminders || []);
             setAssignees(event.assignees || []);
             setSubtasks(event.subtasks || []);
             setComments(event.comments || []);
@@ -635,6 +646,10 @@ export default function EventDrawer({
             setMeetingLink('');
             setDescription('');
             setStatus('scheduled');
+            setVisibility('public');
+            setReminders([
+                { id: `rem_default_1`, minutes_before: 60, target: 'all' }
+            ]);
             setAssignees(currentMember ? [currentMember.id] : []);
             setSubtasks([]);
             setComments([]);
@@ -646,6 +661,7 @@ export default function EventDrawer({
         setAppliedTemplateFeedback(null);
         setAnnouncementSuccess(false);
         setAnnouncementMsg('');
+        setReminderTestSuccess(false);
     }, [isOpen, event, initialDate, calendars, currentMember]);
 
     // Keyboard ESC to close
@@ -815,6 +831,8 @@ export default function EventDrawer({
             color,
             category,
             status,
+            visibility,
+            reminders,
             assignees,
             subtasks,
             comments,
@@ -915,7 +933,69 @@ export default function EventDrawer({
         setSubtasks(subtasks.filter(s => !s.is_completed));
     };
 
-    // Comment Handler
+    // Reminder Handlers
+    const handleAddReminder = (minutesBefore: number, target: 'all' | 'admins' | 'assignees' = 'all') => {
+        const newRem: WorkspaceReminder = {
+            id: `rem_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            event_id: event?.id,
+            minutes_before: minutesBefore,
+            target,
+            is_sent: false,
+        };
+        setReminders(prev => [...prev, newRem]);
+    };
+
+    const handleRemoveReminder = (id: string) => {
+        setReminders(prev => prev.filter(r => r.id !== id));
+    };
+
+    const handleTestInstantReminder = async () => {
+        setIsTestingReminder(true);
+        setReminderTestSuccess(false);
+
+        // 1. Browser Native Notification test if supported & allowed
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+            if (Notification.permission === 'granted') {
+                new Notification(`🔔 HSD Hatırlatıcı: ${title || 'Topluluk Etkinliği'}`, {
+                    body: `${startDate || 'Yakında'} • ${startTime || '10:00'} - ${location || 'Online'}`,
+                    icon: '/favicon.ico',
+                });
+            } else if (Notification.permission !== 'denied') {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        new Notification(`🔔 HSD Hatırlatıcı: ${title || 'Topluluk Etkinliği'}`, {
+                            body: `${startDate || 'Yakında'} • ${startTime || '10:00'} - ${location || 'Online'}`,
+                            icon: '/favicon.ico',
+                        });
+                    }
+                });
+            }
+        }
+
+        // 2. Dispatch simulated reminder to notification center
+        try {
+            await fetch('/api/workspace/notifications', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    eventId: event?.id,
+                    eventTitle: title || 'Topluluk Etkinliği',
+                    title: `⏰ Etkinlik Hatırlatıcısı: ${title || 'Topluluk Etkinliği'}`,
+                    message: `Bu etkinlik için test hatırlatıcısı tetiklendi. Başlangıç: ${startDate || 'Belirtilmedi'} ${startTime || ''}. Katılım linki/konumu: ${location || meetingLink || 'Belirlenmedi'}.`,
+                    targetAudience: 'all',
+                    type: 'reminder',
+                }),
+            });
+            setReminderTestSuccess(true);
+            setTimeout(() => setReminderTestSuccess(false), 4500);
+        } catch (err) {
+            console.error('Hatırlatıcı test hatası:', err);
+        } finally {
+            setIsTestingReminder(false);
+        }
+    };
+
+    // Comment Handlers
     const handleAddComment = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newCommentText.trim()) return;
@@ -927,7 +1007,10 @@ export default function EventDrawer({
             user_name: currentMember?.display_name || 'Topluluk Yöneticisi',
             user_avatar: currentMember?.avatar_url,
             content: newCommentText.trim(),
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            tag: newCommentTag,
+            is_pinned: false,
+            reactions: {},
         };
 
         setComments([...comments, newCom]);
@@ -938,7 +1021,7 @@ export default function EventDrawer({
                 const res = await fetch(`/api/workspace/events/${event.id}/comments`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content: newCom.content }),
+                    body: JSON.stringify({ content: newCom.content, tag: newCommentTag }),
                 });
                 const data = await res.json();
                 if (res.ok && data.comment) {
@@ -953,6 +1036,63 @@ export default function EventDrawer({
                 }
             } catch (err) {
                 console.error('Yorum API hatası:', err);
+            }
+        }
+    };
+
+    const handleToggleCommentPin = async (commentId: string) => {
+        setComments(prev => prev.map(c => c.id === commentId ? { ...c, is_pinned: !c.is_pinned } : c));
+        if (event?.id) {
+            try {
+                await fetch(`/api/workspace/events/${event.id}/comments`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ commentId, action: 'toggle_pin' }),
+                });
+            } catch (err) {
+                console.error('Pin hatası:', err);
+            }
+        }
+    };
+
+    const handleToggleCommentReaction = async (commentId: string, emoji: string) => {
+        const userId = currentMember?.id || 'anon';
+        setComments(prev => prev.map(c => {
+            if (c.id !== commentId) return c;
+            const rx = { ...(c.reactions || {}) };
+            const currentUsers = rx[emoji] || [];
+            if (currentUsers.includes(userId)) {
+                rx[emoji] = currentUsers.filter(u => u !== userId);
+                if (rx[emoji].length === 0) delete rx[emoji];
+            } else {
+                rx[emoji] = [...currentUsers, userId];
+            }
+            return { ...c, reactions: rx };
+        }));
+
+        if (event?.id) {
+            try {
+                await fetch(`/api/workspace/events/${event.id}/comments`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ commentId, action: 'toggle_reaction', emoji }),
+                });
+            } catch (err) {
+                console.error('Reaksiyon hatası:', err);
+            }
+        }
+    };
+
+    const handleDeleteComment = async (commentId: string) => {
+        if (!confirm('Bu yorumu silmek istediğinize emin misiniz?')) return;
+        setComments(prev => prev.filter(c => c.id !== commentId));
+        if (event?.id) {
+            try {
+                await fetch(`/api/workspace/events/${event.id}/comments?commentId=${commentId}`, {
+                    method: 'DELETE',
+                });
+            } catch (err) {
+                console.error('Yorum silme hatası:', err);
             }
         }
     };
@@ -1307,6 +1447,89 @@ export default function EventDrawer({
                                 </div>
                             </div>
 
+                            {/* ── BÖLÜM 2.5: ERİŞİM & GÖRÜNÜRLÜK DÜZEYİ (RBAC KORUMALI) ── */}
+                            <div className="p-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-3">
+                                <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm">🛡️</span>
+                                        <span className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
+                                            Erişim & Görünürlük Düzeyi
+                                        </span>
+                                    </div>
+                                    <span className="text-[10px] font-mono text-zinc-400 font-semibold px-2 py-0.5 rounded bg-zinc-800">
+                                        {visibility === 'public' ? '🌍 Herkese Açık' : visibility === 'admin_only' ? '🛡️ Yönetici Özel' : '🔒 Gizli'}
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                    {/* 1. Tüm Topluluk */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setVisibility('public')}
+                                        className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                                            visibility === 'public'
+                                                ? 'bg-zinc-800/90 border-emerald-500 shadow-md ring-1 ring-emerald-500/30'
+                                                : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50'
+                                        }`}
+                                    >
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-base">🌍</span>
+                                                {visibility === 'public' && <span className="text-[10px] text-emerald-400 font-bold">✓ Seçili</span>}
+                                            </div>
+                                            <p className="text-xs font-bold text-white">Tüm Topluluk</p>
+                                            <p className="text-[10px] text-zinc-400 mt-0.5 leading-snug">
+                                                Tüm topluluk üyeleri takvimde görüntüleyebilir.
+                                            </p>
+                                        </div>
+                                    </button>
+
+                                    {/* 2. Sadece Adminler */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setVisibility('admin_only')}
+                                        className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                                            visibility === 'admin_only'
+                                                ? 'bg-zinc-800/90 border-amber-500 shadow-md ring-1 ring-amber-500/30'
+                                                : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50'
+                                        }`}
+                                    >
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-base">🛡️</span>
+                                                {visibility === 'admin_only' && <span className="text-[10px] text-amber-400 font-bold">✓ Seçili</span>}
+                                            </div>
+                                            <p className="text-xs font-bold text-white">Sadece Adminler</p>
+                                            <p className="text-[10px] text-zinc-400 mt-0.5 leading-snug">
+                                                Yalnızca Super Admin, Workspace Admin ve Editorler görür.
+                                            </p>
+                                        </div>
+                                    </button>
+
+                                    {/* 3. Sadece Ben */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setVisibility('private')}
+                                        className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                                            visibility === 'private'
+                                                ? 'bg-zinc-800/90 border-rose-500 shadow-md ring-1 ring-rose-500/30'
+                                                : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50'
+                                        }`}
+                                    >
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-base">🔒</span>
+                                                {visibility === 'private' && <span className="text-[10px] text-rose-400 font-bold">✓ Seçili</span>}
+                                            </div>
+                                            <p className="text-xs font-bold text-white">Sadece Ben</p>
+                                            <p className="text-[10px] text-zinc-400 mt-0.5 leading-snug">
+                                                Yalnızca oluşturan siz ve Super Admin görebilir.
+                                            </p>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+
                             {/* ── BÖLÜM 3: ZAMANLAMA, TARİH & HIZLI SÜRE KISAYOLLARI ── */}
                             <div className="p-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-4">
                                 <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
@@ -1425,6 +1648,112 @@ export default function EventDrawer({
                                             )}
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+
+                            {/* ── BÖLÜM 3.5: PROFESYONEL HATIRLATICI MEKANİZMASI ── */}
+                            <div className="p-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-3.5">
+                                <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm">⏰</span>
+                                        <span className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
+                                            Profesyonel Hatırlatıcı Mekanizması ({reminders.length})
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleTestInstantReminder}
+                                        disabled={isTestingReminder}
+                                        className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors px-2.5 py-1 rounded-lg bg-zinc-800 border border-zinc-700 hover:border-zinc-600 disabled:opacity-50"
+                                        title="Sistem ve tarayıcı hatırlatıcısını hemen test et"
+                                    >
+                                        <span>🔔</span>
+                                        <span>{isTestingReminder ? 'Test Ediliyor...' : 'Hatırlatıcıyı Test Et'}</span>
+                                    </button>
+                                </div>
+
+                                {reminderTestSuccess && (
+                                    <div className="p-2.5 rounded-xl bg-emerald-950/70 border border-emerald-800 text-emerald-200 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                                        <span>✓</span>
+                                        <span>Test hatırlatıcısı başarıyla gönderildi! Bildirim merkezinden ve sisteminizden kontrol edebilirsiniz.</span>
+                                    </div>
+                                )}
+
+                                {/* Hızlı Hatırlatıcı Ekleme Butonları */}
+                                <div>
+                                    <span className="text-[11px] font-semibold text-zinc-400 block mb-1.5">
+                                        Hızlı Hatırlatıcı Ekle:
+                                    </span>
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleAddReminder(15, 'all')}
+                                            className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700/80 transition-colors"
+                                        >
+                                            + ⏱️ 15 Dk Önce
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleAddReminder(60, 'all')}
+                                            className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700/80 transition-colors"
+                                        >
+                                            + ⏰ 1 Saat Önce
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleAddReminder(1440, 'all')}
+                                            className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700/80 transition-colors"
+                                        >
+                                            + 📅 1 Gün Önce
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleAddReminder(2880, 'admins')}
+                                            className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700/80 transition-colors"
+                                        >
+                                            + 🛡️ 2 Gün Önce (Yöneticiler)
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Aktif Hatırlatıcılar Listesi */}
+                                <div className="space-y-1.5">
+                                    {reminders.length === 0 ? (
+                                        <p className="text-xs text-zinc-500 italic py-1">Henüz planlanmış hatırlatıcı yok. Yukarıdaki butonlardan ekleyebilirsiniz.</p>
+                                    ) : (
+                                        reminders.map(rem => {
+                                            const mins = rem.minutes_before ?? rem.trigger_minutes_before ?? 60;
+                                            const label = mins < 60
+                                                ? `${mins} dakika önce`
+                                                : mins < 1440
+                                                    ? `${Math.round(mins / 60)} saat önce`
+                                                    : `${Math.round(mins / 1440)} gün önce`;
+                                            const targetLabel = rem.target === 'admins' ? 'Sadece Yöneticiler' : rem.target === 'assignees' ? 'Görevliler' : 'Tüm Topluluk';
+
+                                            return (
+                                                <div
+                                                    key={rem.id}
+                                                    className="flex items-center justify-between p-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs"
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-rose-400">🔔</span>
+                                                        <span className="font-semibold text-zinc-200">{label}</span>
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">
+                                                            {targetLabel}
+                                                        </span>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveReminder(rem.id)}
+                                                        className="text-zinc-500 hover:text-rose-400 p-1 text-xs transition-colors"
+                                                        title="Hatırlatıcıyı Kaldır"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </div>
+                                            );
+                                        })
+                                    )}
                                 </div>
                             </div>
 
@@ -1835,40 +2164,162 @@ export default function EventDrawer({
                             </div>
                         </div>
 
-                        {/* ── BÖLÜM 10: YORUMLAR & EKİP NOTLARI ── */}
-                        <div className="p-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-3">
-                            <span className="text-xs font-bold text-zinc-200 uppercase tracking-wider block border-b border-zinc-800 pb-2">
-                                Yorumlar & Ekip Notları ({comments.length})
-                            </span>
+                        {/* ── BÖLÜM 10: YORUMLAR & EKİP NOTLARI (KURUMSAL SEVİYE) ── */}
+                        <div className="p-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-4">
+                            <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm">💬</span>
+                                    <span className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
+                                        Yorumlar & Ekip Notları ({comments.length})
+                                    </span>
+                                </div>
+                                <span className="text-[10px] text-zinc-400 font-mono">
+                                    {comments.filter(c => c.is_pinned).length > 0 && `${comments.filter(c => c.is_pinned).length} Sabitlendi • `}
+                                    Kurumsal İşbirliği
+                                </span>
+                            </div>
 
-                            <form onSubmit={handleAddComment} className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={newCommentText}
-                                    onChange={(e) => setNewCommentText(e.target.value)}
-                                    placeholder="Bir güncelleme veya ekip notu yaz..."
-                                    className="flex-1 bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-rose-500 font-medium"
-                                />
-                                <button
-                                    type="submit"
-                                    className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-white transition-colors"
-                                >
-                                    Gönder
-                                </button>
+                            {/* Yeni Yorum / Ekip Notu Formu */}
+                            <form onSubmit={handleAddComment} className="space-y-2">
+                                <div className="flex gap-2">
+                                    <select
+                                        value={newCommentTag}
+                                        onChange={(e) => setNewCommentTag(e.target.value as any)}
+                                        className="bg-zinc-950 border border-zinc-700 rounded-xl px-2.5 py-2 text-xs font-semibold text-zinc-200 focus:outline-none focus:border-rose-500 shrink-0"
+                                    >
+                                        <option value="general">💬 Genel</option>
+                                        <option value="idea">💡 Fikir</option>
+                                        <option value="decision">✅ Karar</option>
+                                        <option value="blocker">⚠️ Engel</option>
+                                        <option value="info">📌 Bilgi</option>
+                                    </select>
+                                    <input
+                                        type="text"
+                                        value={newCommentText}
+                                        onChange={(e) => setNewCommentText(e.target.value)}
+                                        placeholder="Bir güncelleme, karar veya ekip notu yazın..."
+                                        className="flex-1 bg-zinc-950 border border-zinc-700 rounded-xl px-3.5 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-rose-500 font-medium"
+                                    />
+                                    <button
+                                        type="submit"
+                                        className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white transition-colors shrink-0 shadow-md shadow-rose-950/30"
+                                    >
+                                        Ekle
+                                    </button>
+                                </div>
                             </form>
 
-                            <div className="space-y-2 max-h-48 overflow-y-auto">
-                                {comments.map(c => (
-                                    <div key={c.id} className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs space-y-1">
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-bold text-zinc-100">{c.user_name}</span>
-                                            <span className="text-[10px] text-zinc-500 font-mono">
-                                                {new Date(c.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
-                                            </span>
-                                        </div>
-                                        <p className="text-zinc-300 leading-relaxed font-sans">{c.content}</p>
-                                    </div>
-                                ))}
+                            {/* Yorumlar Listesi (Sabitlenenler En Üstte) */}
+                            <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+                                {comments.length === 0 ? (
+                                    <p className="text-xs text-zinc-500 italic text-center py-4">
+                                        Henüz bir ekip notu veya değerlendirme eklenmedi. İlk notu siz ekleyin.
+                                    </p>
+                                ) : (
+                                    [...comments]
+                                        .sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0))
+                                        .map(c => {
+                                            const isPinned = Boolean(c.is_pinned);
+                                            const canDelete = currentMember?.role === 'super_admin' ||
+                                                currentMember?.role === 'workspace_admin' ||
+                                                c.user_id === currentMember?.id;
+
+                                            const tagBadge = {
+                                                idea: { label: '💡 Fikir', color: 'bg-purple-950/70 border-purple-800 text-purple-300' },
+                                                decision: { label: '✅ Karar', color: 'bg-emerald-950/70 border-emerald-800 text-emerald-300' },
+                                                blocker: { label: '⚠️ Engel', color: 'bg-rose-950/70 border-rose-800 text-rose-300' },
+                                                info: { label: '📌 Bilgi', color: 'bg-sky-950/70 border-sky-800 text-sky-300' },
+                                                general: { label: '💬 Not', color: 'bg-zinc-800 border-zinc-700 text-zinc-400' },
+                                            }[c.tag || 'general'];
+
+                                            return (
+                                                <div
+                                                    key={c.id}
+                                                    className={`p-3 rounded-xl border text-xs space-y-2 transition-all ${
+                                                        isPinned
+                                                            ? 'bg-amber-950/20 border-amber-600/60 shadow-sm'
+                                                            : 'bg-zinc-950/80 border-zinc-800/90 hover:border-zinc-700'
+                                                    }`}
+                                                >
+                                                    {/* Üst Bilgi: Yazar, Tag, Zaman & Eylemler */}
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <div className="w-5 h-5 rounded-full bg-rose-600/30 border border-rose-500/40 text-[10px] font-bold text-rose-300 flex items-center justify-center shrink-0">
+                                                                {c.user_name.charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <span className="font-bold text-zinc-200 truncate">{c.user_name}</span>
+                                                            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${tagBadge.color}`}>
+                                                                {tagBadge.label}
+                                                            </span>
+                                                            {isPinned && (
+                                                                <span className="text-[10px] font-bold text-amber-400 font-mono bg-amber-950/60 border border-amber-800/80 px-1.5 py-0.5 rounded">
+                                                                    📌 Sabitlendi
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        <div className="flex items-center gap-2 shrink-0">
+                                                            <span className="text-[10px] text-zinc-500 font-mono">
+                                                                {new Date(c.created_at).toLocaleString('tr-TR', {
+                                                                    day: '2-digit',
+                                                                    month: '2-digit',
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit',
+                                                                })}
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleToggleCommentPin(c.id)}
+                                                                className={`p-1 rounded text-xs transition-colors ${
+                                                                    isPinned ? 'text-amber-400 hover:text-amber-300' : 'text-zinc-500 hover:text-zinc-300'
+                                                                }`}
+                                                                title={isPinned ? 'Sabitlemeyi Kaldır' : 'Yorumu Sabitle'}
+                                                            >
+                                                                📌
+                                                            </button>
+                                                            {canDelete && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDeleteComment(c.id)}
+                                                                    className="p-1 rounded text-zinc-500 hover:text-rose-400 text-xs transition-colors"
+                                                                    title="Yorumu Sil"
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Yorum İçeriği */}
+                                                    <p className="text-zinc-200 leading-relaxed font-sans pl-1">{c.content}</p>
+
+                                                    {/* Reaksiyon Çubuğu */}
+                                                    <div className="flex items-center gap-1.5 pt-1 border-t border-zinc-900/60">
+                                                        {['👍', '🚀', '❤️', '👀'].map(emoji => {
+                                                            const users = (c.reactions && c.reactions[emoji]) || [];
+                                                            const hasReacted = users.includes(currentMember?.id || 'anon');
+
+                                                            return (
+                                                                <button
+                                                                    key={emoji}
+                                                                    type="button"
+                                                                    onClick={() => handleToggleCommentReaction(c.id, emoji)}
+                                                                    className={`px-2 py-0.5 rounded-lg text-xs font-mono transition-all flex items-center gap-1 ${
+                                                                        hasReacted
+                                                                            ? 'bg-rose-950/80 border border-rose-700 text-rose-200'
+                                                                            : 'bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                                                                    }`}
+                                                                >
+                                                                    <span>{emoji}</span>
+                                                                    {users.length > 0 && <span className="text-[10px] font-bold">{users.length}</span>}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                )}
                             </div>
                         </div>
 

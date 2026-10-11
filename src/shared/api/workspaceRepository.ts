@@ -13,7 +13,10 @@ import {
     AuditLogRecord,
     WorkspaceSubtask,
     WorkspaceComment,
-    WorkspaceAttachment
+    WorkspaceCommentTag,
+    WorkspaceAttachment,
+    WorkspaceMemberNote,
+    EventVisibility
 } from './workspaceTypes';
 import { hashPassword, verifyPassword } from '@/shared/lib/security';
 
@@ -63,7 +66,7 @@ export class WorkspaceRepository {
     // ETKİNLİKLER (Events & Concurrency Locking)
     // ==========================================
 
-    public static async getEvents(calendarId?: string): Promise<WorkspaceEvent[]> {
+    public static async getEvents(calendarId?: string, viewerMember?: WorkspaceMember | null): Promise<WorkspaceEvent[]> {
         this.ensureDatabaseConfigured();
         if (this.isSupabaseConfigured()) {
             try {
@@ -81,13 +84,28 @@ export class WorkspaceRepository {
                     const comments = comRes.data || [];
                     const subtasks = subRes.data || [];
 
-                    const enriched = data.map((ev: any) => ({
+                    let enriched = data.map((ev: any) => ({
                         ...ev,
                         comments: comments.filter((c: any) => c.event_id === ev.id),
                         subtasks: subtasks.filter((s: any) => s.event_id === ev.id),
                         attachments: [],
-                        reminders: []
+                        reminders: ev.reminders || []
                     })) as WorkspaceEvent[];
+
+                    // Görünürlük (Visibility) Filtreleme
+                    const isViewerAdmin = viewerMember?.role === 'super_admin' ||
+                        viewerMember?.role === 'workspace_admin' ||
+                        viewerMember?.role === 'editor';
+
+                    enriched = enriched.filter(e => {
+                        const vis = e.visibility || 'public';
+                        if (vis === 'public') return true;
+                        if (vis === 'admin_only') return isViewerAdmin;
+                        if (vis === 'private') {
+                            return viewerMember && (e.created_by === viewerMember.id || viewerMember.role === 'super_admin');
+                        }
+                        return true;
+                    });
 
                     return enriched;
                 }
@@ -95,7 +113,7 @@ export class WorkspaceRepository {
                 console.warn('Postgres etkinlik okuma hatası:', err);
             }
         }
-        return WorkspaceStoreManager.getInstance().getEvents(calendarId);
+        return WorkspaceStoreManager.getInstance().getEvents(calendarId, viewerMember);
     }
 
     public static async getEventById(id: string): Promise<WorkspaceEvent | null> {
@@ -114,7 +132,7 @@ export class WorkspaceRepository {
                         comments: comRes.data || [],
                         subtasks: subRes.data || [],
                         attachments: [],
-                        reminders: []
+                        reminders: data.reminders || []
                     } as WorkspaceEvent;
                 }
             } catch (err) {
@@ -145,6 +163,9 @@ export class WorkspaceRepository {
                     location: event.location || null,
                     meeting_link: event.meeting_link || null,
                     status: event.status || 'scheduled',
+                    visibility: event.visibility || 'public',
+                    created_by: event.created_by || null,
+                    reminders: event.reminders || [],
                     version: event.version || 1,
                     created_at: event.created_at || new Date().toISOString(),
                     updated_at: event.updated_at || new Date().toISOString()
@@ -172,7 +193,7 @@ export class WorkspaceRepository {
                         reminders: event.reminders || []
                     } as WorkspaceEvent;
                 } else if (error) {
-                    console.warn('Postgres etkinlik kayıt hatası:', error);
+                    console.warn('Postgres etkinlik kayıt hatası (fallback taban):', error);
                 }
             } catch (err) {
                 console.warn('Postgres etkinlik kayıt hatası:', err);
@@ -354,7 +375,15 @@ export class WorkspaceRepository {
         return event?.comments || [];
     }
 
-    public static async addComment(eventId: string, userId: string, userName: string, content: string): Promise<WorkspaceComment> {
+    public static async addComment(
+        eventId: string,
+        userId: string,
+        userName: string,
+        content: string,
+        tag: WorkspaceCommentTag = 'general',
+        isPinned: boolean = false,
+        userAvatar?: string
+    ): Promise<WorkspaceComment> {
         this.ensureDatabaseConfigured();
         const commentId = `com_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
         const nowIso = new Date().toISOString();
@@ -364,7 +393,11 @@ export class WorkspaceRepository {
             event_id: eventId,
             user_id: userId,
             user_name: userName,
+            user_avatar: userAvatar,
             content,
+            is_pinned: isPinned,
+            tag,
+            reactions: {},
             created_at: nowIso
         };
 
@@ -379,7 +412,7 @@ export class WorkspaceRepository {
 
                 if (!error && data) {
                     try {
-                        WorkspaceStoreManager.getInstance().addComment(eventId, userId, userName, content);
+                        WorkspaceStoreManager.getInstance().addComment(eventId, userId, userName, content, tag, isPinned, userAvatar);
                     } catch {}
                     return data as WorkspaceComment;
                 }
@@ -392,10 +425,52 @@ export class WorkspaceRepository {
         }
 
         try {
-            return WorkspaceStoreManager.getInstance().addComment(eventId, userId, userName, content);
+            return WorkspaceStoreManager.getInstance().addComment(eventId, userId, userName, content, tag, isPinned, userAvatar);
         } catch {
             return newComment;
         }
+    }
+
+    public static async toggleCommentPin(eventId: string, commentId: string): Promise<WorkspaceComment | null> {
+        this.ensureDatabaseConfigured();
+        const updated = WorkspaceStoreManager.getInstance().toggleCommentPin(eventId, commentId);
+        if (updated && this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                await supabase.from('workspace_event_comments').update({ is_pinned: updated.is_pinned }).eq('id', commentId);
+            } catch (err) {
+                console.warn('Postgres yorum sabitleme güncelleme hatası:', err);
+            }
+        }
+        return updated;
+    }
+
+    public static async toggleCommentReaction(eventId: string, commentId: string, emoji: string, userName: string): Promise<WorkspaceComment | null> {
+        this.ensureDatabaseConfigured();
+        const updated = WorkspaceStoreManager.getInstance().toggleCommentReaction(eventId, commentId, emoji, userName);
+        if (updated && this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                await supabase.from('workspace_event_comments').update({ reactions: updated.reactions }).eq('id', commentId);
+            } catch (err) {
+                console.warn('Postgres yorum reaksiyon güncelleme hatası:', err);
+            }
+        }
+        return updated;
+    }
+
+    public static async deleteComment(eventId: string, commentId: string): Promise<boolean> {
+        this.ensureDatabaseConfigured();
+        const deleted = WorkspaceStoreManager.getInstance().deleteComment(eventId, commentId);
+        if (deleted && this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                await supabase.from('workspace_event_comments').delete().eq('id', commentId);
+            } catch (err) {
+                console.warn('Postgres yorum silme hatası:', err);
+            }
+        }
+        return deleted;
     }
 
     // ==========================================
@@ -1041,5 +1116,77 @@ export class WorkspaceRepository {
             }
         }
         return WorkspaceStoreManager.getInstance().getAuditLogs();
+    }
+
+    public static async clearAuditLogs(clearedBy: string): Promise<boolean> {
+        this.ensureDatabaseConfigured();
+        WorkspaceStoreManager.getInstance().clearAuditLogs(clearedBy);
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                await supabase.from('workspace_audit_logs').delete().neq('id', 'placeholder_keep_schema');
+                await supabase.from('workspace_audit_logs').insert({
+                    id: `audit_clear_${Date.now()}`,
+                    user_id: 'admin',
+                    user_email: clearedBy,
+                    action: 'AUDIT_LOGS_CLEARED',
+                    entity_type: 'SECURITY',
+                    details: `Denetim günlüğü geçmişi ${clearedBy} tarafından güvenle temizlendi.`,
+                    created_at: new Date().toISOString()
+                });
+            } catch (err) {
+                console.warn('Postgres denetim izi temizleme hatası:', err);
+            }
+        }
+        return true;
+    }
+
+    // ==========================================
+    // ÜYE NOTLARI & DEĞERLENDİRME (Member Notes)
+    // ==========================================
+
+    public static async addMemberNote(
+        memberId: string,
+        note: { author_id: string; author_name: string; content: string }
+    ): Promise<WorkspaceMember | null> {
+        this.ensureDatabaseConfigured();
+        const updated = WorkspaceStoreManager.getInstance().addMemberNote(memberId, note);
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                const member = await this.getMemberById(memberId);
+                const notes = member?.member_notes || [];
+                const newNoteObj = {
+                    id: `mn_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                    author_id: note.author_id,
+                    author_name: note.author_name,
+                    content: note.content,
+                    created_at: new Date().toISOString()
+                };
+                const updatedNotes = [newNoteObj, ...notes];
+                await supabase.from('workspace_members').update({ member_notes: updatedNotes }).eq('id', memberId);
+            } catch (err) {
+                console.warn('Postgres üye notu ekleme hatası:', err);
+            }
+        }
+        return updated;
+    }
+
+    public static async deleteMemberNote(memberId: string, noteId: string): Promise<WorkspaceMember | null> {
+        this.ensureDatabaseConfigured();
+        const updated = WorkspaceStoreManager.getInstance().deleteMemberNote(memberId, noteId);
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                const member = await this.getMemberById(memberId);
+                if (member?.member_notes) {
+                    const filtered = member.member_notes.filter(n => n.id !== noteId);
+                    await supabase.from('workspace_members').update({ member_notes: filtered }).eq('id', memberId);
+                }
+            } catch (err) {
+                console.warn('Postgres üye notu silme hatası:', err);
+            }
+        }
+        return updated;
     }
 }
