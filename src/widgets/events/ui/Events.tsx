@@ -69,6 +69,11 @@ interface EventItem {
     image_url?: string;
     join_link?: string;
     is_active: boolean;
+    is_showcase?: boolean;
+    rsvp_enabled?: boolean;
+    rsvp_qr_enabled?: boolean;
+    rsvp_capacity?: number;
+    attendee_count?: number;
     // computed
     date: string;
     time: string;
@@ -78,6 +83,57 @@ interface EventItem {
     status: string;
     statusColor: string;
 }
+
+// 🗓️ Google Calendar URL Üreteci
+const getGoogleCalendarUrl = (ev: EventItem) => {
+    try {
+        const s = new Date(ev.event_date).toISOString().replace(/-|:|\.\d\d\d/g, '');
+        const e = new Date(ev.end_date || ev.event_date).toISOString().replace(/-|:|\.\d\d\d/g, '');
+        const url = new URL('https://calendar.google.com/calendar/render');
+        url.searchParams.set('action', 'TEMPLATE');
+        url.searchParams.set('text', ev.title);
+        url.searchParams.set('dates', `${s}/${e}`);
+        if (ev.description) url.searchParams.set('details', ev.description);
+        if (ev.location || ev.join_link) url.searchParams.set('location', ev.location || ev.join_link || '');
+        return url.toString();
+    } catch {
+        return 'https://calendar.google.com';
+    }
+};
+
+// 📥 Apple & Outlook .ICS İndir
+const handleDownloadICS = (ev: EventItem) => {
+    try {
+        const s = new Date(ev.event_date).toISOString().replace(/-|:|\.\d\d\d/g, '');
+        const e = new Date(ev.end_date || ev.event_date).toISOString().replace(/-|:|\.\d\d\d/g, '');
+        const icsContent = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//HSD MTU//Topluluk Vitrini//TR',
+            'CALSCALE:GREGORIAN',
+            'METHOD:PUBLISH',
+            'BEGIN:VEVENT',
+            `SUMMARY:${ev.title}`,
+            `DESCRIPTION:${(ev.description || '').replace(/\n/g, '\\n')}`,
+            `LOCATION:${ev.location || ev.join_link || 'MTÜ Kampüsü'}`,
+            `DTSTART:${s}`,
+            `DTEND:${e}`,
+            'STATUS:CONFIRMED',
+            'END:VEVENT',
+            'END:VCALENDAR'
+        ].join('\r\n');
+
+        const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.setAttribute('download', `${ev.title.replace(/[^a-zA-Z0-9]/g, '_')}.ics`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } catch (err) {
+        console.error('ICS oluşturma hatası:', err);
+    }
+};
 
 // --- Components ---
 
@@ -102,22 +158,25 @@ export default function Events() {
     const [events, setEvents] = useState<EventItem[]>([]);
     const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
 
+    // RSVP Registration States
+    const [isRegistering, setIsRegistering] = useState(false);
+    const [rsvpFullName, setRsvpFullName] = useState('');
+    const [rsvpEmail, setRsvpEmail] = useState('');
+    const [rsvpStudentNo, setRsvpStudentNo] = useState('');
+    const [rsvpDept, setRsvpDept] = useState('');
+    const [isSubmittingRsvp, setIsSubmittingRsvp] = useState(false);
+    const [rsvpTicket, setRsvpTicket] = useState<any | null>(null);
+    const [rsvpError, setRsvpError] = useState<string | null>(null);
+
     useEffect(() => {
-        const supabase = createClient();
-        supabase
-            .from('events')
-            .select('id, title, description, event_date, end_date, category, location, image_url, join_link, is_active')
-            .eq('is_active', true)
-            .order('event_date', { ascending: false })
-            .limit(4)
-            .then(({ data, error }: { data: any[] | null, error: any }) => {
-                if (error) {
-                    console.error('[Events] Supabase fetch error:', error);
-                    return;
-                }
-                if (data && data.length > 0) {
+        // 🚀 Tek Tıkla Vitrine Taşıma: /api/events/public hem workspace_events vitrinini hem events tablosunu çeker
+        fetch('/api/events/public')
+            .then(res => res.json())
+            .then(data => {
+                const list = data.events || [];
+                if (list.length > 0) {
                     const now = new Date();
-                    setEvents(data.map((item, i) => {
+                    setEvents(list.map((item: any, i: number) => {
                         const eventDate = new Date(item.event_date);
                         const isPast = eventDate < now;
                         return {
@@ -133,8 +192,59 @@ export default function Events() {
                         };
                     }));
                 }
+            })
+            .catch(err => {
+                console.error('[Events] API fetch error:', err);
             });
     }, []);
+
+    // Reset RSVP state on modal close or change
+    useEffect(() => {
+        setIsRegistering(false);
+        setRsvpTicket(null);
+        setRsvpError(null);
+        setRsvpFullName('');
+        setRsvpEmail('');
+        setRsvpStudentNo('');
+        setRsvpDept('');
+    }, [selectedEvent]);
+
+    const handleRsvpSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedEvent) return;
+        setRsvpError(null);
+
+        if (!rsvpFullName.trim() || !rsvpEmail.trim()) {
+            setRsvpError('Lütfen ad soyad ve e-posta adresinizi girin.');
+            return;
+        }
+
+        setIsSubmittingRsvp(true);
+        try {
+            const res = await fetch('/api/workspace/rsvp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    event_id: selectedEvent.id,
+                    full_name: rsvpFullName.trim(),
+                    email: rsvpEmail.trim(),
+                    student_number: rsvpStudentNo.trim(),
+                    department: rsvpDept.trim(),
+                }),
+            });
+            const data = await res.json();
+            if (res.ok && data.attendee) {
+                setRsvpTicket(data.attendee);
+                setIsRegistering(false);
+            } else {
+                setRsvpError(data.error || 'Kayıt işlemi gerçekleştirilemedi.');
+            }
+        } catch {
+            setRsvpError('Bağlantı hatası oluştu.');
+        } finally {
+            setIsSubmittingRsvp(false);
+        }
+    };
 
     // Body scroll lock
     useEffect(() => {
@@ -348,28 +458,189 @@ export default function Events() {
                                         {selectedEvent.title}
                                     </h3>
 
-                                    <div className="flex flex-wrap gap-4 mb-8">
-                                        <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 flex items-center gap-2">
+                                    <div className="flex flex-wrap gap-3 mb-6">
+                                        <div className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-xs sm:text-sm flex items-center gap-2">
                                             <Icons.Calendar />
                                             {selectedEvent.date}
                                         </div>
-                                        <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 flex items-center gap-2">
+                                        <div className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-xs sm:text-sm flex items-center gap-2">
                                             <Icons.Clock />
                                             {selectedEvent.time}
                                         </div>
-                                        <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 flex items-center gap-2">
-                                            <Icons.MapPin />
-                                            {selectedEvent.location}
-                                        </div>
+                                        {selectedEvent.location && (
+                                            <div className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-xs sm:text-sm flex items-center gap-2">
+                                                <Icons.MapPin />
+                                                {selectedEvent.location}
+                                            </div>
+                                        )}
                                     </div>
 
-                                    <p className="text-gray-400 text-lg leading-relaxed mb-10 border-l-2 border-white/10 pl-6">
+                                    {/* 📅 Takvime Ekle Butonları */}
+                                    <div className="flex flex-wrap items-center gap-2 mb-6">
+                                        <a
+                                            href={getGoogleCalendarUrl(selectedEvent)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-white border border-white/10 flex items-center gap-2 transition-all"
+                                        >
+                                            <span>📅</span>
+                                            <span>Google Takvim'e Ekle</span>
+                                        </a>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDownloadICS(selectedEvent)}
+                                            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-white border border-white/10 flex items-center gap-2 transition-all cursor-pointer"
+                                        >
+                                            <span>📥</span>
+                                            <span>Apple / Outlook (.ics İndir)</span>
+                                        </button>
+                                    </div>
+
+                                    <p className="text-gray-300 text-base md:text-lg leading-relaxed mb-8 border-l-2 border-rose-500/50 pl-6">
                                         {selectedEvent.description}
                                     </p>
 
-                                    {selectedEvent.status === 'Geçmiş Etkinlik' ? (
+                                    {/* 🎟️ Bilet & Kayıt Bölümü */}
+                                    {rsvpTicket ? (
+                                        <div className="p-6 rounded-2xl bg-gradient-to-b from-rose-950/40 via-black to-black border border-rose-500/30 shadow-2xl text-center space-y-4 animate-in fade-in zoom-in-95">
+                                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-xs font-bold">
+                                                <span>✓</span>
+                                                <span>Kaydınız Başarıyla Alındı!</span>
+                                            </div>
+
+                                            <div className="border border-white/10 rounded-xl p-5 bg-black/60 max-w-sm mx-auto space-y-3">
+                                                <div className="border-b border-white/10 pb-2">
+                                                    <span className="text-[10px] tracking-widest uppercase font-mono text-gray-400">HSD MTÜ DİJİTAL ETKİNLİK BİLETİ</span>
+                                                    <h4 className="text-base font-bold text-white mt-0.5">{selectedEvent.title}</h4>
+                                                </div>
+
+                                                <div className="text-xs text-left space-y-1 text-gray-300 font-medium">
+                                                    <p>👤 <strong>Katılımcı:</strong> {rsvpTicket.full_name}</p>
+                                                    <p>📅 <strong>Tarih:</strong> {selectedEvent.date} ({selectedEvent.time})</p>
+                                                    <p>📍 <strong>Konum:</strong> {selectedEvent.location || 'MTÜ Kampüsü'}</p>
+                                                </div>
+
+                                                {selectedEvent.rsvp_qr_enabled && (
+                                                    <div className="py-2">
+                                                        <img
+                                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(rsvpTicket.ticket_code)}`}
+                                                            alt={`Bilet QR Kodu: ${rsvpTicket.ticket_code}`}
+                                                            className="w-36 h-36 mx-auto rounded-xl bg-white p-2 border border-white/20 shadow-lg"
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                <div className="pt-2 border-t border-white/10">
+                                                    <span className="text-[11px] font-mono font-bold px-3 py-1 rounded bg-rose-600/30 text-rose-300 border border-rose-500/40">
+                                                        BİLET KODU: {rsvpTicket.ticket_code}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <p className="text-xs text-gray-400 max-w-sm mx-auto">
+                                                Lütfen bu ekranın ekran görüntüsünü alınız veya etkinlik girişinde görevliye bu bilet kodunu gösteriniz.
+                                            </p>
+                                        </div>
+                                    ) : isRegistering ? (
+                                        <form onSubmit={handleRsvpSubmit} className="p-6 rounded-2xl bg-white/5 border border-white/10 space-y-4 animate-in fade-in">
+                                            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                                                <h4 className="text-base font-bold text-white flex items-center gap-2">
+                                                    <span>🎟️</span>
+                                                    <span>Etkinlik Kayıt Formu</span>
+                                                </h4>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsRegistering(false)}
+                                                    className="text-xs text-gray-400 hover:text-white"
+                                                >
+                                                    ✕ Kapat
+                                                </button>
+                                            </div>
+
+                                            {rsvpError && (
+                                                <div className="p-2.5 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-200 text-xs font-semibold">
+                                                    {rsvpError}
+                                                </div>
+                                            )}
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-gray-300 mb-1">Ad Soyad *</label>
+                                                    <input
+                                                        type="text"
+                                                        required
+                                                        value={rsvpFullName}
+                                                        onChange={(e) => setRsvpFullName(e.target.value)}
+                                                        placeholder="Örn: Mustafa Zahter"
+                                                        className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/15 text-white text-xs focus:outline-none focus:border-rose-500"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-gray-300 mb-1">E-posta Adresi *</label>
+                                                    <input
+                                                        type="email"
+                                                        required
+                                                        value={rsvpEmail}
+                                                        onChange={(e) => setRsvpEmail(e.target.value)}
+                                                        placeholder="Örn: ornek@ogr.ozal.edu.tr"
+                                                        className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/15 text-white text-xs focus:outline-none focus:border-rose-500"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-gray-300 mb-1">Öğrenci Numarası</label>
+                                                    <input
+                                                        type="text"
+                                                        value={rsvpStudentNo}
+                                                        onChange={(e) => setRsvpStudentNo(e.target.value)}
+                                                        placeholder="Örn: 220101010"
+                                                        className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/15 text-white text-xs focus:outline-none focus:border-rose-500"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-gray-300 mb-1">Bölüm / Fakülte</label>
+                                                    <input
+                                                        type="text"
+                                                        value={rsvpDept}
+                                                        onChange={(e) => setRsvpDept(e.target.value)}
+                                                        placeholder="Örn: Yazılım Mühendisliği"
+                                                        className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-white/15 text-white text-xs focus:outline-none focus:border-rose-500"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-3 pt-2">
+                                                <button
+                                                    type="submit"
+                                                    disabled={isSubmittingRsvp}
+                                                    className="flex-1 py-3 rounded-xl font-bold text-sm text-white bg-rose-600 hover:bg-rose-500 transition-all shadow-lg shadow-rose-950/50 disabled:opacity-50"
+                                                >
+                                                    {isSubmittingRsvp ? 'Kaydediliyor...' : 'Kaydı Tamamla & QR Bileti Al 🎟️'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsRegistering(false)}
+                                                    className="px-4 py-3 rounded-xl font-bold text-xs text-gray-400 hover:text-white bg-white/5 border border-white/10"
+                                                >
+                                                    Vazgeç
+                                                </button>
+                                            </div>
+                                        </form>
+                                    ) : selectedEvent.status === 'Geçmiş Etkinlik' ? (
                                         <button disabled className="w-full py-4 rounded-xl font-bold text-lg text-white/50 bg-white/5 border border-white/10 cursor-not-allowed transition-all shadow-lg shadow-white/5">
                                             Geçmiş Etkinlik
+                                        </button>
+                                    ) : selectedEvent.rsvp_enabled ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsRegistering(true)}
+                                            className="w-full py-4 rounded-xl font-bold text-lg text-white bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 transition-all shadow-lg shadow-rose-950/50 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
+                                        >
+                                            <span>🎟️</span>
+                                            <span>Etkinliğe Kayıt Ol & Bilet Al</span>
                                         </button>
                                     ) : selectedEvent.join_link ? (
                                         <a 

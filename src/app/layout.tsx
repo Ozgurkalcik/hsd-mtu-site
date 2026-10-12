@@ -14,8 +14,21 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport = {
+  themeColor: "#dc2626",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL("https://hsdmtu.vercel.app"),
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "HSD MTÜ",
+  },
   title: {
     default: "HSD Malatya Turgut Özal Topluluğu",
     template: "%s | HSD MTÜ",

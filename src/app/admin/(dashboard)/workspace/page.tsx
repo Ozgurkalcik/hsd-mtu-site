@@ -947,35 +947,40 @@ export default function AdminWorkspacePage() {
 
                     {/* ── 6. GÜVENLİK AYARLARI TABI ── */}
                     {activeTab === 'settings' && settings && (
-                        <form onSubmit={handleSaveSettings} className="space-y-5 max-w-xl">
-                            <h2 className="text-sm font-semibold text-white">Sistem Güvenlik ve Depolama Politikaları</h2>
-
+                        <form onSubmit={handleSaveSettings} className="space-y-6 max-w-2xl">
                             <div>
-                                <label className="block text-xs font-medium text-zinc-400 mb-1">
-                                    Maksimum Dosya Boyutu Sınırı (MB)
-                                </label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max="100"
-                                    value={settings.max_file_size_mb}
-                                    onChange={(e) => setSettings({ ...settings, max_file_size_mb: Number(e.target.value) })}
-                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-zinc-200"
-                                />
+                                <h2 className="text-sm font-semibold text-white">Sistem Güvenlik ve Depolama Politikaları</h2>
+                                <p className="text-xs text-zinc-400 mt-0.5">Workspace dosya kotası, oturum ve iki adımlı doğrulama kuralları.</p>
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-medium text-zinc-400 mb-1">
-                                    Oturum Zaman Aşımı (Dakika)
-                                </label>
-                                <input
-                                    type="number"
-                                    min="15"
-                                    max="1440"
-                                    value={settings.session_timeout_minutes}
-                                    onChange={(e) => setSettings({ ...settings, session_timeout_minutes: Number(e.target.value) })}
-                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-zinc-200"
-                                />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-zinc-400 mb-1">
+                                        Maksimum Dosya Boyutu Sınırı (MB)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="100"
+                                        value={settings.max_file_size_mb}
+                                        onChange={(e) => setSettings({ ...settings, max_file_size_mb: Number(e.target.value) })}
+                                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-zinc-200"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium text-zinc-400 mb-1">
+                                        Oturum Zaman Aşımı (Dakika)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="15"
+                                        max="1440"
+                                        value={settings.session_timeout_minutes}
+                                        onChange={(e) => setSettings({ ...settings, session_timeout_minutes: Number(e.target.value) })}
+                                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-zinc-200"
+                                    />
+                                </div>
                             </div>
 
                             <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
@@ -987,15 +992,139 @@ export default function AdminWorkspacePage() {
                                     type="checkbox"
                                     checked={settings.mfa_required}
                                     onChange={(e) => setSettings({ ...settings, mfa_required: e.target.checked })}
-                                    className="w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-rose-600 focus:ring-0"
+                                    className="w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-rose-600 focus:ring-0 cursor-pointer"
                                 />
+                            </div>
+
+                            {/* ── YENİ: MODÜL VE ÖZELLİK AÇ/KAPA (FEATURE FLAGS) ── */}
+                            <div className="pt-4 border-t border-zinc-800 space-y-4">
+                                <div>
+                                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                                        <span>⚙️</span>
+                                        <span>Topluluk & Workspace Modül Kontrolleri</span>
+                                    </h3>
+                                    <p className="text-xs text-zinc-400 mt-0.5">
+                                        Sitedeki ve çalışma alanındaki ana özellikleri bağımsız olarak etkinleştirin veya devre dışı bırakın.
+                                    </p>
+                                </div>
+
+                                {/* 1. RSVP Kayıt Sistemi */}
+                                <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
+                                    <div>
+                                        <p className="text-xs font-semibold text-white flex items-center gap-1.5">
+                                            <span>✍️</span>
+                                            <span>Dahili Etkinlik Kayıt Sistemi (RSVP)</span>
+                                        </p>
+                                        <p className="text-[11px] text-zinc-400 mt-0.5">
+                                            Öğrencilerin harici form yerine doğrudan siteden isim, e-posta ve öğrenci no ile kaydolmasını sağlar.
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={settings.rsvp_registration_enabled ?? true}
+                                        onChange={(e) => setSettings({ ...settings, rsvp_registration_enabled: e.target.checked })}
+                                        className="w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-rose-600 focus:ring-0 cursor-pointer"
+                                    />
+                                </div>
+
+                                {/* 2. QR Dijital Bilet */}
+                                <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
+                                    <div>
+                                        <p className="text-xs font-semibold text-white flex items-center gap-1.5">
+                                            <span>📱</span>
+                                            <span>QR Kodlu Dijital Bilet Üretimi</span>
+                                        </p>
+                                        <p className="text-[11px] text-zinc-400 mt-0.5">
+                                            Kayıt olan öğrencilere etkinlik kapısında okutulabilir benzersiz QR dijital bilet üretir.
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={settings.rsvp_qr_enabled ?? true}
+                                        onChange={(e) => setSettings({ ...settings, rsvp_qr_enabled: e.target.checked })}
+                                        className="w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-rose-600 focus:ring-0 cursor-pointer"
+                                    />
+                                </div>
+
+                                {/* 3. Pano / Kanban Görünümü */}
+                                <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
+                                    <div>
+                                        <p className="text-xs font-semibold text-white flex items-center gap-1.5">
+                                            <span>📋</span>
+                                            <span>Workspace Pano / Kanban Görünümü</span>
+                                        </p>
+                                        <p className="text-[11px] text-zinc-400 mt-0.5">
+                                            /workspace takviminde Sprint/Kanban pano modunu (Planlanan, Devam Eden, Tamamlanan) aktif eder.
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={settings.kanban_view_enabled ?? true}
+                                        onChange={(e) => setSettings({ ...settings, kanban_view_enabled: e.target.checked })}
+                                        className="w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-rose-600 focus:ring-0 cursor-pointer"
+                                    />
+                                </div>
+
+                                {/* 4. Topluluk Projeleri Vitrini */}
+                                <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
+                                    <div>
+                                        <p className="text-xs font-semibold text-white flex items-center gap-1.5">
+                                            <span>🚀</span>
+                                            <span>Açık Kaynak Projeler Vitrini (/projeler)</span>
+                                        </p>
+                                        <p className="text-[11px] text-zinc-400 mt-0.5">
+                                            Topluluk üyelerinin geliştirdiği GitHub projelerini sergileyen vitrin sayfasını aktif kılar.
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={settings.showcase_projects_enabled ?? false}
+                                        onChange={(e) => setSettings({ ...settings, showcase_projects_enabled: e.target.checked })}
+                                        className="w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-rose-600 focus:ring-0 cursor-pointer"
+                                    />
+                                </div>
+
+                                {/* 5. Discord / Webhook Ayarı */}
+                                <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-3">
+                                    <div>
+                                        <p className="text-xs font-semibold text-white flex items-center gap-1.5">
+                                            <span>📢</span>
+                                            <span>Discord / Meet Duyuru Botu Webhook Entegrasyonu</span>
+                                        </p>
+                                        <p className="text-[11px] text-zinc-400 mt-0.5">
+                                            Workspace'te planlanan etkinliklerin ve acil duyuruların otomatik düşeceği Discord kanal webhook URL'i.
+                                        </p>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-[11px] font-medium text-zinc-400 mb-1">Webhook URL</label>
+                                            <input
+                                                type="url"
+                                                value={settings.webhook_url || ''}
+                                                onChange={(e) => setSettings({ ...settings, webhook_url: e.target.value })}
+                                                placeholder="https://discord.com/api/webhooks/..."
+                                                className="w-full bg-zinc-950 border border-zinc-750 rounded-xl px-3 py-2 text-xs text-zinc-200 font-mono"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[11px] font-medium text-zinc-400 mb-1">Kanal Adı (Referans)</label>
+                                            <input
+                                                type="text"
+                                                value={settings.webhook_channel || ''}
+                                                onChange={(e) => setSettings({ ...settings, webhook_channel: e.target.value })}
+                                                placeholder="#etkinlik-duyuru"
+                                                className="w-full bg-zinc-950 border border-zinc-750 rounded-xl px-3 py-2 text-xs text-zinc-200"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <button
                                 type="submit"
-                                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs shadow-md transition-all"
+                                className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs shadow-lg shadow-rose-950/40 transition-all cursor-pointer"
                             >
-                                Güvenlik Politikalarını Kaydet
+                                Sistem Politikalarını ve Modülleri Kaydet
                             </button>
                         </form>
                     )}

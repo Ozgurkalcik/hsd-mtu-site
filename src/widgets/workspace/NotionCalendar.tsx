@@ -14,7 +14,7 @@ import { useFrozen } from '@/shared/lib/FrozenSection';
 import { createClient } from '@/shared/api/supabase';
 import EventDrawer from './EventDrawer';
 
-export type CalendarViewMode = 'ay' | '3ay' | '6ay' | 'hafta' | 'gun' | 'liste';
+export type CalendarViewMode = 'ay' | '3ay' | '6ay' | 'hafta' | 'gun' | 'liste' | 'pano';
 
 const DAYS_TR = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
 const DAYS_SHORT_TR = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
@@ -72,6 +72,20 @@ export default function NotionCalendar({
                 setWorkspaceTheme(saved);
             }
         }
+    }, []);
+
+    // Pano / Kanban Özelliği Admin Aç/Kapa Durumu
+    const [kanbanEnabled, setKanbanEnabled] = useState(true);
+
+    useEffect(() => {
+        fetch('/api/workspace/settings')
+            .then(res => res.json())
+            .then(data => {
+                if (data.settings && typeof data.settings.kanban_view_enabled === 'boolean') {
+                    setKanbanEnabled(data.settings.kanban_view_enabled);
+                }
+            })
+            .catch(() => {});
     }, []);
 
     const handleToggleTheme = () => {
@@ -606,7 +620,15 @@ export default function NotionCalendar({
                 <div className="flex items-center justify-between xl:justify-end gap-2 flex-wrap">
                     {/* Görünüm Modları (Segmented Control) */}
                     <div className="flex items-center bg-zinc-900/90 border border-zinc-800/90 rounded-xl p-0.5 text-xs font-medium shrink-0 shadow-inner">
-                        {(['ay', '3ay', '6ay', 'hafta', 'gun', 'liste'] as CalendarViewMode[]).map((mode) => (
+                        {(([
+                            'ay',
+                            '3ay',
+                            '6ay',
+                            'hafta',
+                            'gun',
+                            'liste',
+                            ...(kanbanEnabled ? ['pano'] : [])
+                        ]) as CalendarViewMode[]).map((mode) => (
                             <button
                                 key={mode}
                                 type="button"
@@ -621,7 +643,8 @@ export default function NotionCalendar({
                                  mode === '3ay' ? '3 Ay' :
                                  mode === '6ay' ? '6 Ay' :
                                  mode === 'hafta' ? 'Hafta' :
-                                 mode === 'gun' ? 'Gün' : 'Liste'}
+                                 mode === 'gun' ? 'Gün' :
+                                 mode === 'liste' ? 'Liste' : '📋 Pano'}
                             </button>
                         ))}
                     </div>
@@ -1295,6 +1318,27 @@ export default function NotionCalendar({
                             members={members}
                             theme={workspaceTheme}
                             onEventClick={handleOpenEditEvent}
+                        />
+                    )}
+
+                    {viewMode === 'pano' && (
+                        <KanbanView
+                            events={filteredEvents}
+                            calendars={calendars}
+                            theme={workspaceTheme}
+                            onEventClick={handleOpenEditEvent}
+                            onUpdateStatus={async (eventId, newStatus) => {
+                                setEvents(prev => prev.map(e => e.id === eventId ? { ...e, status: newStatus } : e));
+                                try {
+                                    await fetch(`/api/workspace/events/${eventId}`, {
+                                        method: 'PUT',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ status: newStatus }),
+                                    });
+                                } catch (err) {
+                                    console.error('Pano durum güncelleme hatası:', err);
+                                }
+                            }}
                         />
                     )}
                 </main>
@@ -1976,3 +2020,258 @@ function ListView({ currentDate, events, members = [], theme = 'dark', onEventCl
         </div>
     );
 }
+
+// ── 7. KANBAN / NOTION PANO GÖRÜNÜMÜ (SPRINT BOARD) ──
+interface KanbanViewProps {
+    events: WorkspaceEvent[];
+    calendars?: WorkspaceCalendar[];
+    theme?: 'light' | 'dark';
+    onEventClick: (event: WorkspaceEvent) => void;
+    onUpdateStatus: (eventId: string, status: 'scheduled' | 'in_progress' | 'completed') => void;
+}
+
+function KanbanView({
+    events,
+    calendars = [],
+    theme = 'dark',
+    onEventClick,
+    onUpdateStatus,
+}: KanbanViewProps) {
+    const isLight = theme === 'light';
+
+    const columns: Array<{
+        id: 'scheduled' | 'in_progress' | 'completed';
+        title: string;
+        icon: string;
+        badgeColor: string;
+        headerBorder: string;
+    }> = [
+        {
+            id: 'scheduled',
+            title: 'Planlanan',
+            icon: '🗓️',
+            badgeColor: isLight ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-blue-950/60 text-blue-300 border-blue-800',
+            headerBorder: 'border-blue-500/50',
+        },
+        {
+            id: 'in_progress',
+            title: 'Devam Eden (Sprint)',
+            icon: '⚡',
+            badgeColor: isLight ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-amber-950/60 text-amber-300 border-amber-800',
+            headerBorder: 'border-amber-500/50',
+        },
+        {
+            id: 'completed',
+            title: 'Tamamlanan',
+            icon: '✓',
+            badgeColor: isLight ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-emerald-950/60 text-emerald-300 border-emerald-800',
+            headerBorder: 'border-emerald-500/50',
+        },
+    ];
+
+    const handleDragStart = (e: React.DragEvent, eventId: string) => {
+        e.dataTransfer.setData('text/plain', eventId);
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+    };
+
+    const handleDrop = (e: React.DragEvent, targetStatus: 'scheduled' | 'in_progress' | 'completed') => {
+        e.preventDefault();
+        const eventId = e.dataTransfer.getData('text/plain');
+        if (eventId) {
+            onUpdateStatus(eventId, targetStatus);
+        }
+    };
+
+    return (
+        <div className={`flex-1 flex flex-col h-full rounded-2xl overflow-hidden p-4 sm:p-5 transition-colors ${
+            isLight ? 'bg-white border border-slate-200 shadow-sm' : 'bg-zinc-900/30 border border-zinc-800 shadow-inner'
+        }`}>
+            {/* Header */}
+            <div className={`mb-4 pb-3 border-b flex items-center justify-between flex-wrap gap-2 ${
+                isLight ? 'border-slate-200' : 'border-zinc-800'
+            }`}>
+                <div className="flex items-center gap-2">
+                    <span className="text-base">📋</span>
+                    <h2 className={`text-sm font-bold uppercase tracking-wider ${
+                        isLight ? 'text-slate-800' : 'text-zinc-200'
+                    }`}>
+                        Sprint & Görev Panosu (Kanban)
+                    </h2>
+                </div>
+                <div className={`text-xs px-2.5 py-1 rounded-lg border font-mono ${
+                    isLight ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-zinc-800/80 text-zinc-400 border-zinc-700'
+                }`}>
+                    Kartları sürükleyip bırakarak veya hızlı butonlarla durumu güncelleyin
+                </div>
+            </div>
+
+            {/* Columns */}
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 overflow-y-auto">
+                {columns.map(col => {
+                    const colEvents = events.filter(e => (e.status || 'scheduled') === col.id);
+
+                    return (
+                        <div
+                            key={col.id}
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => handleDrop(e, col.id)}
+                            className={`flex flex-col rounded-2xl border p-3 min-h-[380px] transition-colors ${
+                                isLight
+                                    ? 'bg-slate-50/70 border-slate-200 hover:border-slate-300'
+                                    : 'bg-zinc-950/50 border-zinc-800 hover:border-zinc-700'
+                            }`}
+                        >
+                            {/* Column Header */}
+                            <div className={`flex items-center justify-between pb-2.5 mb-3 border-b-2 ${col.headerBorder}`}>
+                                <div className="flex items-center gap-2">
+                                    <span>{col.icon}</span>
+                                    <span className={`text-xs font-bold uppercase tracking-wider ${
+                                        isLight ? 'text-slate-800' : 'text-zinc-200'
+                                    }`}>
+                                        {col.title}
+                                    </span>
+                                </div>
+                                <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full border ${col.badgeColor}`}>
+                                    {colEvents.length}
+                                </span>
+                            </div>
+
+                            {/* Cards list */}
+                            <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+                                {colEvents.length === 0 ? (
+                                    <div className={`p-6 text-center text-xs italic rounded-xl border border-dashed ${
+                                        isLight ? 'border-slate-300 text-slate-400' : 'border-zinc-800 text-zinc-600'
+                                    }`}>
+                                        Bu sütunda etkinlik yok
+                                    </div>
+                                ) : (
+                                    colEvents.map(ev => {
+                                        const s = new Date(ev.start_time);
+                                        const subtasks = ev.subtasks || [];
+                                        const completedSubtasks = subtasks.filter(st => st.is_completed).length;
+                                        const subtaskPercent = subtasks.length > 0 ? Math.round((completedSubtasks / subtasks.length) * 100) : 0;
+                                        const cal = calendars.find(c => c.id === ev.calendar_id);
+
+                                        return (
+                                            <div
+                                                key={ev.id}
+                                                draggable
+                                                onDragStart={(e) => handleDragStart(e, ev.id)}
+                                                className={`p-3.5 rounded-xl border cursor-grab active:cursor-grabbing transition-all hover:scale-[1.01] hover:shadow-md ${
+                                                    isLight
+                                                        ? 'bg-white border-slate-200 hover:border-slate-300 shadow-xs'
+                                                        : 'bg-zinc-900/90 border-zinc-800 hover:border-zinc-700 shadow-md'
+                                                }`}
+                                            >
+                                                {/* Header tags */}
+                                                <div className="flex items-center justify-between gap-2 mb-2">
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <span
+                                                            className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs"
+                                                            style={{ backgroundColor: ev.color || cal?.color || '#dc2626' }}
+                                                        />
+                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                                                            isLight ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-zinc-800 text-zinc-300 border-zinc-700'
+                                                        }`}>
+                                                            {ev.category}
+                                                        </span>
+                                                        {ev.is_showcase && (
+                                                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-600 text-white shadow-xs">
+                                                                🌟 Vitrin
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    <span className={`text-[10px] font-mono ${isLight ? 'text-slate-400' : 'text-zinc-500'}`}>
+                                                        {s.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                                                    </span>
+                                                </div>
+
+                                                {/* Card Title */}
+                                                <h4
+                                                    onClick={() => onEventClick(ev)}
+                                                    className={`text-xs font-bold leading-snug cursor-pointer transition-colors ${
+                                                        isLight ? 'text-slate-900 hover:text-rose-600' : 'text-zinc-100 hover:text-rose-400'
+                                                    }`}
+                                                >
+                                                    {ev.title}
+                                                </h4>
+
+                                                {/* Subtasks Progress */}
+                                                {subtasks.length > 0 && (
+                                                    <div className="mt-2.5 space-y-1">
+                                                        <div className="flex items-center justify-between text-[10px] font-semibold">
+                                                            <span className={isLight ? 'text-slate-500' : 'text-zinc-400'}>
+                                                                Alt Görevler ({completedSubtasks}/{subtasks.length})
+                                                            </span>
+                                                            <span className={isLight ? 'text-slate-700' : 'text-zinc-300'}>
+                                                                %{subtaskPercent}
+                                                            </span>
+                                                        </div>
+                                                        <div className={`w-full h-1.5 rounded-full overflow-hidden ${
+                                                            isLight ? 'bg-slate-200' : 'bg-zinc-800'
+                                                        }`}>
+                                                            <div
+                                                                className="h-full bg-rose-500 rounded-full transition-all duration-300"
+                                                                style={{ width: `${subtaskPercent}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Location / Meeting */}
+                                                {(ev.location || ev.meeting_link) && (
+                                                    <div className={`mt-2 flex items-center gap-1.5 text-[10px] truncate ${
+                                                        isLight ? 'text-slate-500' : 'text-zinc-400'
+                                                    }`}>
+                                                        <span>{ev.meeting_link ? '📹' : '📍'}</span>
+                                                        <span className="truncate">{ev.location || 'Online Toplantı'}</span>
+                                                    </div>
+                                                )}
+
+                                                {/* Action controls */}
+                                                <div className={`mt-3 pt-2 border-t flex items-center justify-between gap-1 text-[10px] ${
+                                                    isLight ? 'border-slate-100' : 'border-zinc-800'
+                                                }`}>
+                                                    {col.id !== 'scheduled' ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => onUpdateStatus(ev.id, col.id === 'completed' ? 'in_progress' : 'scheduled')}
+                                                            className={`px-2 py-0.5 rounded font-semibold transition-colors ${
+                                                                isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+                                                            }`}
+                                                        >
+                                                            ◀ {col.id === 'completed' ? 'Devam Eden' : 'Planlanan'}
+                                                        </button>
+                                                    ) : <div />}
+
+                                                    {col.id !== 'completed' ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => onUpdateStatus(ev.id, col.id === 'scheduled' ? 'in_progress' : 'completed')}
+                                                            className={`px-2 py-0.5 rounded font-semibold transition-colors ${
+                                                                col.id === 'scheduled'
+                                                                    ? isLight ? 'bg-amber-100 hover:bg-amber-200 text-amber-800' : 'bg-amber-950/60 hover:bg-amber-900 text-amber-300'
+                                                                    : isLight ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800' : 'bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300'
+                                                            }`}
+                                                        >
+                                                            {col.id === 'scheduled' ? 'Başlat ⚡' : 'Tamamla ✓'}
+                                                        </button>
+                                                    ) : <div />}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+

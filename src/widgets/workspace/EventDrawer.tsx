@@ -11,7 +11,8 @@ import {
     WorkspaceAttachment,
     WorkspaceRole,
     EventVisibility,
-    WorkspaceReminder
+    WorkspaceReminder,
+    EventAttendee
 } from '@/shared/api/workspaceTypes';
 
 interface EventDrawerProps {
@@ -523,6 +524,16 @@ export default function EventDrawer({
     const [attachments, setAttachments] = useState<WorkspaceAttachment[]>([]);
     const [version, setVersion] = useState<number>(1);
 
+    // 🚀 Vitrin & RSVP & Webhook State
+    const [isShowcase, setIsShowcase] = useState(false);
+    const [rsvpEnabled, setRsvpEnabled] = useState(false);
+    const [rsvpQrEnabled, setRsvpQrEnabled] = useState(false);
+    const [rsvpCapacity, setRsvpCapacity] = useState<number | ''>('');
+    const [attendees, setAttendees] = useState<EventAttendee[]>([]);
+    const [isLoadingAttendees, setIsLoadingAttendees] = useState(false);
+    const [webhookFeedback, setWebhookFeedback] = useState<string | null>(null);
+    const [isSendingWebhook, setIsSendingWebhook] = useState(false);
+
     // Past Event Detection & Permissions
     const isEventPast = useMemo(() => {
         if (!event) return false;
@@ -601,6 +612,10 @@ export default function EventDrawer({
             setComments(event.comments || []);
             setAttachments(event.attachments || []);
             setVersion(event.version || 1);
+            setIsShowcase(Boolean(event.is_showcase));
+            setRsvpEnabled(Boolean(event.rsvp_enabled));
+            setRsvpQrEnabled(Boolean(event.rsvp_qr_enabled));
+            setRsvpCapacity(event.rsvp_capacity || '');
 
             // Fetch latest comments directly from database
             if (event.id) {
@@ -612,6 +627,22 @@ export default function EventDrawer({
                         }
                     })
                     .catch(err => console.error('Yorum yükleme hatası:', err));
+
+                // Fetch RSVP Attendees
+                setIsLoadingAttendees(true);
+                fetch(`/api/workspace/rsvp?event_id=${event.id}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.attendees && Array.isArray(data.attendees)) {
+                            setAttendees(data.attendees);
+                        } else {
+                            setAttendees([]);
+                        }
+                    })
+                    .catch(err => console.error('RSVP yükleme hatası:', err))
+                    .finally(() => setIsLoadingAttendees(false));
+            } else {
+                setAttendees([]);
             }
 
             // Parse Dates
@@ -658,6 +689,11 @@ export default function EventDrawer({
             setComments([]);
             setAttachments([]);
             setVersion(1);
+            setIsShowcase(false);
+            setRsvpEnabled(false);
+            setRsvpQrEnabled(false);
+            setRsvpCapacity('');
+            setAttendees([]);
         }
 
         setErrorMsg(null);
@@ -835,6 +871,10 @@ export default function EventDrawer({
             category,
             status,
             visibility,
+            is_showcase: isShowcase,
+            rsvp_enabled: rsvpEnabled,
+            rsvp_qr_enabled: rsvpQrEnabled,
+            rsvp_capacity: rsvpCapacity ? Number(rsvpCapacity) : undefined,
             reminders,
             assignees,
             subtasks,
@@ -876,6 +916,130 @@ export default function EventDrawer({
             setErrorMsg(err.message || 'Sunucuyla bağlantı kurulamadı.');
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    // 🗓️ Google Calendar URL Üreteci
+    const getGoogleCalendarUrl = () => {
+        try {
+            const s = new Date(startDate ? `${startDate}T${startTime || '00:00'}:00` : Date.now()).toISOString().replace(/-|:|\.\d\d\d/g, '');
+            const e = new Date(endDate ? `${endDate}T${endTime || '23:59'}:00` : Date.now()).toISOString().replace(/-|:|\.\d\d\d/g, '');
+            const url = new URL('https://calendar.google.com/calendar/render');
+            url.searchParams.set('action', 'TEMPLATE');
+            url.searchParams.set('text', title || 'HSD MTÜ Topluluk Etkinliği');
+            url.searchParams.set('dates', `${s}/${e}`);
+            if (description) url.searchParams.set('details', description);
+            if (location || meetingLink) url.searchParams.set('location', location || meetingLink);
+            return url.toString();
+        } catch {
+            return 'https://calendar.google.com';
+        }
+    };
+
+    // 📥 Apple & Outlook .ICS Dosyası İndir
+    const handleDownloadICS = () => {
+        try {
+            const s = new Date(startDate ? `${startDate}T${startTime || '00:00'}:00` : Date.now()).toISOString().replace(/-|:|\.\d\d\d/g, '');
+            const e = new Date(endDate ? `${endDate}T${endTime || '23:59'}:00` : Date.now()).toISOString().replace(/-|:|\.\d\d\d/g, '');
+            const icsContent = [
+                'BEGIN:VCALENDAR',
+                'VERSION:2.0',
+                'PRODID:-//HSD MTU//Topluluk Takvimi//TR',
+                'CALSCALE:GREGORIAN',
+                'METHOD:PUBLISH',
+                'BEGIN:VEVENT',
+                `SUMMARY:${title || 'HSD MTÜ Etkinliği'}`,
+                `DESCRIPTION:${(description || '').replace(/\n/g, '\\n')}`,
+                `LOCATION:${location || meetingLink || 'MTÜ Kampüsü'}`,
+                `DTSTART:${s}`,
+                `DTEND:${e}`,
+                'STATUS:CONFIRMED',
+                'END:VEVENT',
+                'END:VCALENDAR'
+            ].join('\r\n');
+
+            const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = window.URL.createObjectURL(blob);
+            link.setAttribute('download', `${(title || 'hsd_etkinlik').replace(/[^a-zA-Z0-9]/g, '_')}.ics`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (err) {
+            console.error('ICS oluşturma hatası:', err);
+        }
+    };
+
+    // 📢 Discord & Meet Webhook İletimi
+    const handleSendWebhook = async () => {
+        setIsSendingWebhook(true);
+        setWebhookFeedback(null);
+        try {
+            const res = await fetch('/api/workspace/webhook', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    event_id: event?.id,
+                    title: title.trim() || 'Topluluk Etkinliği',
+                    description: description.trim(),
+                    start_time: startDate ? `${startDate}T${startTime}:00` : undefined,
+                    end_time: endDate ? `${endDate}T${endTime}:00` : undefined,
+                    location: location.trim(),
+                    meeting_link: meetingLink.trim()
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setWebhookFeedback('✓ Etkinlik başarıyla Discord / Webhook kanalına duyuruldu!');
+            } else {
+                setWebhookFeedback(`⚠️ ${data.error || 'Webhook duyurusu gönderilemedi.'}`);
+            }
+        } catch (err: any) {
+            setWebhookFeedback('⚠️ Bağlantı hatası: Webhook gönderilemedi.');
+        } finally {
+            setIsSendingWebhook(false);
+            setTimeout(() => setWebhookFeedback(null), 6000);
+        }
+    };
+
+    // 📊 Katılımcı Listesini CSV Olarak Dışa Aktar (Excel Uyumlu UTF-8 BOM)
+    const handleExportCSV = () => {
+        if (!attendees.length) return;
+        const headers = ['Ad Soyad', 'E-posta', 'Öğrenci No', 'Bölüm', 'Bilet Kodu', 'Durum', 'Kayıt Tarihi'];
+        const rows = attendees.map(a => [
+            `"${(a.full_name || '').replace(/"/g, '""')}"`,
+            `"${(a.email || '').replace(/"/g, '""')}"`,
+            `"${(a.student_number || '').replace(/"/g, '""')}"`,
+            `"${(a.department || '').replace(/"/g, '""')}"`,
+            `"${a.ticket_code || ''}"`,
+            `"${a.status === 'checked_in' ? 'Katıldı' : 'Kayıtlı'}"`,
+            `"${new Date(a.created_at).toLocaleString('tr-TR')}"`
+        ]);
+        const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `${(title || 'etkinlik').replace(/[^a-zA-Z0-9]/g, '_')}_katilimcilar.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    // 🎟️ Katılımcı Check-in Durumu Güncelle
+    const handleToggleCheckIn = async (attendeeId: string, currentStatus: string) => {
+        const nextStatus = currentStatus === 'checked_in' ? 'registered' : 'checked_in';
+        try {
+            const res = await fetch('/api/workspace/rsvp', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ attendee_id: attendeeId, status: nextStatus })
+            });
+            if (res.ok) {
+                setAttendees(prev => prev.map(a => a.id === attendeeId ? { ...a, status: nextStatus as any, checked_in_at: nextStatus === 'checked_in' ? new Date().toISOString() : undefined } : a));
+            }
+        } catch (err) {
+            console.error('Check-in güncelleme hatası:', err);
         }
     };
 
@@ -1686,6 +1850,53 @@ export default function EventDrawer({
                                         </div>
                                     </button>
                                 </div>
+
+                                {/* 🚀 VİTRİN KÖPRÜSÜ: ANA SAYFADA / VİTRİNDE YAYINLA (SHOWCASE TOGGLE) */}
+                                <div className={`p-3.5 rounded-xl border transition-all ${
+                                    isShowcase
+                                        ? isLight
+                                            ? 'bg-gradient-to-r from-rose-50 to-amber-50 border-rose-300 shadow-sm ring-1 ring-rose-400/30'
+                                            : 'bg-gradient-to-r from-rose-950/40 to-amber-950/20 border-rose-700/80 shadow-md ring-1 ring-rose-500/30'
+                                        : isLight
+                                            ? 'bg-white border-slate-200 hover:border-slate-300'
+                                            : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700'
+                                }`}>
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="flex items-start gap-2.5">
+                                            <span className="text-xl shrink-0 mt-0.5">🌟</span>
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-xs font-bold ${isLight ? 'text-slate-900' : 'text-zinc-100'}`}>
+                                                        Ana Sayfada / Vitrinde Yayınla (Public Showcase)
+                                                    </span>
+                                                    {isShowcase && (
+                                                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-600 text-white shadow-xs">
+                                                            CANLI VİTRİN AKTİF
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className={`text-[11px] mt-1 leading-relaxed ${isLight ? 'text-slate-600' : 'text-zinc-400'}`}>
+                                                    Bu seçenek açık olduğunda etkinlik yalnızca dahili takvimde kalmaz; ana sayfadaki (<strong className="font-semibold text-rose-600 dark:text-rose-400">/</strong>) Bento Grid vitrininde tüm öğrencilere sergilenir.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsShowcase(!isShowcase)}
+                                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                                isShowcase ? 'bg-rose-600' : isLight ? 'bg-slate-300' : 'bg-zinc-700'
+                                            }`}
+                                            role="switch"
+                                            aria-checked={isShowcase}
+                                        >
+                                            <span
+                                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                                    isShowcase ? 'translate-x-5' : 'translate-x-0'
+                                                }`}
+                                            />
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* ── BÖLÜM 3: ZAMANLAMA, TARİH & HIZLI SÜRE KISAYOLLARI ── */}
@@ -2101,6 +2312,84 @@ export default function EventDrawer({
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* 📅 Takvime Ekle & Meet & Webhook Aksiyonları */}
+                                <div className={`pt-2.5 border-t flex flex-wrap items-center gap-2 ${
+                                    isLight ? 'border-slate-200' : 'border-zinc-800'
+                                }`}>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            window.open('https://meet.google.com/new', '_blank');
+                                            if (!meetingLink) {
+                                                setMeetingLink('https://meet.google.com/new');
+                                            }
+                                        }}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-colors ${
+                                            isLight
+                                                ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200 shadow-xs'
+                                                : 'bg-blue-950/40 text-blue-300 hover:bg-blue-900/60 border-blue-800'
+                                        }`}
+                                        title="Google Meet Başlat (Yeni Sekme)"
+                                    >
+                                        <span>📹</span>
+                                        <span>Google Meet Başlat</span>
+                                    </button>
+
+                                    <a
+                                        href={getGoogleCalendarUrl()}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-colors ${
+                                            isLight
+                                                ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200 shadow-xs'
+                                                : 'bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/60 border-emerald-800'
+                                        }`}
+                                        title="Google Takvime Ekle"
+                                    >
+                                        <span>📅</span>
+                                        <span>Google Takvime Ekle</span>
+                                    </a>
+
+                                    <button
+                                        type="button"
+                                        onClick={handleDownloadICS}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-colors ${
+                                            isLight
+                                                ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300 shadow-xs'
+                                                : 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700 border-zinc-700'
+                                        }`}
+                                        title="Apple & Outlook için .ics İndir"
+                                    >
+                                        <span>📥</span>
+                                        <span>Apple/Outlook (.ics)</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={handleSendWebhook}
+                                        disabled={isSendingWebhook}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-colors disabled:opacity-50 ${
+                                            isLight
+                                                ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 shadow-xs'
+                                                : 'bg-indigo-950/40 text-indigo-300 hover:bg-indigo-900/60 border-indigo-800'
+                                        }`}
+                                        title="Discord / Webhook ile Topluluğa Bildir"
+                                    >
+                                        <span>📢</span>
+                                        <span>{isSendingWebhook ? 'İletiliyor...' : 'Discord/Webhook ile Duyur'}</span>
+                                    </button>
+                                </div>
+
+                                {webhookFeedback && (
+                                    <div className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 animate-in fade-in ${
+                                        webhookFeedback.startsWith('✓')
+                                            ? isLight ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-emerald-950/70 border-emerald-800 text-emerald-200'
+                                            : isLight ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-amber-950/70 border-amber-800 text-amber-200'
+                                    }`}>
+                                        <span>{webhookFeedback}</span>
+                                    </div>
+                                )}
                             </div>
 
                             {/* ── BÖLÜM 5: ETKİNLİK DURUMU ── */}
@@ -2198,7 +2487,214 @@ export default function EventDrawer({
                                     </div>
                                 )}
                             </div>
+
+                            {/* ── BÖLÜM 6.5: 🎟️ ETKİNLİK KAYIT (RSVP) & DİJİTAL QR BİLET AYARLARI ── */}
+                            <div className={`p-4 rounded-2xl ${
+                                isLight 
+                                    ? 'bg-slate-50/80 border border-slate-200' 
+                                    : 'bg-zinc-900/70 border border-zinc-800'
+                            } space-y-3.5`}>
+                                <div className={`flex items-center justify-between border-b pb-2 ${
+                                    isLight ? 'border-slate-200' : 'border-zinc-800'
+                                }`}>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm">🎟️</span>
+                                        <span className={`text-xs font-bold uppercase tracking-wider ${
+                                            isLight ? 'text-slate-700' : 'text-zinc-200'
+                                        }`}>
+                                            Etkinlik Kayıt & QR Bilet Sistemi (RSVP)
+                                        </span>
+                                    </div>
+                                    <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded ${
+                                        rsvpEnabled
+                                            ? 'bg-rose-500 text-white'
+                                            : isLight ? 'bg-slate-200 text-slate-600' : 'bg-zinc-800 text-zinc-400'
+                                    }`}>
+                                        {rsvpEnabled ? 'KAYIT AKTİF' : 'KAPALI'}
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {/* RSVP Açık / Kapalı */}
+                                    <label className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors ${
+                                        rsvpEnabled
+                                            ? isLight ? 'bg-rose-50/90 border-rose-300' : 'bg-rose-950/30 border-rose-800'
+                                            : isLight ? 'bg-white border-slate-200 hover:border-slate-300' : 'bg-zinc-950/60 border-zinc-800'
+                                    }`}>
+                                        <div className="flex items-center gap-2.5">
+                                            <span className="text-lg">✍️</span>
+                                            <div>
+                                                <span className={`text-xs font-bold block ${isLight ? 'text-slate-900' : 'text-zinc-100'}`}>
+                                                    Katılımcı Kaydı Açık (RSVP)
+                                                </span>
+                                                <span className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                                                    Öğrenciler isim & no ile kayıt olabilir
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={rsvpEnabled}
+                                            onChange={(e) => setRsvpEnabled(e.target.checked)}
+                                            className="w-4 h-4 text-rose-600 rounded focus:ring-rose-500"
+                                        />
+                                    </label>
+
+                                    {/* QR Kod Bilet Üretimi */}
+                                    <label className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors ${
+                                        rsvpQrEnabled
+                                            ? isLight ? 'bg-amber-50/90 border-amber-300' : 'bg-amber-950/30 border-amber-800'
+                                            : isLight ? 'bg-white border-slate-200 hover:border-slate-300' : 'bg-zinc-950/60 border-zinc-800'
+                                    }`}>
+                                        <div className="flex items-center gap-2.5">
+                                            <span className="text-lg">📱</span>
+                                            <div>
+                                                <span className={`text-xs font-bold block ${isLight ? 'text-slate-900' : 'text-zinc-100'}`}>
+                                                    Dijital QR Bilet Üret
+                                                </span>
+                                                <span className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                                                    Kayıt sonrası tekil QR bilet oluşturulur
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={rsvpQrEnabled}
+                                            onChange={(e) => setRsvpQrEnabled(e.target.checked)}
+                                            className="w-4 h-4 text-rose-600 rounded focus:ring-rose-500"
+                                        />
+                                    </label>
+                                </div>
+
+                                {rsvpEnabled && (
+                                    <div>
+                                        <label className={`block text-xs font-bold mb-1 ${
+                                            isLight ? 'text-slate-600' : 'text-zinc-300'
+                                        }`}>
+                                            Maksimum Katılımcı Kontenjanı (İsteğe Bağlı)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max="5000"
+                                            value={rsvpCapacity}
+                                            onChange={(e) => setRsvpCapacity(e.target.value ? Number(e.target.value) : '')}
+                                            placeholder="Örn: 100 (Boş bırakılırsa sınırsız kontenjan)"
+                                            className={`w-full border rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-rose-500 ${
+                                                isLight
+                                                    ? 'bg-white border-slate-300 text-slate-800 placeholder-slate-400'
+                                                    : 'bg-zinc-950 border-zinc-700 text-zinc-100 placeholder-zinc-500'
+                                            }`}
+                                        />
+                                    </div>
+                                )}
+                            </div>
                         </form>
+
+                        {/* ── BÖLÜM 6.6: 👥 KAYITLI KATILIMCILAR & CHECK-IN YÖNETİMİ ── */}
+                        {event && rsvpEnabled && (
+                            <div className={`p-4 rounded-2xl ${
+                                isLight 
+                                    ? 'bg-slate-50/80 border border-slate-200' 
+                                    : 'bg-zinc-900/70 border border-zinc-800'
+                            } space-y-3`}>
+                                <div className={`flex items-center justify-between border-b pb-2 ${
+                                    isLight ? 'border-slate-200' : 'border-zinc-800'
+                                }`}>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm">👥</span>
+                                        <span className={`text-xs font-bold uppercase tracking-wider ${
+                                            isLight ? 'text-slate-700' : 'text-zinc-200'
+                                        }`}>
+                                            Katılımcı Listesi ({attendees.length}{rsvpCapacity ? ` / ${rsvpCapacity}` : ''})
+                                        </span>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={handleExportCSV}
+                                        disabled={attendees.length === 0}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-colors disabled:opacity-40 ${
+                                            isLight
+                                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 shadow-xs'
+                                                : 'bg-emerald-700 hover:bg-emerald-600 text-white border-emerald-600'
+                                        }`}
+                                    >
+                                        <span>📥</span>
+                                        <span>Excel / CSV İndir</span>
+                                    </button>
+                                </div>
+
+                                {isLoadingAttendees ? (
+                                    <div className={`p-4 text-center text-xs ${isLight ? 'text-slate-400' : 'text-zinc-500'}`}>
+                                        Katılımcı listesi yükleniyor...
+                                    </div>
+                                ) : attendees.length === 0 ? (
+                                    <div className={`p-4 rounded-xl border text-center text-xs italic ${
+                                        isLight ? 'bg-white border-slate-200 text-slate-400' : 'bg-zinc-950 border-zinc-800 text-zinc-500'
+                                    }`}>
+                                        Henüz kayıt yaptıran katılımcı bulunmuyor.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                                        {attendees.map((attendee) => {
+                                            const isCheckedIn = attendee.status === 'checked_in';
+                                            return (
+                                                <div
+                                                    key={attendee.id}
+                                                    className={`p-2.5 rounded-xl border text-xs flex items-center justify-between gap-3 transition-colors ${
+                                                        isLight
+                                                            ? 'bg-white border-slate-200 hover:border-slate-300'
+                                                            : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-2.5 min-w-0">
+                                                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
+                                                            isCheckedIn
+                                                                ? 'bg-emerald-500 text-white'
+                                                                : isLight ? 'bg-slate-100 text-slate-700' : 'bg-zinc-800 text-zinc-300'
+                                                        }`}>
+                                                            {isCheckedIn ? '✓' : attendee.full_name?.substring(0, 1).toUpperCase()}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`font-bold truncate ${isLight ? 'text-slate-900' : 'text-zinc-100'}`}>
+                                                                    {attendee.full_name}
+                                                                </span>
+                                                                <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded shrink-0 ${
+                                                                    isLight ? 'bg-slate-100 text-slate-600' : 'bg-zinc-800 text-zinc-400'
+                                                                }`}>
+                                                                    {attendee.ticket_code}
+                                                                </span>
+                                                            </div>
+                                                            <div className={`text-[10px] truncate ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                                                                {attendee.department || 'Bölüm Yok'} • {attendee.student_number || attendee.email}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleToggleCheckIn(attendee.id, attendee.status)}
+                                                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 border transition-colors ${
+                                                            isCheckedIn
+                                                                ? isLight
+                                                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
+                                                                    : 'bg-emerald-950/60 text-emerald-300 border-emerald-800 hover:bg-emerald-900/60'
+                                                                : isLight
+                                                                    ? 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+                                                                    : 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700'
+                                                        }`}
+                                                    >
+                                                        {isCheckedIn ? '✓ Katıldı' : 'Giriş Onayla'}
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* ── BÖLÜM 7: GÖREV KONTROL LİSTESİ (CHECKLIST & İLERLEME ÇUBUĞU) ── */}
                         <div className={`p-4 rounded-2xl ${

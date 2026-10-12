@@ -147,8 +147,43 @@ export interface WorkspaceEvent {
     reminders: WorkspaceReminder[];
     edit_history?: WorkspaceEventEditHistoryRecord[];
     change_summary?: string;
+    is_showcase?: boolean; // Ana Sayfa Vitrininde Yayınla
+    rsvp_enabled?: boolean; // Etkinlik Kayıt Sistemi Aç/Kapat
+    rsvp_qr_enabled?: boolean; // QR Kod Dijital Bilet Aç/Kapat
+    rsvp_capacity?: number; // Maksimum Katılımcı Kontenjanı
+    attendee_count?: number; // Anlık Kayıtlı Katılımcı Sayısı
     created_at?: string;
     updated_at?: string;
+}
+
+export interface EventAttendee {
+    id: string;
+    event_id: string;
+    full_name: string;
+    email: string;
+    student_no?: string;
+    student_number?: string;
+    department?: string;
+    ticket_code: string;
+    status: 'registered' | 'attended' | 'checked_in' | 'cancelled';
+    checked_in_at?: string;
+    created_at: string;
+}
+
+export interface CommunityProject {
+    id: string;
+    title: string;
+    description: string;
+    category?: string;
+    github_url?: string;
+    demo_url?: string;
+    tech_stack: string[];
+    stars_count?: number;
+    forks_count?: number;
+    contributors: string[];
+    is_featured?: boolean;
+    is_active?: boolean;
+    created_at: string;
 }
 
 export interface WorkspaceNotification {
@@ -193,5 +228,11 @@ export interface WorkspaceSecuritySettings {
     allowed_file_types: string[];
     mfa_required: boolean;
     session_timeout_minutes: number;
+    rsvp_registration_enabled?: boolean;
+    rsvp_qr_enabled?: boolean;
+    kanban_view_enabled?: boolean;
+    showcase_projects_enabled?: boolean;
+    webhook_url?: string;
+    webhook_channel?: string;
 }
 

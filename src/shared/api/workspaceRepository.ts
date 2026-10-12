@@ -16,7 +16,9 @@ import {
     WorkspaceCommentTag,
     WorkspaceAttachment,
     WorkspaceMemberNote,
-    EventVisibility
+    EventVisibility,
+    EventAttendee,
+    CommunityProject
 } from './workspaceTypes';
 import { hashPassword, verifyPassword } from '@/shared/lib/security';
 
@@ -171,6 +173,10 @@ export class WorkspaceRepository {
                     created_by: event.created_by || null,
                     reminders: event.reminders || [],
                     edit_history: event.edit_history || [],
+                    is_showcase: Boolean(event.is_showcase),
+                    rsvp_enabled: Boolean(event.rsvp_enabled),
+                    rsvp_qr_enabled: Boolean(event.rsvp_qr_enabled),
+                    rsvp_capacity: event.rsvp_capacity || null,
                     version: event.version || 1,
                     created_at: event.created_at || new Date().toISOString(),
                     updated_at: event.updated_at || new Date().toISOString()
@@ -1217,5 +1223,290 @@ export class WorkspaceRepository {
             }
         }
         return updated;
+    }
+
+    // ==========================================
+    // VİTRİN & GENEL ETKİNLİKLER (Public Showcase)
+    // ==========================================
+
+    public static async getPublicShowcaseEvents(): Promise<any[]> {
+        this.ensureDatabaseConfigured();
+        const results: any[] = [];
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                // 1. workspace_events içindeki vitrin etkinlikleri
+                const { data: wsEvents } = await supabase
+                    .from('workspace_events')
+                    .select('*')
+                    .or('is_showcase.eq.true,visibility.eq.public')
+                    .order('start_time', { ascending: false });
+
+                if (wsEvents && wsEvents.length > 0) {
+                    wsEvents.forEach((ev: any) => {
+                        results.push({
+                            id: ev.id,
+                            title: ev.title,
+                            description: ev.description || '',
+                            event_date: ev.start_time,
+                            end_date: ev.end_time,
+                            category: ev.category || 'Etkinlik',
+                            location: ev.location || 'HSD MTÜ Kampüs / Online',
+                            image_url: null,
+                            join_link: ev.meeting_link || null,
+                            is_active: ev.status !== 'cancelled',
+                            is_workspace: true,
+                            rsvp_enabled: Boolean(ev.rsvp_enabled),
+                            rsvp_qr_enabled: Boolean(ev.rsvp_qr_enabled),
+                            rsvp_capacity: ev.rsvp_capacity,
+                            color: ev.color || '#dc2626'
+                        });
+                    });
+                }
+
+                // 2. Klasik events tablosundaki etkinlikler (varsa)
+                const { data: legacyEvents } = await supabase
+                    .from('events')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('event_date', { ascending: false });
+
+                if (legacyEvents && legacyEvents.length > 0) {
+                    legacyEvents.forEach((ev: any) => {
+                        if (!results.some(r => r.id === ev.id || r.title === ev.title)) {
+                            results.push(ev);
+                        }
+                    });
+                }
+            } catch (err) {
+                console.warn('Vitrin etkinlikleri çekme hatası:', err);
+            }
+        }
+
+        // Eğer veritabanından çekilemediyse bellek deposundaki vitrin etkinliklerini döndür
+        if (results.length === 0) {
+            const memoryEvents = WorkspaceStoreManager.getInstance().getEvents();
+            memoryEvents
+                .filter(e => e.is_showcase || e.visibility === 'public')
+                .forEach(ev => {
+                    results.push({
+                        id: ev.id,
+                        title: ev.title,
+                        description: ev.description || '',
+                        event_date: ev.start_time,
+                        end_date: ev.end_time,
+                        category: ev.category || 'Etkinlik',
+                        location: ev.location || 'HSD MTÜ Kampüs / Online',
+                        image_url: null,
+                        join_link: ev.meeting_link || null,
+                        is_active: ev.status !== 'cancelled',
+                        is_workspace: true,
+                        rsvp_enabled: Boolean(ev.rsvp_enabled),
+                        rsvp_qr_enabled: Boolean(ev.rsvp_qr_enabled),
+                        rsvp_capacity: ev.rsvp_capacity,
+                        color: ev.color || '#dc2626'
+                    });
+                });
+        }
+
+        return results;
+    }
+
+    // ==========================================
+    // RSVP KATILIMCI YÖNETİMİ & BİLETLEME
+    // ==========================================
+
+    public static async getEventAttendees(eventId: string): Promise<EventAttendee[]> {
+        this.ensureDatabaseConfigured();
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                const { data, error } = await supabase
+                    .from('workspace_event_attendees')
+                    .select('*')
+                    .eq('event_id', eventId)
+                    .order('created_at', { ascending: false });
+                if (!error && data) return data as EventAttendee[];
+            } catch (err) {
+                console.warn('Katılımcı listesi getirme hatası:', err);
+            }
+        }
+        return [];
+    }
+
+    public static async registerEventAttendee(
+        eventId: string,
+        full_name: string,
+        email: string,
+        student_no?: string,
+        department?: string
+    ): Promise<{ success: boolean; attendee?: EventAttendee; error?: string }> {
+        this.ensureDatabaseConfigured();
+        const ticket_code = `HSD-${new Date().getFullYear()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+        const newAttendee: Omit<EventAttendee, 'id'> = {
+            event_id: eventId,
+            full_name: full_name.trim(),
+            email: email.trim().toLowerCase(),
+            student_no: student_no?.trim() || undefined,
+            department: department?.trim() || undefined,
+            ticket_code,
+            status: 'registered',
+            created_at: new Date().toISOString()
+        };
+
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                const { data: existing } = await supabase
+                    .from('workspace_event_attendees')
+                    .select('id')
+                    .eq('event_id', eventId)
+                    .eq('email', newAttendee.email)
+                    .maybeSingle();
+
+                if (existing) {
+                    return { success: false, error: 'Bu e-posta adresiyle bu etkinliğe zaten kayıt olunmuş.' };
+                }
+
+                const { data, error } = await supabase
+                    .from('workspace_event_attendees')
+                    .insert(newAttendee)
+                    .select()
+                    .single();
+
+                if (!error && data) {
+                    return { success: true, attendee: data as EventAttendee };
+                }
+            } catch (err: any) {
+                console.warn('Katılımcı kayıt hatası:', err);
+                return { success: false, error: err.message || 'Kayıt oluşturulamadı.' };
+            }
+        }
+
+        return {
+            success: true,
+            attendee: {
+                id: `att_${Date.now()}`,
+                ...newAttendee
+            }
+        };
+    }
+
+    public static async checkInAttendee(ticketCode: string): Promise<{ success: boolean; attendee?: EventAttendee; error?: string }> {
+        this.ensureDatabaseConfigured();
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                const cleanCode = ticketCode.trim().toUpperCase();
+                const { data, error } = await supabase
+                    .from('workspace_event_attendees')
+                    .update({ status: 'attended', checked_in_at: new Date().toISOString() })
+                    .eq('ticket_code', cleanCode)
+                    .select()
+                    .single();
+
+                if (!error && data) {
+                    return { success: true, attendee: data as EventAttendee };
+                }
+                return { success: false, error: 'Bilet bulunamadı veya geçersiz.' };
+            } catch (err: any) {
+                return { success: false, error: err.message };
+            }
+        }
+        return { success: false, error: 'Veritabanı bağlantısı yok.' };
+    }
+
+    // ==========================================
+    // TOPLULUK PROJELERİ VİTRİNİ (Community Projects)
+    // ==========================================
+
+    public static async getCommunityProjects(): Promise<CommunityProject[]> {
+        this.ensureDatabaseConfigured();
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                const { data, error } = await supabase
+                    .from('community_projects')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('created_at', { ascending: false });
+                if (!error && data) return data as CommunityProject[];
+            } catch (err) {
+                console.warn('Topluluk projeleri getirme hatası:', err);
+            }
+        }
+        return [
+            {
+                id: 'proj_1',
+                title: 'HSD MTÜ Topluluk Portalı & Çalışma Alanı',
+                description: 'Huawei Student Developers topluluğu için geliştirilmiş açık kaynak etkinlik, Notion-tarzı takvim ve yönetim platformu.',
+                github_url: 'https://github.com/mustafazahter/hsd-mtu-site',
+                demo_url: 'https://hsdmtu.vercel.app',
+                tech_stack: ['Next.js 15', 'TypeScript', 'TailwindCSS', 'Supabase PostgreSQL', 'RLS'],
+                stars_count: 14,
+                contributors: ['Mustafa Zahter', 'Özgür Kalçık', 'HSD Core Team'],
+                is_active: true,
+                created_at: new Date().toISOString()
+            }
+        ];
+    }
+
+    public static async createCommunityProject(project: Partial<CommunityProject>): Promise<CommunityProject | null> {
+        this.ensureDatabaseConfigured();
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                const { data, error } = await supabase
+                    .from('community_projects')
+                    .insert(project)
+                    .select()
+                    .single();
+                if (!error && data) return data as CommunityProject;
+            } catch (err) {
+                console.warn('Proje ekleme hatası:', err);
+            }
+        }
+        return null;
+    }
+
+    // ==========================================
+    // DISCORD / MEET / WEBHOOK DUYURU BİLDİRİMİ
+    // ==========================================
+
+    public static async sendWebhookNotification(title: string, message: string, eventUrl?: string): Promise<boolean> {
+        const settings = await this.getSecuritySettings();
+        const webhookUrl = settings.webhook_url?.trim();
+        if (!webhookUrl) return false;
+
+        try {
+            const payload = {
+                username: 'HSD MTÜ Topluluk Botu',
+                avatar_url: 'https://hsdmtu.vercel.app/icon.png',
+                content: `📢 **Yeni Topluluk Bildirimi / Etkinlik**`,
+                embeds: [
+                    {
+                        title,
+                        description: message,
+                        url: eventUrl || 'https://hsdmtu.vercel.app/workspace',
+                        color: 14423100, // Rose #dc2626
+                        footer: {
+                            text: 'Huawei Student Developers - MTÜ Topluluk Takvimi'
+                        },
+                        timestamp: new Date().toISOString()
+                    }
+                ]
+            };
+
+            const res = await fetch(webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            return res.ok;
+        } catch (err) {
+            console.warn('Webhook gönderim hatası:', err);
+            return false;
+        }
     }
 }

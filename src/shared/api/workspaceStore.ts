@@ -37,7 +37,13 @@ export class WorkspaceStoreManager {
         max_file_size_mb: 25,
         allowed_file_types: ['pdf', 'docx', 'xlsx', 'png', 'jpg', 'webp', 'mp3', 'zip'],
         mfa_required: false,
-        session_timeout_minutes: 120
+        session_timeout_minutes: 120,
+        rsvp_registration_enabled: true,
+        rsvp_qr_enabled: true,
+        kanban_view_enabled: true,
+        showcase_projects_enabled: false,
+        webhook_url: '',
+        webhook_channel: 'etkinlik-duyuru'
     };
 
     private constructor() {
