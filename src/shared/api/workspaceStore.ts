@@ -140,13 +140,6 @@ export class WorkspaceStoreManager {
             description: 'Liderlik toplantıları, komite başkanları oturumları',
             is_private: true
         };
-        const aiCal: WorkspaceCalendar = {
-            id: 'cal_ai',
-            title: 'Ar-Ge & Yapay Zeka Komitesi',
-            color: '#10b981',
-            description: 'Yapay zeka modelleri, makale incelemeleri ve akademik projeler',
-            is_private: false
-        };
 
         this.calendars.set(coreCal.id, coreCal);
         this.calendars.set(projCal.id, projCal);
@@ -154,7 +147,6 @@ export class WorkspaceStoreManager {
         this.calendars.set(socialCal.id, socialCal);
         this.calendars.set(mediumCal.id, mediumCal);
         this.calendars.set(mgmtCal.id, mgmtCal);
-        this.calendars.set(aiCal.id, aiCal);
 
         // 4. Varsayılan Komiteler (Core Team)
         const projectCommittee: WorkspaceGroup = {
@@ -202,22 +194,12 @@ export class WorkspaceStoreManager {
             role_key: 'super_admin',
             members: [defaultAdmin1.id, defaultAdmin2.id]
         };
-        const aiCommittee: WorkspaceGroup = {
-            id: 'grp_ai',
-            name: 'Ar-Ge & Yapay Zeka Komitesi',
-            code: 'AI_RESEARCH',
-            description: 'Makine öğrenimi, büyük dil modelleri ve derin teknoloji araştırmaları.',
-            color: '#10b981',
-            role_key: 'ai_lead',
-            members: [defaultAdmin1.id]
-        };
 
         this.groups.set(projectCommittee.id, projectCommittee);
         this.groups.set(eventSponsorCommittee.id, eventSponsorCommittee);
         this.groups.set(socialDesignCommittee.id, socialDesignCommittee);
         this.groups.set(mediumCommittee.id, mediumCommittee);
         this.groups.set(mgmtCommittee.id, mgmtCommittee);
-        this.groups.set(aiCommittee.id, aiCommittee);
 
         // 5. Başlangıç Etkinlikleri (Örnek Core Verisi)
         const now = new Date();
@@ -248,13 +230,17 @@ export class WorkspaceStoreManager {
             ],
             attachments: [],
             reminders: [],
+            edit_history: [
+                { id: 'hist_sample_1', event_id: 'evt_sample_1', user_id: defaultAdmin1.id, user_name: defaultAdmin1.display_name, action: 'created', details: 'Etkinlik oluşturuldu', timestamp: now.toISOString() }
+            ],
+            created_by: defaultAdmin1.id,
             created_at: now.toISOString(),
             updated_at: now.toISOString()
         };
 
         const sampleEvent2: WorkspaceEvent = {
             id: 'evt_sample_2',
-            calendar_id: 'cal_dev',
+            calendar_id: 'cal_proj',
             title: 'Yeni Web Sitesi & Workspace Mimari İncelemesi',
             description: 'Supabase SSR ve Notion Calendar bileşenlerinin canlı testleri yapılacak.',
             category: 'Geliştirme',
@@ -273,6 +259,10 @@ export class WorkspaceStoreManager {
             comments: [],
             attachments: [],
             reminders: [],
+            edit_history: [
+                { id: 'hist_sample_2', event_id: 'evt_sample_2', user_id: defaultAdmin1.id, user_name: defaultAdmin1.display_name, action: 'created', details: 'Etkinlik oluşturuldu', timestamp: now.toISOString() }
+            ],
+            created_by: defaultAdmin1.id,
             created_at: now.toISOString(),
             updated_at: now.toISOString()
         };
@@ -586,6 +576,7 @@ export class WorkspaceStoreManager {
         if (!event.comments) event.comments = [];
         if (!event.attachments) event.attachments = [];
         if (!event.reminders) event.reminders = [];
+        if (!event.edit_history) event.edit_history = [];
         event.created_at = new Date().toISOString();
         event.updated_at = new Date().toISOString();
 

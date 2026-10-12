@@ -89,7 +89,8 @@ export class WorkspaceRepository {
                         comments: comments.filter((c: any) => c.event_id === ev.id),
                         subtasks: subtasks.filter((s: any) => s.event_id === ev.id),
                         attachments: [],
-                        reminders: ev.reminders || []
+                        reminders: ev.reminders || [],
+                        edit_history: ev.edit_history || []
                     })) as WorkspaceEvent[];
 
                     // Görünürlük (Visibility) Filtreleme
@@ -108,6 +109,8 @@ export class WorkspaceRepository {
                     });
 
                     return enriched;
+                } else if (!error && data && data.length === 0) {
+                    return [];
                 }
             } catch (err) {
                 console.warn('Postgres etkinlik okuma hatası:', err);
@@ -132,7 +135,8 @@ export class WorkspaceRepository {
                         comments: comRes.data || [],
                         subtasks: subRes.data || [],
                         attachments: [],
-                        reminders: data.reminders || []
+                        reminders: data.reminders || [],
+                        edit_history: data.edit_history || []
                     } as WorkspaceEvent;
                 }
             } catch (err) {
@@ -166,6 +170,7 @@ export class WorkspaceRepository {
                     visibility: event.visibility || 'public',
                     created_by: event.created_by || null,
                     reminders: event.reminders || [],
+                    edit_history: event.edit_history || [],
                     version: event.version || 1,
                     created_at: event.created_at || new Date().toISOString(),
                     updated_at: event.updated_at || new Date().toISOString()
@@ -190,7 +195,8 @@ export class WorkspaceRepository {
                         subtasks: event.subtasks || [],
                         comments: event.comments || [],
                         attachments: event.attachments || [],
-                        reminders: event.reminders || []
+                        reminders: event.reminders || [],
+                        edit_history: event.edit_history || []
                     } as WorkspaceEvent;
                 } else if (error) {
                     console.warn('Postgres etkinlik kayıt hatası (fallback taban):', error);
@@ -205,15 +211,34 @@ export class WorkspaceRepository {
     public static async updateEventWithConcurrency(
         id: string,
         updates: Partial<WorkspaceEvent>,
-        expectedVersion: number
+        expectedVersion: number,
+        editingMember?: WorkspaceMember | null,
+        changeSummary?: string
     ): Promise<{ success: boolean; conflict?: boolean; currentVersion?: number; event?: WorkspaceEvent }> {
         this.ensureDatabaseConfigured();
+
+        // Düzenleme geçmişi kaydını hazırla
+        const currentEvent = await this.getEventById(id);
+        if (!currentEvent) return { success: false };
+
+        if (editingMember) {
+            const updatedHistory = [...(updates.edit_history || currentEvent.edit_history || [])];
+            updatedHistory.push({
+                id: `hist_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                event_id: id,
+                user_id: editingMember.id,
+                user_name: editingMember.display_name,
+                user_avatar: editingMember.avatar_url,
+                action: 'updated',
+                details: changeSummary || 'Etkinlik güncellendi',
+                timestamp: new Date().toISOString()
+            });
+            updates.edit_history = updatedHistory;
+        }
+
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                const currentEvent = await this.getEventById(id);
-                if (!currentEvent) return { success: false };
-
                 if (currentEvent.version !== expectedVersion) {
                     return {
                         success: false,
@@ -807,12 +832,14 @@ export class WorkspaceRepository {
             try {
                 const supabase = this.getSupabaseClient();
                 const { data, error } = await supabase.from('workspace_calendars').select('*');
-                if (!error && data && data.length > 0) return data as WorkspaceCalendar[];
+                if (!error && data && data.length > 0) {
+                    return (data as WorkspaceCalendar[]).filter(c => c.id !== 'cal_ai' && !c.title.includes('Ar-Ge'));
+                }
             } catch (err) {
                 console.warn('Postgres takvim okuma hatası:', err);
             }
         }
-        return WorkspaceStoreManager.getInstance().getCalendars();
+        return WorkspaceStoreManager.getInstance().getCalendars().filter(c => c.id !== 'cal_ai' && !c.title.includes('Ar-Ge'));
     }
 
     public static async getGroups(): Promise<WorkspaceGroup[]> {
@@ -821,12 +848,14 @@ export class WorkspaceRepository {
             try {
                 const supabase = this.getSupabaseClient();
                 const { data, error } = await supabase.from('workspace_groups').select('*');
-                if (!error && data && data.length > 0) return data as WorkspaceGroup[];
+                if (!error && data && data.length > 0) {
+                    return (data as WorkspaceGroup[]).filter(g => g.id !== 'grp_ai' && !g.name.includes('Ar-Ge'));
+                }
             } catch (err) {
                 console.warn('Postgres grup okuma hatası:', err);
             }
         }
-        return WorkspaceStoreManager.getInstance().getGroups();
+        return WorkspaceStoreManager.getInstance().getGroups().filter(g => g.id !== 'grp_ai' && !g.name.includes('Ar-Ge'));
     }
 
     public static async addGroup(group: WorkspaceGroup): Promise<WorkspaceGroup> {

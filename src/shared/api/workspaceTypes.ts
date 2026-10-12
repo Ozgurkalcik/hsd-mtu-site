@@ -14,6 +14,7 @@ export interface WorkspaceMember {
     email: string;
     username: string;
     display_name: string;
+    full_name?: string;
     role: WorkspaceRole;
     status: 'active' | 'suspended' | 'invited';
     mfa_enabled: boolean;
@@ -110,6 +111,19 @@ export interface WorkspaceReminder {
 
 export type EventVisibility = 'public' | 'admin_only' | 'private';
 
+export interface WorkspaceEventEditHistoryRecord {
+    id: string;
+    event_id: string;
+    user_id: string;
+    user_name: string;
+    user_avatar?: string;
+    user_role?: string;
+    action: string;
+    summary?: string;
+    details?: string;
+    timestamp: string;
+}
+
 export interface WorkspaceEvent {
     id: string;
     calendar_id: string;
@@ -131,6 +145,8 @@ export interface WorkspaceEvent {
     comments: WorkspaceComment[];
     attachments: WorkspaceAttachment[];
     reminders: WorkspaceReminder[];
+    edit_history?: WorkspaceEventEditHistoryRecord[];
+    change_summary?: string;
     created_at?: string;
     updated_at?: string;
 }

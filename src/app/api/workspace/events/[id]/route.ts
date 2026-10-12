@@ -54,7 +54,7 @@ export async function PATCH(req: Request, context: RouteParams) {
         }
 
         const body = await req.json();
-        const { version, ...updates } = body;
+        const { version, change_summary, ...updates } = body;
 
         if (typeof version !== 'number') {
             return NextResponse.json(
@@ -63,7 +63,13 @@ export async function PATCH(req: Request, context: RouteParams) {
             );
         }
 
-        const result = await WorkspaceRepository.updateEventWithConcurrency(id, updates, version);
+        const result = await WorkspaceRepository.updateEventWithConcurrency(
+            id,
+            updates,
+            version,
+            session.member,
+            change_summary || (updates.title ? `Başlık / detaylar güncellendi (${updates.title})` : 'Etkinlik güncellendi')
+        );
 
         if (result.conflict) {
             return NextResponse.json(

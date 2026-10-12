@@ -841,6 +841,7 @@ export default function EventDrawer({
             comments,
             attachments,
             version,
+            change_summary: event ? `"${title.trim()}" bilgileri güncellendi` : undefined,
         };
 
         try {
@@ -1388,6 +1389,72 @@ export default function EventDrawer({
                         )}
 
                         <form id="event-form" onSubmit={handleSave} className="space-y-6">
+
+                            {/* ── BÖLÜM 0: ETKİNLİĞİ EKLEYEN ÜYE & OLUŞTURULMA BİLGİSİ ── */}
+                            {(() => {
+                                const creatorMember = members.find(m => m.id === event?.created_by);
+                                const creatorName = creatorMember?.display_name || creatorMember?.full_name || event?.created_by || (event ? 'Topluluk Üyesi' : (currentMember?.display_name || 'Siz'));
+                                const creatorRole = creatorMember?.role || (event ? 'member' : (currentMember?.role || 'member'));
+                                const creatorAvatar = creatorMember?.avatar_url || (event ? null : currentMember?.avatar_url);
+
+                                return (
+                                    <div className={`p-3.5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-colors ${
+                                        isLight
+                                            ? 'bg-slate-50/90 border-slate-200'
+                                            : 'bg-zinc-900/60 border-zinc-800'
+                                    }`}>
+                                        <div className="flex items-center gap-3">
+                                            {creatorAvatar ? (
+                                                <img
+                                                    src={creatorAvatar}
+                                                    alt={creatorName}
+                                                    className="w-10 h-10 rounded-xl object-cover ring-2 ring-rose-500/30 shadow-sm"
+                                                />
+                                            ) : (
+                                                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-600 via-rose-500 to-amber-500 flex items-center justify-center text-xs font-bold text-white shadow-sm ring-1 ring-white/20">
+                                                    {creatorName.substring(0, 2).toUpperCase()}
+                                                </div>
+                                            )}
+                                            <div className="space-y-0.5">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-xs font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                                                        {event ? creatorName : `${creatorName} (Yeni Ekleyen)`}
+                                                    </span>
+                                                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md font-semibold ${
+                                                        creatorRole === 'super_admin'
+                                                            ? isLight ? 'bg-amber-100 text-amber-800' : 'bg-amber-950/60 text-amber-300'
+                                                            : creatorRole === 'workspace_admin'
+                                                                ? isLight ? 'bg-rose-100 text-rose-800' : 'bg-rose-950/60 text-rose-300'
+                                                                : creatorRole === 'editor'
+                                                                    ? isLight ? 'bg-blue-100 text-blue-800' : 'bg-blue-950/60 text-blue-300'
+                                                                    : isLight ? 'bg-slate-200/80 text-slate-700' : 'bg-zinc-800 text-zinc-300'
+                                                    }`}>
+                                                        {creatorRole === 'super_admin' ? '👑 Admin' : creatorRole === 'workspace_admin' ? '🛡️ Yönetici' : creatorRole === 'editor' ? '✍️ Editör' : 'Üye'}
+                                                    </span>
+                                                </div>
+                                                <p className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                                                    {event ? (
+                                                        <>Etkinliği Ekleyen Üye • {new Date(event.created_at || Date.now()).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</>
+                                                    ) : (
+                                                        <>Bu etkinlik profiliniz ({currentMember?.display_name || 'Oturum Açan Üye'}) adına takvime kaydedilecek.</>
+                                                    )}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {event?.edit_history && event.edit_history.length > 0 && (
+                                            <div className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold border flex items-center gap-1.5 shrink-0 ${
+                                                isLight
+                                                    ? 'bg-white border-slate-200 text-slate-700 shadow-xs'
+                                                    : 'bg-zinc-950 border-zinc-800 text-zinc-300'
+                                            }`}>
+                                                <span className="text-amber-500">✎</span>
+                                                <span>{event.edit_history.length} Kez Düzenlendi</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
 
                             {/* ── BÖLÜM 1: ETKİNLİK BAŞLIĞI ── */}
                             <div className="space-y-1.5">
@@ -2251,10 +2318,10 @@ export default function EventDrawer({
                                 />
                                 <button
                                     type="submit"
-                                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors shrink-0 ${
+                                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer shadow-sm ${
                                         isLight
-                                            ? 'bg-slate-800 hover:bg-slate-900 text-white shadow-xs'
-                                            : 'bg-zinc-800 hover:bg-zinc-700 text-white'
+                                            ? 'bg-rose-600 hover:bg-rose-700 text-white active:scale-95'
+                                            : 'bg-rose-600 hover:bg-rose-700 text-white active:scale-95'
                                     }`}
                                 >
                                     Ekle
@@ -2713,6 +2780,107 @@ export default function EventDrawer({
                                 )}
                             </div>
                         </div>
+
+                        {/* ── BÖLÜM 10: DÜZENLEME GEÇMİŞİ & REVİZYON KAYITLARI (CHANGELOG) ── */}
+                        {event && (
+                            <div className={`p-4 rounded-2xl ${
+                                isLight
+                                    ? 'bg-slate-50/80 border border-slate-200'
+                                    : 'bg-zinc-900/70 border border-zinc-800'
+                            } space-y-3.5`}>
+                                <div className={`flex items-center justify-between border-b pb-2 ${
+                                    isLight ? 'border-slate-200' : 'border-zinc-800'
+                                }`}>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm">📜</span>
+                                        <span className={`text-xs font-bold uppercase tracking-wider ${
+                                            isLight ? 'text-slate-700' : 'text-zinc-200'
+                                        }`}>
+                                            Düzenleme Geçmişi ({event.edit_history?.length || 0})
+                                        </span>
+                                    </div>
+                                    <span className={`text-[10px] font-mono font-medium px-2 py-0.5 rounded ${
+                                        isLight ? 'bg-slate-200/70 text-slate-700' : 'bg-zinc-800 text-zinc-300'
+                                    }`}>
+                                        Versiyon: v{event.version || 1}
+                                    </span>
+                                </div>
+
+                                {event.edit_history && event.edit_history.length > 0 ? (
+                                    <div className="space-y-2.5 max-h-52 overflow-y-auto pr-1">
+                                        {[...event.edit_history].reverse().map((record) => {
+                                            const recMember = members.find(m => m.id === record.user_id);
+                                            const recAvatar = recMember?.avatar_url;
+                                            const recName = record.user_name || recMember?.display_name || recMember?.full_name || 'Topluluk Yöneticisi';
+                                            const recDate = new Date(record.timestamp);
+
+                                            return (
+                                                <div
+                                                    key={record.id}
+                                                    className={`p-2.5 rounded-xl border text-xs flex items-start gap-3 transition-colors ${
+                                                        isLight
+                                                            ? 'bg-white border-slate-200 hover:border-slate-300'
+                                                            : 'bg-zinc-950 border-zinc-850 hover:border-zinc-700'
+                                                    }`}
+                                                >
+                                                    <div className="shrink-0 mt-0.5">
+                                                        {recAvatar ? (
+                                                            <img
+                                                                src={recAvatar}
+                                                                alt={recName}
+                                                                className="w-6 h-6 rounded-lg object-cover ring-1 ring-slate-200 dark:ring-zinc-700"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center text-[9px] font-bold text-white shadow-xs">
+                                                                {recName.substring(0, 2).toUpperCase()}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex-1 space-y-0.5">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                <span className={`font-bold ${isLight ? 'text-slate-900' : 'text-zinc-100'}`}>
+                                                                    {recName}
+                                                                </span>
+                                                                {record.user_role && (
+                                                                    <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono ${
+                                                                        record.user_role === 'super_admin'
+                                                                            ? isLight ? 'bg-amber-100 text-amber-800' : 'bg-amber-950/60 text-amber-300'
+                                                                            : isLight ? 'bg-slate-100 text-slate-700' : 'bg-zinc-800 text-zinc-300'
+                                                                    }`}>
+                                                                        {record.user_role === 'super_admin' ? 'Admin' : record.user_role}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <span className={`text-[10px] font-mono shrink-0 ${isLight ? 'text-slate-400' : 'text-zinc-500'}`}>
+                                                                {recDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} {recDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
+                                                        </div>
+
+                                                        <p className={`text-[11px] leading-relaxed font-medium ${isLight ? 'text-slate-600' : 'text-zinc-300'}`}>
+                                                            {record.action === 'created' ? (
+                                                                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">✨ Etkinlik oluşturuldu: {record.summary}</span>
+                                                            ) : record.action === 'reverted' ? (
+                                                                <span className="text-amber-600 dark:text-amber-400 font-semibold">↺ Geri alındı: {record.summary}</span>
+                                                            ) : (
+                                                                <span>✎ {record.summary}</span>
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className={`p-3 rounded-xl border text-center italic text-xs ${
+                                        isLight ? 'bg-white border-slate-200 text-slate-400' : 'bg-zinc-950 border-zinc-800 text-zinc-500'
+                                    }`}>
+                                        Bu etkinlik için henüz kayıtlı bir düzenleme geçmişi bulunmuyor.
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                     </div>
 

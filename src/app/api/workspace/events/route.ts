@@ -98,8 +98,11 @@ export async function POST(req: Request) {
             ? visibility
             : 'public';
 
+        const eventId = `evt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        const nowIso = new Date().toISOString();
+
         const newEvent: WorkspaceEvent = {
-            id: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            id: eventId,
             calendar_id: calendar_id || 'cal_core',
             title: title.trim(),
             description: description || '',
@@ -118,7 +121,21 @@ export async function POST(req: Request) {
             subtasks: Array.isArray(subtasks) ? subtasks : [],
             comments: [],
             attachments: [],
-            reminders: Array.isArray(reminders) ? reminders : []
+            reminders: Array.isArray(reminders) ? reminders : [],
+            edit_history: [
+                {
+                    id: `hist_${Date.now()}_init`,
+                    event_id: eventId,
+                    user_id: session.member.id,
+                    user_name: session.member.display_name,
+                    user_avatar: session.member.avatar_url,
+                    action: 'created',
+                    details: 'Etkinlik oluşturuldu',
+                    timestamp: nowIso
+                }
+            ],
+            created_at: nowIso,
+            updated_at: nowIso
         };
 
         const created = await WorkspaceRepository.createEvent(newEvent);

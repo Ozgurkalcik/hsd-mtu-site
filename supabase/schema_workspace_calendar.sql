@@ -73,6 +73,10 @@ CREATE TABLE IF NOT EXISTS public.workspace_events (
     location TEXT,
     meeting_link TEXT,
     status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'in_progress', 'completed', 'cancelled')),
+    visibility TEXT DEFAULT 'public',
+    created_by TEXT,
+    reminders JSONB DEFAULT '[]'::jsonb,
+    edit_history JSONB DEFAULT '[]'::jsonb,
     version INTEGER NOT NULL DEFAULT 1,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
