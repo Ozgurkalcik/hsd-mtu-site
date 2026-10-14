@@ -13,7 +13,8 @@ import {
     ActiveSession,
     AuditLogRecord,
     WorkspaceSecuritySettings,
-    WorkspaceMemberNote
+    WorkspaceMemberNote,
+    MemberAttendance
 } from './workspaceTypes';
 import { hashPassword, verifyPassword } from '@/shared/lib/security';
 
@@ -59,13 +60,33 @@ export class WorkspaceStoreManager {
     }
 
     private initializeDefaults() {
-        // 1. Varsayılan İzin Matrisi
+        // 1. Varsayılan İzin Matrisi (Genişletilmiş RBAC)
         const defaultPerms: RolePermissions[] = [
-            { role: 'super_admin', can_view: true, can_create: true, can_edit: true, can_delete: true, can_upload: true, can_share: true },
-            { role: 'workspace_admin', can_view: true, can_create: true, can_edit: true, can_delete: true, can_upload: true, can_share: true },
-            { role: 'editor', can_view: true, can_create: true, can_edit: true, can_delete: false, can_upload: true, can_share: true },
-            { role: 'contributor', can_view: true, can_create: true, can_edit: false, can_delete: false, can_upload: true, can_share: false },
-            { role: 'viewer', can_view: true, can_create: false, can_edit: false, can_delete: false, can_upload: false, can_share: false }
+            {
+                role: 'super_admin',
+                can_view: true, can_create: true, can_edit: true, can_delete: true, can_upload: true, can_share: true,
+                can_comment: true, can_manage_rsvp: true, can_manage_tasks: true, can_broadcast: true, can_export: true
+            },
+            {
+                role: 'workspace_admin',
+                can_view: true, can_create: true, can_edit: true, can_delete: true, can_upload: true, can_share: true,
+                can_comment: true, can_manage_rsvp: true, can_manage_tasks: true, can_broadcast: true, can_export: true
+            },
+            {
+                role: 'editor',
+                can_view: true, can_create: true, can_edit: true, can_delete: true, can_upload: true, can_share: true,
+                can_comment: true, can_manage_rsvp: true, can_manage_tasks: true, can_broadcast: false, can_export: true
+            },
+            {
+                role: 'contributor',
+                can_view: true, can_create: true, can_edit: false, can_delete: false, can_upload: true, can_share: false,
+                can_comment: true, can_manage_rsvp: false, can_manage_tasks: true, can_broadcast: false, can_export: false
+            },
+            {
+                role: 'viewer',
+                can_view: true, can_create: false, can_edit: false, can_delete: false, can_upload: false, can_share: false,
+                can_comment: false, can_manage_rsvp: false, can_manage_tasks: false, can_broadcast: false, can_export: false
+            }
         ];
         defaultPerms.forEach(p => this.rolePermissions.set(p.role, p));
 
@@ -806,6 +827,52 @@ export class WorkspaceStoreManager {
     }
 
     // ============================================
+    // Dahili Ekip LCV & Katılım Teyidi
+    // ============================================
+    public getMemberAttendance(eventId: string): MemberAttendance[] {
+        const event = this.events.get(eventId);
+        return event?.member_attendance || [];
+    }
+
+    public recordMemberAttendance(
+        eventId: string,
+        userId: string,
+        userName: string,
+        role: WorkspaceRole,
+        status: 'attending' | 'declined' | 'maybe',
+        reason?: string,
+        userAvatar?: string
+    ): { success: boolean; attendance?: MemberAttendance; event?: WorkspaceEvent; error?: string } {
+        const event = this.events.get(eventId);
+        if (!event) {
+            return { success: false, error: 'Etkinlik bulunamadı.' };
+        }
+
+        const newAttendance: MemberAttendance = {
+            user_id: userId,
+            user_name: userName,
+            user_avatar: userAvatar,
+            role,
+            status,
+            reason: reason?.trim() || undefined,
+            responded_at: new Date().toISOString()
+        };
+
+        const existingList = event.member_attendance || [];
+        const filtered = existingList.filter(a => a.user_id !== userId);
+        const updatedList = [newAttendance, ...filtered];
+
+        const updatedEvent: WorkspaceEvent = {
+            ...event,
+            member_attendance: updatedList,
+            updated_at: new Date().toISOString()
+        };
+
+        this.events.set(eventId, updatedEvent);
+        return { success: true, attendance: newAttendance, event: updatedEvent };
+    }
+
+    // ============================================
     // Bildirim Dağıtımı & Anlık Duyuru
     // ============================================
     public getNotifications(userId?: string): WorkspaceNotification[] {
@@ -1065,7 +1132,12 @@ export class WorkspaceStoreManager {
                 can_edit: true,
                 can_delete: true,
                 can_upload: true,
-                can_share: true
+                can_share: true,
+                can_comment: true,
+                can_manage_rsvp: true,
+                can_manage_tasks: true,
+                can_broadcast: true,
+                can_export: true
             };
         }
 
@@ -1077,7 +1149,29 @@ export class WorkspaceStoreManager {
                 can_edit: true,
                 can_delete: true,
                 can_upload: true,
-                can_share: true
+                can_share: true,
+                can_comment: true,
+                can_manage_rsvp: true,
+                can_manage_tasks: true,
+                can_broadcast: false,
+                can_export: true
+            };
+        }
+
+        if (r === 'contributor' || r.includes('katkici') || r.includes('contributor')) {
+            return {
+                role,
+                can_view: true,
+                can_create: true,
+                can_edit: false,
+                can_delete: false,
+                can_upload: true,
+                can_share: false,
+                can_comment: true,
+                can_manage_rsvp: false,
+                can_manage_tasks: true,
+                can_broadcast: false,
+                can_export: false
             };
         }
 
@@ -1089,7 +1183,12 @@ export class WorkspaceStoreManager {
                 can_edit: false,
                 can_delete: false,
                 can_upload: false,
-                can_share: false
+                can_share: false,
+                can_comment: false,
+                can_manage_rsvp: false,
+                can_manage_tasks: false,
+                can_broadcast: false,
+                can_export: false
             };
         }
 
@@ -1101,7 +1200,12 @@ export class WorkspaceStoreManager {
             can_edit: true,
             can_delete: true,
             can_upload: true,
-            can_share: true
+            can_share: true,
+            can_comment: true,
+            can_manage_rsvp: false,
+            can_manage_tasks: true,
+            can_broadcast: false,
+            can_export: false
         };
     }
 

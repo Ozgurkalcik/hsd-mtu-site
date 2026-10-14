@@ -17,6 +17,9 @@ ADD COLUMN IF NOT EXISTS rsvp_qr_enabled BOOLEAN DEFAULT false;
 ALTER TABLE public.workspace_events 
 ADD COLUMN IF NOT EXISTS rsvp_capacity INTEGER DEFAULT NULL;
 
+ALTER TABLE public.workspace_events 
+ADD COLUMN IF NOT EXISTS member_attendance JSONB DEFAULT '[]'::jsonb;
+
 -- 2. workspace_event_attendees (RSVP Katılımcı Kayıtları) Tablosu
 CREATE TABLE IF NOT EXISTS public.workspace_event_attendees (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -87,7 +90,41 @@ CREATE POLICY "Allow projects update access" ON public.community_projects
     USING (true)
     WITH CHECK (true);
 
--- 4. workspace_settings Tablosuna Yeni Ayar Kolonları
+-- 4. workspace_settings Tablosu (Yoksa Oluştur, Varsa Güncelle)
+CREATE TABLE IF NOT EXISTS public.workspace_settings (
+    id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_name              TEXT DEFAULT 'HSD MTÜ Workspace',
+    allow_member_registration   BOOLEAN DEFAULT true,
+    default_calendar_id         TEXT DEFAULT 'cal_core',
+    created_at                  TIMESTAMPTZ DEFAULT now(),
+    updated_at                  TIMESTAMPTZ DEFAULT now()
+);
+
+-- RLS
+ALTER TABLE public.workspace_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow workspace settings read" ON public.workspace_settings;
+CREATE POLICY "Allow workspace settings read" ON public.workspace_settings
+    FOR SELECT TO authenticated, anon
+    USING (true);
+
+DROP POLICY IF EXISTS "Allow workspace settings update" ON public.workspace_settings;
+CREATE POLICY "Allow workspace settings update" ON public.workspace_settings
+    FOR UPDATE TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow workspace settings insert" ON public.workspace_settings;
+CREATE POLICY "Allow workspace settings insert" ON public.workspace_settings
+    FOR INSERT TO authenticated
+    WITH CHECK (true);
+
+-- Varsayılan satırı ekle (yoksa)
+INSERT INTO public.workspace_settings (id)
+VALUES ('00000000-0000-0000-0000-000000000001')
+ON CONFLICT (id) DO NOTHING;
+
+-- Yeni Ayar Kolonları (Idempotent)
 ALTER TABLE public.workspace_settings 
 ADD COLUMN IF NOT EXISTS rsvp_registration_enabled BOOLEAN DEFAULT true;
 

@@ -18,7 +18,8 @@ import {
     WorkspaceMemberNote,
     EventVisibility,
     EventAttendee,
-    CommunityProject
+    CommunityProject,
+    MemberAttendance
 } from './workspaceTypes';
 import { hashPassword, verifyPassword } from '@/shared/lib/security';
 
@@ -1415,6 +1416,121 @@ export class WorkspaceRepository {
             }
         }
         return { success: false, error: 'Veritabanı bağlantısı yok.' };
+    }
+
+    // ==========================================
+    // DAHİLİ EKİP LCV KATILIM TEYİDİ & YÖNETİMİ
+    // ==========================================
+
+    public static async getMemberAttendance(eventId: string): Promise<MemberAttendance[]> {
+        this.ensureDatabaseConfigured();
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                const { data, error } = await supabase
+                    .from('workspace_events')
+                    .select('member_attendance')
+                    .eq('id', eventId)
+                    .single();
+                if (!error && data?.member_attendance && Array.isArray(data.member_attendance)) {
+                    return data.member_attendance as MemberAttendance[];
+                }
+            } catch (err) {
+                console.warn('Postgres member_attendance getirme hatası:', err);
+            }
+        }
+        return WorkspaceStoreManager.getInstance().getMemberAttendance(eventId);
+    }
+
+    public static async recordMemberAttendance(
+        eventId: string,
+        userId: string,
+        userName: string,
+        role: WorkspaceRole,
+        status: 'attending' | 'declined' | 'maybe',
+        reason?: string,
+        userAvatar?: string
+    ): Promise<{ success: boolean; attendance?: MemberAttendance; event?: WorkspaceEvent; error?: string }> {
+        this.ensureDatabaseConfigured();
+        const res = WorkspaceStoreManager.getInstance().recordMemberAttendance(
+            eventId,
+            userId,
+            userName,
+            role,
+            status,
+            reason,
+            userAvatar
+        );
+
+        if (!res.success || !res.event) {
+            return res;
+        }
+
+        // Supabase Postgres Veritabanına Eşitle
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                await supabase
+                    .from('workspace_events')
+                    .update({ member_attendance: res.event.member_attendance })
+                    .eq('id', eventId);
+            } catch (err) {
+                console.warn('Postgres member_attendance kaydetme hatası:', err);
+            }
+        }
+
+        // İlgili adminlere ve etkinlik yöneticilerine anlık LCV bildirim dağıtımı
+        try {
+            const statusTr = status === 'attending' 
+                ? 'KATILACAĞINI' 
+                : status === 'declined' 
+                    ? 'KATILMAYACAĞINI' 
+                    : 'BELKİ KATILABİLECEĞİNİ';
+            const notifTitle = `📢 LCV Bildirimi: ${res.event.title}`;
+            const notifMsg = `${userName} (${role}), "${res.event.title}" etkinliği için ${statusTr} bildirdi.${reason ? ` Gerekçe: "${reason}"` : ''}`;
+
+            // 1. Workspace Admin rolüne bildirim
+            await this.dispatchInstantNotification({
+                title: notifTitle,
+                message: notifMsg,
+                type: 'committee',
+                category: 'committee',
+                target_audience: 'role',
+                target_role: 'workspace_admin',
+                eventId: res.event.id,
+                eventTitle: res.event.title
+            });
+
+            // 2. Super Admin rolüne bildirim
+            await this.dispatchInstantNotification({
+                title: notifTitle,
+                message: notifMsg,
+                type: 'committee',
+                category: 'committee',
+                target_audience: 'role',
+                target_role: 'super_admin',
+                eventId: res.event.id,
+                eventTitle: res.event.title
+            });
+
+            // 3. Etkinliği oluşturan kişiye bildirim (eğer kendisi değilse)
+            if (res.event.created_by && res.event.created_by !== userId) {
+                await this.dispatchInstantNotification({
+                    title: notifTitle,
+                    message: notifMsg,
+                    type: 'committee',
+                    category: 'committee',
+                    target_audience: 'selected',
+                    target_users: [res.event.created_by],
+                    eventId: res.event.id,
+                    eventTitle: res.event.title
+                });
+            }
+        } catch (notifErr) {
+            console.warn('LCV bildirim gönderimi hatası (sessiz):', notifErr);
+        }
+
+        return res;
     }
 
     // ==========================================

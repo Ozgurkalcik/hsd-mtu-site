@@ -751,20 +751,37 @@ export default function AdminWorkspacePage() {
                                     <thead>
                                         <tr className="border-b border-zinc-800 text-zinc-400 font-semibold">
                                             <th className="py-2.5 px-3">Rol</th>
-                                            <th className="py-2.5 px-3 text-center">Görüntüleme (can_view)</th>
-                                            <th className="py-2.5 px-3 text-center">Oluşturma (can_create)</th>
-                                            <th className="py-2.5 px-3 text-center">Düzenleme (can_edit)</th>
-                                            <th className="py-2.5 px-3 text-center">Silme (can_delete)</th>
-                                            <th className="py-2.5 px-3 text-center">Dosya Yükleme (can_upload)</th>
-                                            <th className="py-2.5 px-3 text-center">Paylaşım (can_share)</th>
+                                            <th className="py-2.5 px-2 text-center" title="Takvim ve etkinlikleri görüntüleme">Görüntüleme<br/><span className="text-[10px] text-zinc-500 font-mono font-normal">can_view</span></th>
+                                            <th className="py-2.5 px-2 text-center" title="Yeni etkinlik oluşturma">Oluşturma<br/><span className="text-[10px] text-zinc-500 font-mono font-normal">can_create</span></th>
+                                            <th className="py-2.5 px-2 text-center" title="Mevcut etkinlikleri güncelleme">Düzenleme<br/><span className="text-[10px] text-zinc-500 font-mono font-normal">can_edit</span></th>
+                                            <th className="py-2.5 px-2 text-center" title="Etkinlikleri takvimden silme">Silme<br/><span className="text-[10px] text-zinc-500 font-mono font-normal">can_delete</span></th>
+                                            <th className="py-2.5 px-2 text-center" title="Ek dosya ve afiş yükleme">Dosya<br/><span className="text-[10px] text-zinc-500 font-mono font-normal">can_upload</span></th>
+                                            <th className="py-2.5 px-2 text-center" title="Etkinlikleri dışarı paylaşma">Paylaşım<br/><span className="text-[10px] text-zinc-500 font-mono font-normal">can_share</span></th>
+                                            <th className="py-2.5 px-2 text-center" title="Etkinliklere ekip notu ve yorum yazma">Yorum & Not<br/><span className="text-[10px] text-zinc-500 font-mono font-normal">can_comment</span></th>
+                                            <th className="py-2.5 px-2 text-center" title="RSVP, LCV ve QR biletlerini yönetme">LCV & Bilet<br/><span className="text-[10px] text-zinc-500 font-mono font-normal">can_manage_rsvp</span></th>
+                                            <th className="py-2.5 px-2 text-center" title="Alt görev checklist ekleme/düzenleme">Görevler<br/><span className="text-[10px] text-zinc-500 font-mono font-normal">can_manage_tasks</span></th>
+                                            <th className="py-2.5 px-2 text-center" title="Anlık acil duyuru ve bildirim yayını">Duyuru<br/><span className="text-[10px] text-zinc-500 font-mono font-normal">can_broadcast</span></th>
+                                            <th className="py-2.5 px-2 text-center" title="Katılımcı ve etkinlik verilerini CSV/JSON indirme">Dışa Aktar<br/><span className="text-[10px] text-zinc-500 font-mono font-normal">can_export</span></th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-zinc-900">
                                         {roles.map(r => (
                                             <tr key={r.role} className="hover:bg-zinc-900/40">
                                                 <td className="py-3 px-3 font-bold text-white uppercase font-mono">{r.role}</td>
-                                                {(['can_view', 'can_create', 'can_edit', 'can_delete', 'can_upload', 'can_share'] as const).map(col => (
-                                                    <td key={col} className="py-3 px-3 text-center">
+                                                {([
+                                                    'can_view',
+                                                    'can_create',
+                                                    'can_edit',
+                                                    'can_delete',
+                                                    'can_upload',
+                                                    'can_share',
+                                                    'can_comment',
+                                                    'can_manage_rsvp',
+                                                    'can_manage_tasks',
+                                                    'can_broadcast',
+                                                    'can_export'
+                                                ] as const).map(col => (
+                                                    <td key={col} className="py-3 px-2 text-center">
                                                         <button
                                                             type="button"
                                                             onClick={() => handleTogglePermission(r.role, col)}
@@ -772,6 +789,7 @@ export default function AdminWorkspacePage() {
                                                                     ? 'bg-rose-600 text-white shadow-xs'
                                                                     : 'bg-zinc-900 text-zinc-600 border border-zinc-800 hover:text-zinc-400'
                                                                 }`}
+                                                            title={`${r.role} - ${col}: ${r[col] ? 'Açık' : 'Kapalı'}`}
                                                         >
                                                             {r[col] ? '✓' : '✕'}
                                                         </button>

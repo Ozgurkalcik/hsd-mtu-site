@@ -35,6 +35,11 @@ export interface RolePermissions {
     can_delete: boolean;
     can_upload: boolean;
     can_share: boolean;
+    can_comment?: boolean;
+    can_manage_rsvp?: boolean;
+    can_manage_tasks?: boolean;
+    can_broadcast?: boolean;
+    can_export?: boolean;
 }
 
 export interface WorkspaceCalendar {
@@ -152,8 +157,19 @@ export interface WorkspaceEvent {
     rsvp_qr_enabled?: boolean; // QR Kod Dijital Bilet Aç/Kapat
     rsvp_capacity?: number; // Maksimum Katılımcı Kontenjanı
     attendee_count?: number; // Anlık Kayıtlı Katılımcı Sayısı
+    member_attendance?: MemberAttendance[]; // Dahili Ekip LCV Katılım Durumları
     created_at?: string;
     updated_at?: string;
+}
+
+export interface MemberAttendance {
+    user_id: string;
+    user_name: string;
+    user_avatar?: string;
+    role: WorkspaceRole;
+    status: 'attending' | 'declined' | 'maybe';
+    reason?: string;
+    responded_at: string;
 }
 
 export interface EventAttendee {

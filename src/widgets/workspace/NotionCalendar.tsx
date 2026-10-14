@@ -13,6 +13,7 @@ import {
 import { useFrozen } from '@/shared/lib/FrozenSection';
 import { createClient } from '@/shared/api/supabase';
 import EventDrawer from './EventDrawer';
+import WeeklyRsvpModal from './WeeklyRsvpModal';
 
 export type CalendarViewMode = 'ay' | '3ay' | '6ay' | 'hafta' | 'gun' | 'liste' | 'pano';
 
@@ -100,6 +101,35 @@ export default function NotionCalendar({
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [editingEvent, setEditingEvent] = useState<WorkspaceEvent | null>(null);
     const [initialTargetDate, setInitialTargetDate] = useState<Date | null>(null);
+
+    // 🎯 Haftalık LCV Katılım Modal State & Otomatik Bildirim
+    const [isWeeklyRsvpOpen, setIsWeeklyRsvpOpen] = useState(false);
+
+    // Önümüzdeki 7 gün içindeki etkinlik sayısı
+    const upcomingWeeklyEvents = useMemo(() => {
+        const now = Date.now();
+        const sevenDaysLater = now + 7 * 24 * 60 * 60 * 1000;
+        return events.filter(ev => {
+            if (ev.status === 'cancelled') return false;
+            try {
+                const startMs = new Date(ev.start_time).getTime();
+                return startMs >= now && startMs <= sevenDaysLater;
+            } catch {
+                return false;
+            }
+        });
+    }, [events]);
+
+    // Girişte 7 gün içinde bekleyen etkinlik varsa şık menüyü otomatik aç (Günde 1 kez veya oturumda)
+    useEffect(() => {
+        if (!currentUser || upcomingWeeklyEvents.length === 0) return;
+        const todayKey = `hsd_weekly_rsvp_prompt_${new Date().toISOString().slice(0, 10)}`;
+        const alreadyPrompted = sessionStorage.getItem(todayKey);
+        if (!alreadyPrompted) {
+            setIsWeeklyRsvpOpen(true);
+            sessionStorage.setItem(todayKey, 'true');
+        }
+    }, [currentUser, upcomingWeeklyEvents.length]);
 
     // User Profile Dropdown Menu State
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -671,6 +701,28 @@ export default function NotionCalendar({
                             </button>
                         )}
                     </div>
+
+                    {/* 🎯 Haftalık LCV Katılım Butonu (Pop-up Açıcı) */}
+                    <button
+                        type="button"
+                        onClick={() => setIsWeeklyRsvpOpen(true)}
+                        className={`p-1.5 px-3 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center gap-1.5 text-xs font-bold shrink-0 ${
+                            upcomingWeeklyEvents.length > 0
+                                ? 'bg-gradient-to-r from-rose-600 via-rose-500 to-amber-600 text-white border-rose-500 hover:brightness-110 shadow-rose-950/40 animate-pulse'
+                                : workspaceTheme === 'light'
+                                    ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
+                                    : 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white'
+                        }`}
+                        title="Önümüzdeki 7 gün içindeki etkinliklere katılım bildirimi yapın veya tercihlerinizi güncelleyin"
+                    >
+                        <span>🎯</span>
+                        <span className="hidden sm:inline">Haftalık LCV</span>
+                        {upcomingWeeklyEvents.length > 0 && (
+                            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-white/20 text-white font-bold">
+                                {upcomingWeeklyEvents.length}
+                            </span>
+                        )}
+                    </button>
 
                     {/* Aydınlık / Karanlık Tema Düğmesi (Sadece /workspace) */}
                     <button
@@ -1354,6 +1406,7 @@ export default function NotionCalendar({
                 groups={groups}
                 members={members}
                 currentMember={currentUser}
+                userPermissions={userPermissions}
                 theme={workspaceTheme}
                 onEventSaved={(savedEv) => {
                     const idx = events.findIndex(e => e.id === savedEv.id);
@@ -1365,6 +1418,18 @@ export default function NotionCalendar({
                 }}
                 onEventDeleted={(deletedId) => {
                     setEvents(events.filter(e => e.id !== deletedId));
+                }}
+            />
+
+            {/* 🎯 Haftalık LCV Katılım Bildirimi (Açılır Şık Menü) */}
+            <WeeklyRsvpModal
+                isOpen={isWeeklyRsvpOpen}
+                onClose={() => setIsWeeklyRsvpOpen(false)}
+                events={events}
+                currentUser={currentUser}
+                theme={workspaceTheme}
+                onEventUpdated={(updatedEv) => {
+                    setEvents(prev => prev.map(e => e.id === updatedEv.id ? updatedEv : e));
                 }}
             />
         </div>

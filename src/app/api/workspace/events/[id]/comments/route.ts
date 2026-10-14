@@ -26,6 +26,21 @@ export async function POST(req: Request, context: RouteParams) {
             return NextResponse.json({ error: 'Yorum yapmak için oturum açmalısınız.' }, { status: 401 });
         }
 
+        // Yorum yetki kontrolü: En az Contributor seviyesi veya can_comment: true izni gereklidir
+        const canComment = session.permissions?.can_comment ?? (
+            session.member.role === 'super_admin' ||
+            session.member.role === 'workspace_admin' ||
+            session.member.role === 'editor' ||
+            session.member.role === 'contributor'
+        );
+
+        if (!canComment) {
+            return NextResponse.json(
+                { error: 'Yorum yapabilmek için en az Contributor (Katkı Sağlayıcı) yetkisine sahip olmalısınız.' },
+                { status: 403 }
+            );
+        }
+
         const body = await req.json();
         const { content, tag, is_pinned } = body;
 
