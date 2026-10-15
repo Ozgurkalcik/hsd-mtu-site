@@ -135,14 +135,14 @@ export class WorkspaceStoreManager {
         const projCal: WorkspaceCalendar = {
             id: 'cal_proj',
             title: 'Proje Komitesi Takvimi',
-            color: '#8b5cf6',
+            color: '#3b82f6',
             description: 'Yazılım geliştirme, sprintler, code-review ve teknik hackathonlar',
             is_private: false
         };
         const eventCal: WorkspaceCalendar = {
             id: 'cal_event',
             title: 'Etkinlik & Sponsorluk Komitesi',
-            color: '#dc2626',
+            color: '#f97316',
             description: 'Fiziki konferanslar, atölyeler ve sponsorluk görüşmeleri',
             is_private: false
         };
@@ -156,14 +156,14 @@ export class WorkspaceStoreManager {
         const mediumCal: WorkspaceCalendar = {
             id: 'cal_medium',
             title: 'Medium Komitesi Takvimi',
-            color: '#f59e0b',
+            color: '#eab308',
             description: 'Teknik blog makaleleri, bülten hazırlığı ve peer-review',
             is_private: false
         };
         const mgmtCal: WorkspaceCalendar = {
             id: 'cal_mgmt',
             title: 'Yönetim & Koordinasyon Takvimi',
-            color: '#3b82f6',
+            color: '#8b5cf6',
             description: 'Liderlik toplantıları, komite başkanları oturumları',
             is_private: true
         };
@@ -585,6 +585,12 @@ export class WorkspaceStoreManager {
             }
             if (vis === 'private') {
                 return viewerMember && (e.created_by === viewerMember.id || viewerMember.role === 'super_admin');
+            }
+            if (vis === 'custom') {
+                if (!viewerMember) return false;
+                if (viewerMember.role === 'super_admin' || e.created_by === viewerMember.id) return true;
+                const allowed = (e as any).allowed_member_ids || e.assignees || [];
+                return allowed.includes(viewerMember.id) || allowed.includes(viewerMember.username);
             }
             return true;
         });

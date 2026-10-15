@@ -46,6 +46,15 @@ const PRESET_COLORS = [
     { name: 'Nötr (Genel)', value: '#71717a' },
 ];
 
+export const COMMITTEE_COLORS: Record<string, string> = {
+    cal_core: '#ef4444',    // Genel Topluluk Takvimi (Kırmızı)
+    cal_proj: '#3b82f6',    // Proje Komitesi Takvimi (Mavi)
+    cal_event: '#f97316',   // Etkinlik & Sponsorluk Komitesi (Turuncu)
+    cal_social: '#ec4899',  // Sosyal Medya & Tasarım Komitesi (Pembe)
+    cal_medium: '#eab308',  // Medium Komitesi Takvimi (Sarı)
+    cal_mgmt: '#8b5cf6',    // Yönetim & Koordinasyon Takvimi (Mor)
+};
+
 // ⚡ 4 Çekirdek Komiteye Özel Gelişmiş Etkinlik Şablonları (Templates)
 interface CommitteeTemplate {
     id: string;
@@ -530,7 +539,12 @@ export default function EventDrawer({
     const [description, setDescription] = useState('');
     const [status, setStatus] = useState<'scheduled' | 'in_progress' | 'completed' | 'cancelled'>('scheduled');
     const [visibility, setVisibility] = useState<EventVisibility>('public');
+    const [customVisibleMembers, setCustomVisibleMembers] = useState<string[]>([]);
+    const [memberSearchQuery, setMemberSearchQuery] = useState('');
     const [reminders, setReminders] = useState<WorkspaceReminder[]>([]);
+    const [customReminderVal, setCustomReminderVal] = useState<number>(30);
+    const [customReminderUnit, setCustomReminderUnit] = useState<'minutes' | 'hours' | 'days'>('minutes');
+    const [customReminderTarget, setCustomReminderTarget] = useState<'all' | 'admins' | 'assignees'>('all');
     const [assignees, setAssignees] = useState<string[]>([]);
     const [subtasks, setSubtasks] = useState<WorkspaceSubtask[]>([]);
     const [comments, setComments] = useState<WorkspaceComment[]>([]);
@@ -547,7 +561,7 @@ export default function EventDrawer({
     const [webhookFeedback, setWebhookFeedback] = useState<string | null>(null);
     const [isSendingWebhook, setIsSendingWebhook] = useState(false);
 
-    // 👥 Dahili Ekip LCV Katılım Durumları (Katılacaklar, Katılmayacaklar & Gerekçeleri)
+    // 👥 Dahili Ekip Katılım Durumları (Katılacaklar, Katılmayacaklar & Gerekçeleri)
     const [memberAttendanceList, setMemberAttendanceList] = useState<MemberAttendance[]>([]);
     const [attendanceFilter, setAttendanceFilter] = useState<'all' | 'attending' | 'declined' | 'maybe' | 'pending'>('all');
 
@@ -574,7 +588,7 @@ export default function EventDrawer({
     const isReadOnly = Boolean(event && !canEditEvent);
     const canDeleteEvent = Boolean(event && (isCreator || isAdmin || userPermissions?.can_delete));
 
-    // Bireysel LCV Katılım Durumu (Görüntüleme Modunda Anında Yanıt)
+    // Bireysel Katılım Durumu (Görüntüleme Modunda Anında Yanıt)
     const [myAttendanceStatus, setMyAttendanceStatus] = useState<'attending' | 'declined' | 'maybe' | null>(null);
     const [myAttendanceReason, setMyAttendanceReason] = useState<string>('');
     const [isSubmittingMyRsvp, setIsSubmittingMyRsvp] = useState<boolean>(false);
@@ -676,15 +690,18 @@ export default function EventDrawer({
             }
 
             setTitle(event.title || '');
-            setCalendarId(event.calendar_id || calendars[0]?.id || 'cal_core');
+            const targetCalId = event.calendar_id || calendars[0]?.id || 'cal_core';
+            setCalendarId(targetCalId);
             setCategory(event.category || 'Toplantı');
-            setColor(event.color || '#dc2626');
+            setColor(COMMITTEE_COLORS[targetCalId] || event.color || '#ef4444');
             setIsAllDay(Boolean(event.is_all_day));
             setLocation(event.location || '');
             setMeetingLink(event.meeting_link || '');
             setDescription(event.description || '');
             setStatus(event.status || 'scheduled');
             setVisibility(event.visibility || 'public');
+            setCustomVisibleMembers((event as any).allowed_member_ids || event.assignees || []);
+            setMemberSearchQuery('');
             setReminders(event.reminders || []);
             setAssignees(event.assignees || []);
             setSubtasks(event.subtasks || []);
@@ -755,9 +772,10 @@ export default function EventDrawer({
             const targetDateStr = formatLocalDate(baseDate);
 
             setTitle('');
-            setCalendarId(calendars[0]?.id || 'cal_core');
+            const defaultCalId = calendars[0]?.id || 'cal_core';
+            setCalendarId(defaultCalId);
             setCategory('Toplantı');
-            setColor(calendars[0]?.color || '#dc2626');
+            setColor(COMMITTEE_COLORS[defaultCalId] || '#ef4444');
             setStartDate(targetDateStr);
             setStartTime('10:00');
             setEndDate(targetDateStr);
@@ -768,6 +786,8 @@ export default function EventDrawer({
             setDescription('');
             setStatus('scheduled');
             setVisibility('public');
+            setCustomVisibleMembers([]);
+            setMemberSearchQuery('');
             setReminders([
                 { id: `rem_default_1`, minutes_before: 60, target: 'all' }
             ]);
@@ -983,7 +1003,7 @@ export default function EventDrawer({
         setEndDate(dateStr);
     };
 
-    // ⚡ İzleyici / Üye Bireysel LCV Katılım Bildirimi Gönderici
+    // ⚡ İzleyici / Üye Bireysel Katılım Bildirimi Gönderici
     const handleMyRsvp = async (status: 'attending' | 'declined' | 'maybe', reasonText?: string) => {
         if (!event || !currentMember) return;
         setIsSubmittingMyRsvp(true);
@@ -1090,6 +1110,8 @@ export default function EventDrawer({
             ? new Date(`${endDate}T23:59:59`).toISOString()
             : new Date(`${endDate}T${endTime}:00`).toISOString();
 
+        const effectiveAssignees = visibility === 'custom' ? customVisibleMembers : assignees;
+
         const payload: Partial<WorkspaceEvent> = {
             calendar_id: calendarId,
             title: title.trim(),
@@ -1099,16 +1121,17 @@ export default function EventDrawer({
             is_all_day: isAllDay,
             location: location.trim(),
             meeting_link: meetingLink.trim() || undefined,
-            color,
+            color: COMMITTEE_COLORS[calendarId] || color || '#ef4444',
             category,
             status,
             visibility,
+            allowed_member_ids: visibility === 'custom' ? customVisibleMembers : undefined,
             is_showcase: isShowcase,
             rsvp_enabled: rsvpEnabled,
             rsvp_qr_enabled: rsvpQrEnabled,
             rsvp_capacity: rsvpCapacity ? Number(rsvpCapacity) : undefined,
             reminders,
-            assignees,
+            assignees: effectiveAssignees,
             subtasks,
             comments,
             attachments,
@@ -2032,9 +2055,10 @@ export default function EventDrawer({
                                         <select
                                             value={calendarId}
                                             onChange={(e) => {
-                                                setCalendarId(e.target.value);
-                                                const selected = calendars.find(c => c.id === e.target.value);
-                                                if (selected) setColor(selected.color);
+                                                const newCalId = e.target.value;
+                                                setCalendarId(newCalId);
+                                                const assignedColor = COMMITTEE_COLORS[newCalId] || calendars.find(c => c.id === newCalId)?.color || '#ef4444';
+                                                setColor(assignedColor);
                                             }}
                                             className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-rose-500 ${
                                                 isLight
@@ -2046,6 +2070,15 @@ export default function EventDrawer({
                                                 <option key={cal.id} value={cal.id}>{cal.title}</option>
                                             ))}
                                         </select>
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <span 
+                                                className="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs ring-2 ring-white/20" 
+                                                style={{ backgroundColor: COMMITTEE_COLORS[calendarId] || color }} 
+                                            />
+                                            <span className={`text-[11px] font-medium ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                                                Komite Rengi: <strong>{calendars.find(c => c.id === calendarId)?.title || 'Genel'}</strong> için otomatik ayarlandı.
+                                            </span>
+                                        </div>
                                     </div>
 
                                     {/* Kategori Seçimi */}
@@ -2074,66 +2107,6 @@ export default function EventDrawer({
                                             <option value="Genel">Genel Kampüs Etkinliği</option>
                                         </select>
                                     </div>
-                                </div>
-
-                                {/* Renk Paleti */}
-                                <div>
-                                    <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-2">
-                                        Renk Göstergesi
-                                    </label>
-                                    <div className="flex flex-wrap items-center gap-2.5">
-                                        {PRESET_COLORS.map(c => (
-                                            <button
-                                                key={c.value}
-                                                type="button"
-                                                onClick={() => setColor(c.value)}
-                                                className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
-                                                    color === c.value
-                                                        ? 'ring-2 ring-white scale-110 shadow-md'
-                                                        : 'opacity-70 hover:opacity-100 hover:scale-105'
-                                                }`}
-                                                style={{ backgroundColor: c.value }}
-                                                title={c.name}
-                                            >
-                                                {color === c.value && (
-                                                    <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                                                        <polyline points="20 6 9 17 4 12" />
-                                                    </svg>
-                                                )}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* ── BÖLÜM 5: ETKİNLİK DURUMU ── */}
-                            <div>
-                                <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${
-                                    isLight ? 'text-slate-700' : 'text-zinc-200'
-                                }`}>
-                                    Etkinlik Durumu
-                                </label>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                    {(['scheduled', 'in_progress', 'completed', 'cancelled'] as const).map(st => (
-                                        <button
-                                            key={st}
-                                            type="button"
-                                            onClick={() => setStatus(st)}
-                                            className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all ${
-                                                status === st
-                                                    ? isLight
-                                                        ? 'bg-rose-50 border-rose-500 text-rose-700 shadow-sm'
-                                                        : 'bg-zinc-800 border-rose-500 text-white shadow-sm'
-                                                    : isLight
-                                                        ? 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                                                        : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                                            }`}
-                                        >
-                                            {st === 'scheduled' ? '🗓️ Planlandı' :
-                                                st === 'in_progress' ? '⚡ Devam Ediyor' :
-                                                    st === 'completed' ? '✓ Tamamlandı' : '✕ İptal'}
-                                        </button>
-                                    ))}
                                 </div>
                             </div>
 
@@ -2227,11 +2200,11 @@ export default function EventDrawer({
                                     <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded ${
                                         isLight ? 'text-slate-600 bg-slate-200/80 border border-slate-300/70' : 'text-zinc-400 bg-zinc-800'
                                     }`}>
-                                        {visibility === 'public' ? '🌍 Herkese Açık' : visibility === 'admin_only' ? '🛡️ Yönetici Özel' : '🔒 Gizli'}
+                                        {visibility === 'public' ? '🌍 Herkese Açık' : visibility === 'admin_only' ? '🛡️ Yönetici Özel' : visibility === 'custom' ? `👥 Belirli Kullanıcılar (${customVisibleMembers.length})` : '🔒 Gizli'}
                                     </span>
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                                     {/* 1. Tüm Topluluk */}
                                     <button
                                         type="button"
@@ -2288,7 +2261,35 @@ export default function EventDrawer({
                                         </div>
                                     </button>
 
-                                    {/* 3. Sadece Ben */}
+                                    {/* 3. Belirli Kullanıcılar */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setVisibility('custom')}
+                                        className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                                            visibility === 'custom'
+                                                ? isLight
+                                                    ? 'bg-blue-50/90 border-blue-500 shadow-sm ring-1 ring-blue-500/30'
+                                                    : 'bg-zinc-800/90 border-blue-500 shadow-md ring-1 ring-blue-500/30'
+                                                : isLight
+                                                    ? 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80'
+                                                    : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50'
+                                        }`}
+                                    >
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-base">👥</span>
+                                                {visibility === 'custom' && (
+                                                    <span className={`text-[10px] font-bold ${isLight ? 'text-blue-700' : 'text-blue-400'}`}>✓ Seçili</span>
+                                                )}
+                                            </div>
+                                            <p className={`text-xs font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>Belirli Kullanıcılar</p>
+                                            <p className={`text-[10px] mt-0.5 leading-snug ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                                                Yalnızca arayıp seçtiğiniz özel kullanıcı listesi görür.
+                                            </p>
+                                        </div>
+                                    </button>
+
+                                    {/* 4. Sadece Ben */}
                                     <button
                                         type="button"
                                         onClick={() => setVisibility('private')}
@@ -2316,6 +2317,142 @@ export default function EventDrawer({
                                         </div>
                                     </button>
                                 </div>
+
+                                {/* 👥 Belirli Kullanıcılar Arama & Çoklu Seçim Paneli */}
+                                {visibility === 'custom' && (
+                                    <div className={`p-4 rounded-xl border space-y-3 ${
+                                        isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-zinc-950/80 border-zinc-800 shadow-sm'
+                                    }`}>
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm">🔍</span>
+                                                <span className={`text-xs font-bold ${isLight ? 'text-slate-700' : 'text-zinc-200'}`}>
+                                                    Erişim İzni Olan Kullanıcılar ({customVisibleMembers.length})
+                                                </span>
+                                            </div>
+                                            {customVisibleMembers.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCustomVisibleMembers([])}
+                                                    className="text-[10px] text-rose-500 hover:underline font-semibold cursor-pointer"
+                                                >
+                                                    Tümünü Temizle
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Arama Inputu */}
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                placeholder="Kullanıcı adı (@username) veya isim ile ara..."
+                                                value={memberSearchQuery}
+                                                onChange={(e) => setMemberSearchQuery(e.target.value)}
+                                                className={`w-full rounded-xl pl-9 pr-8 py-2 text-xs font-semibold focus:outline-none focus:border-rose-500 border ${
+                                                    isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-zinc-900 border-zinc-700 text-zinc-100'
+                                                }`}
+                                            />
+                                            <span className="absolute left-3 top-2.5 text-xs text-zinc-400">🔍</span>
+                                            {memberSearchQuery && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setMemberSearchQuery('')}
+                                                    className="absolute right-3 top-2.5 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Seçili Kullanıcı Rozetleri (Chips) */}
+                                        {customVisibleMembers.length > 0 ? (
+                                            <div className="flex flex-wrap gap-1.5 pt-1">
+                                                {customVisibleMembers.map(mId => {
+                                                    const m = members.find(u => u.id === mId || u.username === mId);
+                                                    const displayName = m?.display_name || m?.full_name || m?.username || mId;
+                                                    return (
+                                                        <span
+                                                            key={mId}
+                                                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
+                                                                isLight
+                                                                    ? 'bg-rose-50 border-rose-200 text-rose-800'
+                                                                    : 'bg-rose-950/40 border-rose-800/60 text-rose-300'
+                                                            }`}
+                                                        >
+                                                            <span className="w-4 h-4 rounded-full bg-rose-500 text-white flex items-center justify-center text-[9px] font-bold">
+                                                                {displayName.charAt(0).toUpperCase()}
+                                                            </span>
+                                                            <span>{displayName}</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setCustomVisibleMembers(prev => prev.filter(id => id !== mId))}
+                                                                className="text-rose-500 hover:text-rose-700 hover:bg-rose-200/50 rounded p-0.5 transition-colors cursor-pointer"
+                                                                title="Kaldır"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        </span>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <p className={`text-[11px] italic py-1 ${isLight ? 'text-slate-500' : 'text-zinc-500'}`}>
+                                                Henüz kullanıcı seçilmedi. Aşağıdaki arama listesinden dilediğiniz kullanıcıları ekleyin.
+                                            </p>
+                                        )}
+
+                                        {/* Arama Sonuçları / Önerilen Kullanıcılar */}
+                                        <div className="max-h-44 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                                            {members
+                                                .filter(m => {
+                                                    if (!memberSearchQuery.trim()) return true;
+                                                    const q = memberSearchQuery.toLowerCase();
+                                                    const nameStr = (m.display_name || m.full_name || '').toLowerCase();
+                                                    const userStr = (m.username || '').toLowerCase();
+                                                    const roleStr = (m.role || '').toLowerCase();
+                                                    return nameStr.includes(q) || userStr.includes(q) || roleStr.includes(q);
+                                                })
+                                                .map(m => {
+                                                    const isSelected = customVisibleMembers.includes(m.id) || customVisibleMembers.includes(m.username);
+                                                    const displayName = m.display_name || m.full_name || m.username;
+                                                    return (
+                                                        <div
+                                                            key={m.id}
+                                                            onClick={() => {
+                                                                if (isSelected) {
+                                                                    setCustomVisibleMembers(prev => prev.filter(id => id !== m.id && id !== m.username));
+                                                                } else {
+                                                                    setCustomVisibleMembers(prev => [...prev, m.id]);
+                                                                }
+                                                            }}
+                                                            className={`flex items-center justify-between p-2 rounded-xl text-xs cursor-pointer transition-all border ${
+                                                                isSelected
+                                                                    ? isLight
+                                                                        ? 'bg-rose-50/80 border-rose-300 text-rose-900 font-bold'
+                                                                        : 'bg-rose-950/40 border-rose-700 text-rose-200 font-bold'
+                                                                    : isLight
+                                                                        ? 'hover:bg-slate-100 border-transparent text-slate-700'
+                                                                        : 'hover:bg-zinc-900 border-transparent text-zinc-300'
+                                                            }`}
+                                                        >
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="w-6 h-6 rounded-full bg-slate-200 dark:bg-zinc-800 flex items-center justify-center text-[10px] font-bold">
+                                                                    {displayName.charAt(0).toUpperCase()}
+                                                                </span>
+                                                                <div>
+                                                                    <p className="font-semibold text-xs leading-none">{displayName}</p>
+                                                                    <p className="text-[10px] text-zinc-400 mt-0.5">@{m.username} {m.role ? `• ${m.role}` : ''}</p>
+                                                                </div>
+                                                            </div>
+                                                            <span className={`text-xs ${isSelected ? 'text-rose-500 font-bold' : 'text-zinc-400'}`}>
+                                                                {isSelected ? '✓ Seçili' : '+ Seç'}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* 🚀 VİTRİN KÖPRÜSÜ: ANA SAYFADA / VİTRİNDE YAYINLA (SHOWCASE TOGGLE) */}
                                 <div className={`p-3.5 rounded-xl border transition-all ${
@@ -2643,6 +2780,57 @@ export default function EventDrawer({
                                             + 🛡️ 2 Gün Önce (Yöneticiler)
                                         </button>
                                     </div>
+                                </div>
+
+                                {/* ⚙️ Özel Hatırlatıcı Kurucu */}
+                                <div className={`p-2.5 rounded-xl border flex flex-wrap items-center gap-2 ${
+                                    isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-zinc-950 border-zinc-800 shadow-xs'
+                                }`}>
+                                    <span className={`text-[11px] font-bold ${isLight ? 'text-slate-600' : 'text-zinc-300'}`}>
+                                        Özel Hatırlatıcı:
+                                    </span>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="1000"
+                                        value={customReminderVal}
+                                        onChange={(e) => setCustomReminderVal(Math.max(1, parseInt(e.target.value) || 1))}
+                                        className={`w-16 px-2 py-1 rounded-lg text-xs border text-center font-bold focus:outline-none focus:border-rose-500 ${
+                                            isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-zinc-900 border-zinc-700 text-zinc-100'
+                                        }`}
+                                    />
+                                    <select
+                                        value={customReminderUnit}
+                                        onChange={(e) => setCustomReminderUnit(e.target.value as any)}
+                                        className={`px-2 py-1 rounded-lg text-xs border font-semibold focus:outline-none focus:border-rose-500 ${
+                                            isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-zinc-900 border-zinc-700 text-zinc-100'
+                                        }`}
+                                    >
+                                        <option value="minutes">Dakika Önce</option>
+                                        <option value="hours">Saat Önce</option>
+                                        <option value="days">Gün Önce</option>
+                                    </select>
+                                    <select
+                                        value={customReminderTarget}
+                                        onChange={(e) => setCustomReminderTarget(e.target.value as any)}
+                                        className={`px-2 py-1 rounded-lg text-xs border font-semibold focus:outline-none focus:border-rose-500 ${
+                                            isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-zinc-900 border-zinc-700 text-zinc-100'
+                                        }`}
+                                    >
+                                        <option value="all">Tüm Topluluk</option>
+                                        <option value="admins">Sadece Yöneticiler</option>
+                                        <option value="assignees">Görevliler</option>
+                                    </select>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const mult = customReminderUnit === 'days' ? 1440 : customReminderUnit === 'hours' ? 60 : 1;
+                                            handleAddReminder(customReminderVal * mult, customReminderTarget);
+                                        }}
+                                        className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition-colors cursor-pointer"
+                                    >
+                                        + Hatırlatıcı Ekle
+                                    </button>
                                 </div>
 
                                 {/* Aktif Hatırlatıcılar Listesi */}
@@ -3015,10 +3203,10 @@ export default function EventDrawer({
                     )}
                 </form>
 
-                {/* ── SEKMELER: 4. KATILIMCILAR & DAHİLİ EKİP LCV KATILIM ÖZETİ ── */}
+                {/* ── SEKMELER: 4. KATILIMCILAR & DAHİLİ EKİP KATILIM ÖZETİ ── */}
                 {activeDrawerTab === 'rsvp' && (
                     <>
-                        {/* 👥 Dahili Ekip LCV Katılım Özeti */}
+                        {/* 👥 Dahili Ekip Katılım Özeti */}
                         <div className={`p-4 rounded-2xl ${
                             isLight 
                                 ? 'bg-slate-50/80 border border-slate-200' 
@@ -3033,7 +3221,7 @@ export default function EventDrawer({
                                         <h4 className={`text-xs font-bold uppercase tracking-wider ${
                                             isLight ? 'text-slate-800' : 'text-zinc-100'
                                         }`}>
-                                            Dahili Ekip LCV Katılım Durumu
+                                            Dahili Ekip Katılım Durumu
                                         </h4>
                                         <p className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
                                             Topluluk üyelerinin haftalık bildirim popup'ından verdikleri yanıtlar
@@ -3113,11 +3301,11 @@ export default function EventDrawer({
                             <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                                 {!event ? (
                                     <p className={`text-xs italic text-center py-4 ${isLight ? 'text-slate-400' : 'text-zinc-500'}`}>
-                                        Etkinliği kaydettikten sonra ekip üyeleri LCV bildiriminde bulunabilir.
+                                        Etkinliği kaydettikten sonra ekip üyeleri katılım bildiriminde bulunabilir.
                                     </p>
                                 ) : memberAttendanceList.length === 0 ? (
                                     <p className={`text-xs italic text-center py-4 ${isLight ? 'text-slate-400' : 'text-zinc-500'}`}>
-                                        Henüz bu etkinlik için LCV bildirimi yapan ekip üyesi bulunmuyor.
+                                        Henüz bu etkinlik için katılım bildirimi yapan ekip üyesi bulunmuyor.
                                     </p>
                                 ) : (
                                     memberAttendanceList

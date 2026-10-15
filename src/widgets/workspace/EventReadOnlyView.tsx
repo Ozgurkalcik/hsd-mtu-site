@@ -170,7 +170,7 @@ export default function EventReadOnlyView({
                 </div>
             </div>
 
-            {/* ── 3. BİREYSEL LCV KATILIM PANELİ ── */}
+            {/* ── 3. BİREYSEL KATILIM PANELİ ── */}
             {currentMember && (
                 <div className={`p-5 rounded-2xl border ${
                     isLight 

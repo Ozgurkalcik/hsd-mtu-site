@@ -182,7 +182,7 @@ export default function WeeklyRsvpModal({
                             <div>
                                 <div className="flex items-center gap-2">
                                     <h2 className={`text-base sm:text-lg font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                                        Haftalık Etkinlik Katılım Bildirimi (LCV)
+                                        Haftalık Etkinlik Katılım Bildirimi
                                     </h2>
                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono uppercase bg-rose-500/10 border border-rose-500/30 text-rose-500">
                                         Önümüzdeki 7 Gün

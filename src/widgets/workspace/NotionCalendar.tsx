@@ -117,8 +117,9 @@ export default function NotionCalendar({
     const [editingEvent, setEditingEvent] = useState<WorkspaceEvent | null>(null);
     const [initialTargetDate, setInitialTargetDate] = useState<Date | null>(null);
 
-    // 🎯 Haftalık LCV Katılım Modal State & Otomatik Bildirim
+    // 🎯 Haftalık Katılım Modal State & Otomatik Bildirim
     const [isWeeklyRsvpOpen, setIsWeeklyRsvpOpen] = useState(false);
+    const [selectedAnnouncement, setSelectedAnnouncement] = useState<WorkspaceNotification | null>(null);
 
     // Önümüzdeki 7 gün içindeki etkinlikler (Genel Liste)
     const upcomingWeeklyEvents = useMemo(() => {
@@ -451,6 +452,19 @@ export default function NotionCalendar({
         }
     };
 
+    const handleMarkNotificationRead = async (id: string) => {
+        try {
+            await fetch('/api/workspace/notifications', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, mark_read: true }),
+            });
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+        } catch (err) {
+            console.error('Bildirim okundu işaretleme hatası:', err);
+        }
+    };
+
     // Smart Navigation Handler
     const handleNavigate = (direction: 'prev' | 'next' | 'today') => {
         if (direction === 'today') {
@@ -607,6 +621,60 @@ export default function NotionCalendar({
         setInitialTargetDate(new Date(ev.start_time));
         setIsDrawerOpen(true);
     };
+
+    // Bildirime Tıklama Yöneticisi (Etkinliği Aç veya Duyuruyu Göster)
+    const handleNotificationClick = async (n: WorkspaceNotification) => {
+        if (!n.is_read) {
+            handleMarkNotificationRead(n.id);
+        }
+        setIsNotifOpen(false);
+
+        const targetEventId = n.event_id || (n as any).eventId;
+        if (targetEventId) {
+            const foundEvent = events.find(e => e.id === targetEventId);
+            if (foundEvent) {
+                handleOpenEditEvent(foundEvent);
+                return;
+            } else {
+                try {
+                    const res = await fetch(`/api/workspace/events/${targetEventId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.event) {
+                            handleOpenEditEvent(data.event);
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Bildirim etkinliği yüklenemedi:', e);
+                }
+            }
+        }
+
+        setSelectedAnnouncement(n);
+    };
+
+    // Android & iOS Safari (PWA) Service Worker Kaydı
+    useEffect(() => {
+        if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch((err) => {
+                console.warn('HSD Service Worker kaydı yapılamadı:', err);
+            });
+
+            const handleSwMessage = (e: MessageEvent) => {
+                if (e.data?.type === 'NOTIFICATION_CLICKED' && e.data?.eventId) {
+                    const target = events.find(ev => ev.id === e.data.eventId);
+                    if (target) {
+                        handleOpenEditEvent(target);
+                    }
+                }
+            };
+            navigator.serviceWorker.addEventListener('message', handleSwMessage);
+            return () => {
+                navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+            };
+        }
+    }, [events]);
 
     // Unread notifications count & filtering
     const unreadCount = notifications.filter(n => !n.is_read).length;
@@ -766,8 +834,8 @@ export default function NotionCalendar({
                     </div>
                 </div>
 
-                {/* 2. Orta & Sağ Bölüm: Segmented View, Arama, Bildirimler, Yeni Etkinlik & Profil */}
-                <div className="flex items-center justify-between xl:justify-end gap-2 flex-wrap">
+                {/* 2. Orta Bölüm: Segmented View & Arama */}
+                <div className="flex items-center gap-2 flex-wrap">
                     {/* Görünüm Modları (Segmented Control) */}
                     <div className="flex items-center bg-zinc-900/90 border border-zinc-800/90 rounded-xl p-0.5 text-xs font-medium shrink-0 shadow-inner">
                         {(([
@@ -821,8 +889,11 @@ export default function NotionCalendar({
                             </button>
                         )}
                     </div>
+                </div>
 
-                    {/* 🎯 Haftalık LCV Katılım Butonu (Pop-up Açıcı) */}
+                {/* 3. Sağ Bölüm: İşlem Butonları & HER ZAMAN EN SAĞ ÜSTTE SABİT PROFİL ADASI */}
+                <div className="ml-auto flex items-center gap-2 shrink-0 flex-wrap">
+                    {/* 🎯 Haftalık Katılım Butonu (Pop-up Açıcı) */}
                     <button
                         type="button"
                         onClick={() => setIsWeeklyRsvpOpen(true)}
@@ -836,7 +907,7 @@ export default function NotionCalendar({
                         title="Önümüzdeki 7 gün içindeki etkinliklere katılım bildirimi yapın veya tercihlerinizi güncelleyin"
                     >
                         <span>🎯</span>
-                        <span className="hidden sm:inline">Haftalık LCV</span>
+                        <span className="hidden sm:inline">Haftalık Katılım</span>
                         {upcomingWeeklyEvents.length > 0 && (
                             <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-white/20 text-white font-bold">
                                 {upcomingWeeklyEvents.length}
@@ -893,7 +964,7 @@ export default function NotionCalendar({
                                             workspaceTheme === 'light' ? 'text-slate-900' : 'text-white'
                                         }`}>
                                             <span>🔔</span>
-                                            <span>Bildirim Merkezi</span>
+                                            <span>Bildirimler</span>
                                         </h3>
                                         {unreadCount > 0 && (
                                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono border ${
@@ -950,7 +1021,7 @@ export default function NotionCalendar({
                                             : 'bg-rose-950/30 border border-rose-900/50 text-rose-200'
                                     }`}>
                                         <span className={`text-[11px] font-medium ${workspaceTheme === 'light' ? 'text-rose-900' : 'text-rose-200'}`}>
-                                            Masaüstü anlık bildirimleri
+                                            Masaüstü & Telefon Bildirimleri
                                         </span>
                                         <button
                                             type="button"
@@ -984,20 +1055,24 @@ export default function NotionCalendar({
                                                         ? '⏰'
                                                         : '📌';
 
+                                            const hasEvent = Boolean(n.event_id || (n as any).eventId || n.event_title);
+
                                             return (
                                                 <div
                                                     key={n.id}
-                                                    className={`p-3 rounded-xl border transition-all text-xs space-y-1 ${
+                                                    onClick={() => handleNotificationClick(n)}
+                                                    className={`p-3 rounded-xl border transition-all text-xs space-y-1.5 cursor-pointer group hover:scale-[1.01] active:scale-[0.99] ${
                                                         n.is_read
                                                             ? workspaceTheme === 'light'
-                                                                ? 'bg-slate-50/70 border-slate-200/80 text-slate-500'
-                                                                : 'bg-zinc-900/40 border-zinc-900 text-zinc-400'
+                                                                ? 'bg-slate-50/70 border-slate-200/80 text-slate-500 hover:bg-slate-100/90'
+                                                                : 'bg-zinc-900/40 border-zinc-900 text-zinc-400 hover:bg-zinc-900/80'
                                                             : workspaceTheme === 'light'
-                                                                ? 'bg-white border-rose-200 text-slate-800 shadow-xs ring-1 ring-rose-500/10'
-                                                                : 'bg-zinc-900/90 border-zinc-800 text-zinc-200 shadow-xs'
+                                                                ? 'bg-white border-rose-300 text-slate-800 shadow-xs ring-1 ring-rose-500/10 hover:border-rose-400'
+                                                                : 'bg-zinc-900/90 border-zinc-800 text-zinc-200 shadow-xs hover:border-zinc-700'
                                                     }`}
+                                                    title={hasEvent ? 'Etkinliği açmak için tıklayın' : 'Bildirim detayını görmek için tıklayın'}
                                                 >
-                                                    <div className="flex items-center justify-between mb-1">
+                                                    <div className="flex items-center justify-between mb-0.5">
                                                         <span className={`font-semibold flex items-center gap-1.5 truncate ${
                                                             workspaceTheme === 'light' ? 'text-slate-900' : 'text-white'
                                                         }`}>
@@ -1013,15 +1088,20 @@ export default function NotionCalendar({
                                                     <p className={`leading-relaxed text-[11px] ${
                                                         workspaceTheme === 'light' ? 'text-slate-600' : 'text-zinc-300'
                                                     }`}>{n.message}</p>
-                                                    {n.event_title && (
-                                                        <div className={`mt-1.5 inline-block text-[10px] px-2 py-0.5 rounded font-medium border ${
-                                                            workspaceTheme === 'light'
-                                                                ? 'bg-slate-100 text-slate-700 border-slate-200'
-                                                                : 'bg-zinc-800 text-zinc-300 border-zinc-700'
-                                                        }`}>
-                                                            📅 {n.event_title}
-                                                        </div>
-                                                    )}
+                                                    <div className="flex items-center justify-between pt-1">
+                                                        {n.event_title ? (
+                                                            <div className={`inline-block text-[10px] px-2 py-0.5 rounded font-medium border ${
+                                                                workspaceTheme === 'light'
+                                                                    ? 'bg-slate-100 text-slate-700 border-slate-200'
+                                                                    : 'bg-zinc-800 text-zinc-300 border-zinc-700'
+                                                            }`}>
+                                                                📅 {n.event_title}
+                                                            </div>
+                                                        ) : <span />}
+                                                        <span className="text-[10px] text-rose-500 font-semibold group-hover:underline flex items-center gap-0.5">
+                                                            {hasEvent ? 'Etkinliği Aç ↗' : 'Detayı Gör ↗'}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             );
                                         })
@@ -1032,6 +1112,14 @@ export default function NotionCalendar({
                                             {notifFilter !== 'all' ? 'Bu kategoride bildirim bulunmuyor.' : 'Yeni bildirim bulunmuyor.'}
                                         </p>
                                     )}
+                                </div>
+
+                                {/* Mobil Bildirim Bilgi Kartı */}
+                                <div className={`mt-2 p-2 rounded-xl text-[10px] border flex items-center gap-1.5 ${
+                                    workspaceTheme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-600' : 'bg-zinc-900/60 border-zinc-800 text-zinc-400'
+                                }`}>
+                                    <span>📱</span>
+                                    <span><strong>Mobil Bildirim:</strong> Android'de aktif; iPhone'da Safari'den <em>Paylaş &gt; Ana Ekrana Ekle</em> yaparak telefonunuza bildirim alabilirsiniz.</span>
                                 </div>
 
                                 {/* Bildirim Sesi Test & Masaüstü İzin Çubuğu */}
@@ -1651,7 +1739,7 @@ export default function NotionCalendar({
                 }}
             />
 
-            {/* 🎯 Haftalık LCV Katılım Bildirimi (Açılır Şık Menü) */}
+            {/* 🎯 Haftalık Katılım Bildirimi (Açılır Şık Menü) */}
             <WeeklyRsvpModal
                 isOpen={isWeeklyRsvpOpen}
                 onClose={() => setIsWeeklyRsvpOpen(false)}
@@ -1662,6 +1750,72 @@ export default function NotionCalendar({
                     setEvents(prev => prev.map(e => e.id === updatedEv.id ? updatedEv : e));
                 }}
             />
+
+            {/* 📢 Duyuru & Bildirim Detay Modalı */}
+            {selectedAnnouncement && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+                    <div 
+                        className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl relative transition-all ${
+                            workspaceTheme === 'light'
+                                ? 'bg-white border-slate-200 text-slate-800'
+                                : 'bg-zinc-950 border-zinc-800 text-zinc-100'
+                        }`}
+                        role="dialog"
+                        aria-modal="true"
+                    >
+                        <button
+                            type="button"
+                            onClick={() => setSelectedAnnouncement(null)}
+                            className="absolute top-4 right-4 p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors cursor-pointer"
+                            aria-label="Kapat"
+                        >
+                            ✕
+                        </button>
+
+                        <div className="flex items-center gap-3 mb-4">
+                            <span className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center text-xl shrink-0 font-bold">
+                                📢
+                            </span>
+                            <div>
+                                <h3 className="font-bold text-base leading-snug">
+                                    {selectedAnnouncement.title}
+                                </h3>
+                                <p className="text-xs text-zinc-400 mt-0.5">
+                                    {new Date(selectedAnnouncement.created_at).toLocaleDateString('tr-TR', {
+                                        day: 'numeric',
+                                        month: 'long',
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                    })}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className={`p-4 rounded-xl border text-sm leading-relaxed mb-6 whitespace-pre-wrap ${
+                            workspaceTheme === 'light'
+                                ? 'bg-slate-50 border-slate-200 text-slate-700'
+                                : 'bg-zinc-900/50 border-zinc-800/80 text-zinc-300'
+                        }`}>
+                            {selectedAnnouncement.message}
+                        </div>
+
+                        <div className="flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedAnnouncement(null)}
+                                className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                                    workspaceTheme === 'light'
+                                        ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700'
+                                        : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-700 text-zinc-200'
+                                }`}
+                            >
+                                Kapat
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -114,7 +114,7 @@ export interface WorkspaceReminder {
     created_at?: string;
 }
 
-export type EventVisibility = 'public' | 'admin_only' | 'private';
+export type EventVisibility = 'public' | 'admin_only' | 'private' | 'custom';
 
 export interface WorkspaceEventEditHistoryRecord {
     id: string;
@@ -140,10 +140,11 @@ export interface WorkspaceEvent {
     end_time: string;   // ISO 8601
     is_all_day: boolean;
     assignees: string[]; // member IDs
+    allowed_member_ids?: string[]; // 'custom' görünürlük için seçilen üye ID'leri
     location?: string;
     meeting_link?: string;
     status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
-    visibility?: EventVisibility; // 'public' | 'admin_only' | 'private'
+    visibility?: EventVisibility; // 'public' | 'admin_only' | 'private' | 'custom'
     created_by?: string; // member id
     version: number; // Concurrency lock
     subtasks: WorkspaceSubtask[];

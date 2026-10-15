@@ -108,6 +108,12 @@ export class WorkspaceRepository {
                         if (vis === 'private') {
                             return viewerMember && (e.created_by === viewerMember.id || viewerMember.role === 'super_admin');
                         }
+                        if (vis === 'custom') {
+                            if (!viewerMember) return false;
+                            if (viewerMember.role === 'super_admin' || e.created_by === viewerMember.id) return true;
+                            const allowed = (e as any).allowed_member_ids || e.assignees || [];
+                            return allowed.includes(viewerMember.id) || allowed.includes(viewerMember.username);
+                        }
                         return true;
                     });
 
@@ -1045,6 +1051,31 @@ export class WorkspaceRepository {
 
     public static async getNotifications(userId?: string): Promise<WorkspaceNotification[]> {
         this.ensureDatabaseConfigured();
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                let query = supabase.from('workspace_notifications').select('*').order('created_at', { ascending: false }).limit(50);
+                if (userId && userId !== 'all') {
+                    query = query.or(`user_id.eq.all,user_id.eq.${userId}`);
+                }
+                const { data, error } = await query;
+                if (!error && data && data.length > 0) {
+                    let readIds = new Set<string>();
+                    if (userId && userId !== 'all') {
+                        const { data: reads } = await supabase.from('workspace_notification_reads').select('notification_id').eq('user_id', userId);
+                        if (reads) {
+                            reads.forEach(r => readIds.add(r.notification_id));
+                        }
+                    }
+                    return data.map(n => ({
+                        ...n,
+                        is_read: n.is_read || readIds.has(n.id)
+                    }));
+                }
+            } catch (err) {
+                console.warn('Postgres bildirim getirme hatası:', err);
+            }
+        }
         return WorkspaceStoreManager.getInstance().getNotifications(userId);
     }
 
@@ -1067,6 +1098,23 @@ export class WorkspaceRepository {
 
     public static async markAllNotificationsAsRead(userId: string): Promise<void> {
         this.ensureDatabaseConfigured();
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                const notifications = await this.getNotifications(userId);
+                const unread = notifications.filter(n => !n.is_read);
+                if (unread.length > 0) {
+                    const toInsert = unread.map(n => ({
+                        notification_id: n.id,
+                        user_id: userId,
+                        read_at: new Date().toISOString()
+                    }));
+                    await supabase.from('workspace_notification_reads').upsert(toInsert);
+                }
+            } catch (err) {
+                console.warn('Postgres tüm bildirimleri okundu yapma hatası:', err);
+            }
+        }
         WorkspaceStoreManager.getInstance().markAllNotificationsAsRead(userId);
     }
 
@@ -1452,6 +1500,21 @@ export class WorkspaceRepository {
         userAvatar?: string
     ): Promise<{ success: boolean; attendance?: MemberAttendance; event?: WorkspaceEvent; error?: string }> {
         this.ensureDatabaseConfigured();
+
+        // 1. Eğer etkinlik RAM'de yoksa Supabase Postgres'ten getir ve RAM'e yükle (Vercel Cold Start Koruması)
+        let inMemoryEvent = WorkspaceStoreManager.getInstance().getEventById(eventId);
+        if (!inMemoryEvent && this.isSupabaseConfigured()) {
+            try {
+                const dbEvent = await this.getEventById(eventId);
+                if (dbEvent) {
+                    WorkspaceStoreManager.getInstance().addEvent(dbEvent);
+                    inMemoryEvent = dbEvent;
+                }
+            } catch (fetchErr) {
+                console.warn('Postgres etkinlik ön yükleme hatası:', fetchErr);
+            }
+        }
+
         const res = WorkspaceStoreManager.getInstance().recordMemberAttendance(
             eventId,
             userId,
@@ -1486,7 +1549,7 @@ export class WorkspaceRepository {
                 : status === 'declined' 
                     ? 'KATILMAYACAĞINI' 
                     : 'BELKİ KATILABİLECEĞİNİ';
-            const notifTitle = `📢 LCV Bildirimi: ${res.event.title}`;
+            const notifTitle = `📢 Katılım Bildirimi: ${res.event.title}`;
             const notifMsg = `${userName} (${role}), "${res.event.title}" etkinliği için ${statusTr} bildirdi.${reason ? ` Gerekçe: "${reason}"` : ''}`;
 
             // 1. Workspace Admin rolüne bildirim

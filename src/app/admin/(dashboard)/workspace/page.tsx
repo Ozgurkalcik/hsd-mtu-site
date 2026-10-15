@@ -551,7 +551,7 @@ export default function AdminWorkspacePage() {
                     { key: 'members', label: 'Üyeler', count: members.length },
                     { key: 'groups', label: 'Komite & Ekip Ayarları', count: groups.length },
                     { key: 'roles', label: 'Yetki Matrisi (RBAC)' },
-                    { key: 'attendance', label: '🎯 Katılım & LCV Analitiği', count: allAttendanceRecords.length },
+                    { key: 'attendance', label: '🎯 Katılım Analitiği', count: allAttendanceRecords.length },
                     { key: 'sessions', label: 'Aktif Oturumlar', count: sessions.length },
                     { key: 'audit', label: 'Denetim İzi (Audit)', count: auditLogs.length },
                     { key: 'settings', label: 'Güvenlik Ayarları' },
@@ -852,7 +852,7 @@ export default function AdminWorkspacePage() {
                                             <th className="py-2.5 px-2 text-center" title="Ek dosya ve afiş yükleme">Dosya<br/><span className="text-[10px] text-zinc-500 font-mono font-normal">can_upload</span></th>
                                             <th className="py-2.5 px-2 text-center" title="Etkinlikleri dışarı paylaşma">Paylaşım<br/><span className="text-[10px] text-zinc-500 font-mono font-normal">can_share</span></th>
                                             <th className="py-2.5 px-2 text-center" title="Etkinliklere ekip notu ve yorum yazma">Yorum & Not<br/><span className="text-[10px] text-zinc-500 font-mono font-normal">can_comment</span></th>
-                                            <th className="py-2.5 px-2 text-center" title="RSVP, LCV ve QR biletlerini yönetme">LCV & Bilet<br/><span className="text-[10px] text-zinc-500 font-mono font-normal">can_manage_rsvp</span></th>
+                                            <th className="py-2.5 px-2 text-center" title="RSVP ve QR biletlerini yönetme">Katılım & Bilet<br/><span className="text-[10px] text-zinc-500 font-mono font-normal">can_manage_rsvp</span></th>
                                             <th className="py-2.5 px-2 text-center" title="Alt görev checklist ekleme/düzenleme">Görevler<br/><span className="text-[10px] text-zinc-500 font-mono font-normal">can_manage_tasks</span></th>
                                             <th className="py-2.5 px-2 text-center" title="Anlık acil duyuru ve bildirim yayını">Duyuru<br/><span className="text-[10px] text-zinc-500 font-mono font-normal">can_broadcast</span></th>
                                             <th className="py-2.5 px-2 text-center" title="Katılımcı ve etkinlik verilerini CSV/JSON indirme">Dışa Aktar<br/><span className="text-[10px] text-zinc-500 font-mono font-normal">can_export</span></th>
@@ -958,7 +958,7 @@ export default function AdminWorkspacePage() {
                                 <div>
                                     <h2 className="text-sm font-bold text-white flex items-center gap-2">
                                         <span>🎯</span>
-                                        <span>Etkinlik Katılım & LCV Analitiği</span>
+                                        <span>Etkinlik Katılım Analitiği</span>
                                     </h2>
                                     <p className="text-xs text-zinc-400 mt-0.5">
                                         Topluluk üyelerinin takvim etkinliklerine katılım yanıtları, mazeret bildirimleri ve devam oranları.

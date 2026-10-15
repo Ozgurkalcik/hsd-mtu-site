@@ -94,7 +94,7 @@ export async function POST(req: Request) {
         }
 
         // Görünürlük Seviyesi Doğrulama
-        const validVisibility = (visibility === 'admin_only' || visibility === 'private')
+        const validVisibility = (visibility === 'admin_only' || visibility === 'private' || visibility === 'custom')
             ? visibility
             : 'public';
 
@@ -112,6 +112,9 @@ export async function POST(req: Request) {
             end_time,
             is_all_day: Boolean(is_all_day),
             assignees: Array.isArray(assignees) ? assignees : [session.member.id],
+            allowed_member_ids: validVisibility === 'custom' && Array.isArray((body as any).allowed_member_ids)
+                ? (body as any).allowed_member_ids
+                : (validVisibility === 'custom' && Array.isArray(assignees) ? assignees : []),
             location: location || '',
             meeting_link: meeting_link || '',
             status: 'scheduled',
