@@ -513,8 +513,17 @@ export class WorkspaceStoreManager {
 
     public updateGroup(id: string, updates: Partial<WorkspaceGroup>): WorkspaceGroup {
         const existing = this.groups.get(id);
-        if (!existing) throw new Error('Komite bulunamadı');
-        const updated = { ...existing, ...updates };
+        const updated = existing
+            ? { ...existing, ...updates }
+            : {
+                id,
+                name: updates.name || 'Komite',
+                code: updates.code || 'CODE',
+                description: updates.description || '',
+                color: updates.color || '#8b5cf6',
+                role_key: updates.role_key || 'member',
+                members: updates.members || []
+            };
         this.groups.set(id, updated);
         this.logAudit({
             id: `audit_${Date.now()}`,
@@ -530,8 +539,22 @@ export class WorkspaceStoreManager {
     }
 
     public toggleGroupMember(groupId: string, memberId: string, add: boolean): WorkspaceGroup {
-        const group = this.groups.get(groupId);
-        if (!group) throw new Error('Komite bulunamadı');
+        let group = this.groups.get(groupId);
+        if (!group) {
+            group = {
+                id: groupId,
+                name: 'Komite',
+                code: 'COMMITTEE',
+                description: '',
+                color: '#8b5cf6',
+                role_key: 'member',
+                members: []
+            };
+            this.groups.set(groupId, group);
+        }
+        if (!Array.isArray(group.members)) {
+            group.members = [];
+        }
         if (add && !group.members.includes(memberId)) {
             group.members.push(memberId);
         } else if (!add) {

@@ -1045,7 +1045,14 @@ export class WorkspaceRepository {
                 const supabase = this.getSupabaseClient();
                 const { data, error } = await supabase.from('workspace_groups').select('*');
                 if (!error && data && data.length > 0) {
-                    return (data as WorkspaceGroup[]).filter(g => g.id !== 'grp_ai' && !g.name.includes('Ar-Ge'));
+                    return (data as any[]).map(g => ({
+                        ...g,
+                        members: Array.isArray(g.members)
+                            ? g.members
+                            : (typeof g.members === 'string' ? (() => {
+                                try { return JSON.parse(g.members); } catch { return []; }
+                            })() : [])
+                    })).filter(g => g.id !== 'grp_ai' && !g.name.includes('Ar-Ge'));
                 }
             } catch (err) {
                 console.warn('Postgres grup okuma hatası:', err);
@@ -1054,13 +1061,39 @@ export class WorkspaceRepository {
         return WorkspaceStoreManager.getInstance().getGroups().filter(g => g.id !== 'grp_ai' && !g.name.includes('Ar-Ge'));
     }
 
+    public static async getGroupById(id: string): Promise<WorkspaceGroup | null> {
+        this.ensureDatabaseConfigured();
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                const { data, error } = await supabase.from('workspace_groups').select('*').eq('id', id).single();
+                if (!error && data) {
+                    return {
+                        ...data,
+                        members: Array.isArray(data.members)
+                            ? data.members
+                            : (typeof data.members === 'string' ? (() => {
+                                try { return JSON.parse(data.members); } catch { return []; }
+                            })() : [])
+                    } as WorkspaceGroup;
+                }
+            } catch (err) {
+                console.warn('Postgres grup tekil okuma hatası:', err);
+            }
+        }
+        return WorkspaceStoreManager.getInstance().getGroupById(id) || null;
+    }
+
     public static async addGroup(group: WorkspaceGroup): Promise<WorkspaceGroup> {
         this.ensureDatabaseConfigured();
         const created = WorkspaceStoreManager.getInstance().addGroup(group);
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                await supabase.from('workspace_groups').insert(group);
+                await supabase.from('workspace_groups').insert({
+                    ...group,
+                    members: Array.isArray(group.members) ? group.members : []
+                });
             } catch (err) {
                 console.warn('Postgres grup ekleme hatası:', err);
             }
@@ -1070,30 +1103,129 @@ export class WorkspaceRepository {
 
     public static async updateGroup(id: string, updates: Partial<WorkspaceGroup>): Promise<WorkspaceGroup | null> {
         this.ensureDatabaseConfigured();
-        const updated = WorkspaceStoreManager.getInstance().updateGroup(id, updates);
+        let result: WorkspaceGroup | null = null;
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                await supabase.from('workspace_groups').update(updates).eq('id', id);
+                const { data, error } = await supabase
+                    .from('workspace_groups')
+                    .update(updates)
+                    .eq('id', id)
+                    .select()
+                    .single();
+                if (!error && data) {
+                    result = {
+                        ...data,
+                        members: Array.isArray(data.members)
+                            ? data.members
+                            : (typeof data.members === 'string' ? (() => {
+                                try { return JSON.parse(data.members); } catch { return []; }
+                            })() : [])
+                    } as WorkspaceGroup;
+                }
             } catch (err) {
                 console.warn('Postgres grup güncelleme hatası:', err);
             }
         }
-        return updated || null;
+        const updated = WorkspaceStoreManager.getInstance().updateGroup(id, updates);
+        return result || updated || null;
     }
 
     public static async toggleGroupMember(groupId: string, memberId: string, add: boolean): Promise<WorkspaceGroup | null> {
         this.ensureDatabaseConfigured();
-        const updated = WorkspaceStoreManager.getInstance().toggleGroupMember(groupId, memberId, add);
-        if (updated && this.isSupabaseConfigured()) {
+        let targetGroup: WorkspaceGroup | null = null;
+
+        if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                await supabase.from('workspace_groups').update({ members: updated.members }).eq('id', groupId);
+                // 1. Veritabanındaki güncel grup kaydını doğrudan çek (Serverless hafıza kaybını engeller)
+                const { data: dbGroup, error: fetchErr } = await supabase
+                    .from('workspace_groups')
+                    .select('*')
+                    .eq('id', groupId)
+                    .single();
+
+                if (!fetchErr && dbGroup) {
+                    let currentMembers: string[] = [];
+                    if (Array.isArray(dbGroup.members)) {
+                        currentMembers = [...dbGroup.members];
+                    } else if (typeof dbGroup.members === 'string') {
+                        try {
+                            const parsed = JSON.parse(dbGroup.members);
+                            if (Array.isArray(parsed)) currentMembers = parsed;
+                        } catch {
+                            currentMembers = [];
+                        }
+                    }
+
+                    if (add) {
+                        if (!currentMembers.includes(memberId)) {
+                            currentMembers.push(memberId);
+                        }
+                    } else {
+                        currentMembers = currentMembers.filter(m => m !== memberId);
+                    }
+
+                    // 2. Güncellenmiş üyeler dizisini Postgres'e yaz
+                    const { data: updatedDbGroup, error: updateErr } = await supabase
+                        .from('workspace_groups')
+                        .update({ members: currentMembers })
+                        .eq('id', groupId)
+                        .select()
+                        .single();
+
+                    if (!updateErr && updatedDbGroup) {
+                        targetGroup = {
+                            ...updatedDbGroup,
+                            members: Array.isArray(updatedDbGroup.members) ? updatedDbGroup.members : currentMembers
+                        } as WorkspaceGroup;
+                    } else {
+                        targetGroup = {
+                            ...dbGroup,
+                            members: currentMembers
+                        } as WorkspaceGroup;
+                    }
+
+                    // 3. workspace_members tablosundaki group_id değerini senkronize et
+                    try {
+                        if (add) {
+                            await supabase
+                                .from('workspace_members')
+                                .update({ group_id: groupId })
+                                .eq('id', memberId);
+                        } else {
+                            await supabase
+                                .from('workspace_members')
+                                .update({ group_id: null })
+                                .eq('id', memberId)
+                                .eq('group_id', groupId);
+                        }
+                    } catch (syncErr) {
+                        console.warn('Üye group_id senkronizasyon uyarısı:', syncErr);
+                    }
+
+                    // 4. Bellek içi depoyu da güncelle
+                    try {
+                        const storeGroup = WorkspaceStoreManager.getInstance().getGroupById(groupId);
+                        if (storeGroup) {
+                            storeGroup.members = currentMembers;
+                        }
+                    } catch {}
+
+                    return targetGroup;
+                }
             } catch (err) {
                 console.warn('Postgres grup üye güncelleme hatası:', err);
             }
         }
-        return updated || null;
+
+        // Supabase yapılandırılmamışsa veya bağlantı hatasında bellek içi fallback
+        try {
+            const updated = WorkspaceStoreManager.getInstance().toggleGroupMember(groupId, memberId, add);
+            return updated || null;
+        } catch {
+            return null;
+        }
     }
 
     public static async deleteGroup(id: string): Promise<boolean> {

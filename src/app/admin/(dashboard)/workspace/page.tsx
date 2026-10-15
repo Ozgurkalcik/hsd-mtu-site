@@ -62,6 +62,7 @@ export default function AdminWorkspacePage() {
     // Group Member Management Filter
     const [selectedGroup, setSelectedGroup] = useState<WorkspaceGroup | null>(null);
     const [memberSearchQuery, setMemberSearchQuery] = useState('');
+    const [togglingMemberId, setTogglingMemberId] = useState<string | null>(null);
 
     // Member Notes & Evaluation Modal
     const [notesModalMember, setNotesModalMember] = useState<WorkspaceMember | null>(null);
@@ -152,7 +153,13 @@ export default function AdminWorkspacePage() {
             if (grpRes && grpRes.ok) {
                 const grpData = (await grpRes.json()).groups || [];
                 setGroups(grpData);
-                if (!selectedGroup && grpData.length > 0) setSelectedGroup(grpData[0]);
+                setSelectedGroup(prev => {
+                    if (!prev && grpData.length > 0) return grpData[0];
+                    if (prev) {
+                        return grpData.find((g: WorkspaceGroup) => g.id === prev.id) || prev;
+                    }
+                    return null;
+                });
             }
             if (rolRes && rolRes.ok) setRoles((await rolRes.json()).roles || []);
             if (sesRes && sesRes.ok) setSessions((await sesRes.json()).sessions || []);
@@ -172,7 +179,7 @@ export default function AdminWorkspacePage() {
         } finally {
             setLoading(false);
         }
-    }, [selectedGroup]);
+    }, []);
 
     useEffect(() => {
         loadData();
@@ -628,6 +635,7 @@ export default function AdminWorkspacePage() {
     };
 
     const handleToggleGroupMember = async (groupId: string, memberId: string, add: boolean) => {
+        setTogglingMemberId(memberId);
         try {
             const res = await fetch('/api/workspace/admin/groups', {
                 method: 'PATCH',
@@ -635,17 +643,18 @@ export default function AdminWorkspacePage() {
                 body: JSON.stringify({ groupId, memberId, add }),
             });
             const data = await res.json();
-            if (res.ok) {
-                setGroups(groups.map(g => g.id === groupId ? data.group : g));
-                if (selectedGroup?.id === groupId) {
-                    setSelectedGroup(data.group);
-                }
+            if (res.ok && data.group) {
+                setGroups(prev => prev.map(g => g.id === groupId ? data.group : g));
+                setSelectedGroup(prev => prev?.id === groupId ? data.group : prev);
+                setMembers(prev => prev.map(m => m.id === memberId ? { ...m, group_id: add ? groupId : undefined } : m));
                 showNotification('success', add ? 'Üye komiteye eklendi.' : 'Üye komiteden çıkarıldı.');
             } else {
                 showNotification('error', data.error || 'Üye durumu güncellenemedi.');
             }
         } catch {
             showNotification('error', 'İşlem başarısız.');
+        } finally {
+            setTogglingMemberId(null);
         }
     };
 
@@ -972,7 +981,7 @@ export default function AdminWorkspacePage() {
                                                     <h3 className="text-xs font-bold text-white">{grp.name}</h3>
                                                 </div>
                                                 <span className="text-[10px] font-mono text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded">
-                                                    {grp.members.length} Üye
+                                                    {(grp.members || []).length} Üye
                                                 </span>
                                             </div>
                                             <p className="text-[11px] text-zinc-400 line-clamp-2">{grp.description}</p>
@@ -987,7 +996,7 @@ export default function AdminWorkspacePage() {
                                             <div>
                                                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
                                                     <span className="w-3 h-3 rounded-full" style={{ backgroundColor: selectedGroup.color }} />
-                                                    {selectedGroup.name} — Üye Listesi
+                                                    {selectedGroup.name} — Üye Listesi ({(selectedGroup.members || []).length} Üye)
                                                 </h3>
                                                 <p className="text-xs text-zinc-400 mt-0.5">{selectedGroup.description}</p>
                                             </div>
@@ -1010,7 +1019,9 @@ export default function AdminWorkspacePage() {
                                                     m.email.toLowerCase().includes(memberSearchQuery.toLowerCase())
                                                 )
                                                 .map(m => {
-                                                    const isMemberOfGroup = selectedGroup.members.includes(m.id);
+                                                    const groupMembersList = Array.isArray(selectedGroup.members) ? selectedGroup.members : [];
+                                                    const isMemberOfGroup = groupMembersList.includes(m.id) || groupMembersList.includes(m.email) || (Boolean(m.username) && groupMembersList.includes(m.username!));
+                                                    const isToggling = togglingMemberId === m.id;
                                                     return (
                                                         <div
                                                             key={m.id}
@@ -1023,13 +1034,21 @@ export default function AdminWorkspacePage() {
 
                                                             <button
                                                                 type="button"
+                                                                disabled={isToggling}
                                                                 onClick={() => handleToggleGroupMember(selectedGroup.id, m.id, !isMemberOfGroup)}
-                                                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${isMemberOfGroup
+                                                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${isMemberOfGroup
                                                                         ? 'bg-rose-950/70 text-rose-300 border border-rose-800 hover:bg-rose-900'
                                                                         : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-                                                                    }`}
+                                                                    } ${isToggling ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                                                             >
-                                                                {isMemberOfGroup ? 'Komiteden Çıkar' : '+ Dahil Et'}
+                                                                {isToggling ? (
+                                                                    <span className="flex items-center gap-1.5">
+                                                                        <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                                                        <span>İşleniyor...</span>
+                                                                    </span>
+                                                                ) : (
+                                                                    <span>{isMemberOfGroup ? 'Komiteden Çıkar' : '+ Dahil Et'}</span>
+                                                                )}
                                                             </button>
                                                         </div>
                                                     );
