@@ -8,10 +8,13 @@ import {
     ActiveSession,
     AuditLogRecord,
     WorkspaceSecuritySettings,
-    WorkspaceRole
+    WorkspaceRole,
+    WorkspaceEvent,
+    MemberAttendance
 } from '@/shared/api/workspaceTypes';
+import { AdminTableSkeleton } from '@/shared/ui/WorkspaceSkeleton';
 
-type AdminTab = 'members' | 'groups' | 'roles' | 'sessions' | 'audit' | 'settings';
+type AdminTab = 'members' | 'groups' | 'roles' | 'attendance' | 'sessions' | 'audit' | 'settings';
 
 export default function AdminWorkspacePage() {
     const [activeTab, setActiveTab] = useState<AdminTab>('members');
@@ -25,6 +28,10 @@ export default function AdminWorkspacePage() {
     const [sessions, setSessions] = useState<ActiveSession[]>([]);
     const [auditLogs, setAuditLogs] = useState<AuditLogRecord[]>([]);
     const [settings, setSettings] = useState<WorkspaceSecuritySettings | null>(null);
+    const [events, setEvents] = useState<WorkspaceEvent[]>([]);
+    const [attendanceEventFilter, setAttendanceEventFilter] = useState<string>('all');
+    const [attendanceStatusFilter, setAttendanceStatusFilter] = useState<string>('all');
+    const [attendanceSearchQuery, setAttendanceSearchQuery] = useState<string>('');
 
     // Modals
     const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
@@ -105,13 +112,14 @@ export default function AdminWorkspacePage() {
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const [memRes, grpRes, rolRes, sesRes, audRes, setRes] = await Promise.all([
+            const [memRes, grpRes, rolRes, sesRes, audRes, setRes, evtRes] = await Promise.all([
                 fetch('/api/workspace/admin/members').catch(() => null),
                 fetch('/api/workspace/admin/groups').catch(() => null),
                 fetch('/api/workspace/admin/roles').catch(() => null),
                 fetch('/api/workspace/admin/sessions').catch(() => null),
                 fetch('/api/workspace/admin/audit-logs').catch(() => null),
                 fetch('/api/workspace/admin/settings').catch(() => null),
+                fetch('/api/workspace/events').catch(() => null),
             ]);
 
             if (memRes && memRes.ok) setMembers((await memRes.json()).members || []);
@@ -124,6 +132,10 @@ export default function AdminWorkspacePage() {
             if (sesRes && sesRes.ok) setSessions((await sesRes.json()).sessions || []);
             if (audRes && audRes.ok) setAuditLogs((await audRes.json()).auditLogs || []);
             if (setRes && setRes.ok) setSettings((await setRes.json()).settings || null);
+            if (evtRes && evtRes.ok) {
+                const evtData = await evtRes.json();
+                setEvents(evtData.events || []);
+            }
         } catch (err: any) {
             console.error('Admin veri yükleme hatası:', err);
             showNotification('error', 'Veriler yüklenirken hata oluştu.');
@@ -135,6 +147,87 @@ export default function AdminWorkspacePage() {
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    // Katılım & LCV Analitiği Hesaplamaları
+    const allAttendanceRecords = React.useMemo(() => {
+        const records: Array<MemberAttendance & { event_id: string; event_title: string; event_date: string }> = [];
+        (events || []).forEach(evt => {
+            if (evt.member_attendance && Array.isArray(evt.member_attendance)) {
+                evt.member_attendance.forEach(att => {
+                    records.push({
+                        ...att,
+                        event_id: evt.id,
+                        event_title: evt.title,
+                        event_date: evt.start_time,
+                    });
+                });
+            }
+        });
+        return records;
+    }, [events]);
+
+    const filteredAttendanceRecords = React.useMemo(() => {
+        return allAttendanceRecords.filter(r => {
+            if (attendanceEventFilter !== 'all' && r.event_id !== attendanceEventFilter) return false;
+            if (attendanceStatusFilter !== 'all' && r.status !== attendanceStatusFilter) return false;
+            if (attendanceSearchQuery.trim()) {
+                const q = attendanceSearchQuery.toLowerCase();
+                const matchesUser = (r.user_name || '').toLowerCase().includes(q);
+                const matchesEvent = (r.event_title || '').toLowerCase().includes(q);
+                const matchesReason = (r.reason || '').toLowerCase().includes(q);
+                if (!matchesUser && !matchesEvent && !matchesReason) return false;
+            }
+            return true;
+        });
+    }, [allAttendanceRecords, attendanceEventFilter, attendanceStatusFilter, attendanceSearchQuery]);
+
+    const memberParticipationSummary = React.useMemo(() => {
+        return members.map(m => {
+            const memberRecords = allAttendanceRecords.filter(r => r.user_id === m.id || r.user_name === m.display_name);
+            const attending = memberRecords.filter(r => r.status === 'attending').length;
+            const declined = memberRecords.filter(r => r.status === 'declined').length;
+            const maybe = memberRecords.filter(r => r.status === 'maybe').length;
+            const total = memberRecords.length;
+            const rate = total > 0 ? Math.round((attending / total) * 100) : 0;
+            return {
+                member: m,
+                attending,
+                declined,
+                maybe,
+                total,
+                rate,
+            };
+        });
+    }, [members, allAttendanceRecords]);
+
+    const handleExportAttendanceCSV = () => {
+        if (filteredAttendanceRecords.length === 0) {
+            showNotification('error', 'Dışa aktarılacak katılım kaydı bulunamadı.');
+            return;
+        }
+
+        const headers = ['Etkinlik Adı', 'Etkinlik Tarihi', 'Üye Adı', 'Rol', 'Katılım Durumu', 'Mazeret / Açıklama', 'Yanıt Tarihi'];
+        const rows = filteredAttendanceRecords.map(r => [
+            `"${(r.event_title || '').replace(/"/g, '""')}"`,
+            `"${new Date(r.event_date).toLocaleString('tr-TR')}"`,
+            `"${(r.user_name || '').replace(/"/g, '""')}"`,
+            `"${r.role || ''}"`,
+            `"${r.status === 'attending' ? 'Katılıyor' : r.status === 'declined' ? 'Katılamıyor' : 'Belirsiz'}"`,
+            `"${(r.reason || '').replace(/"/g, '""')}"`,
+            `"${r.responded_at ? new Date(r.responded_at).toLocaleString('tr-TR') : ''}"`
+        ]);
+
+        const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `hsd_katilim_raporu_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showNotification('success', 'Katılım raporu başarıyla CSV olarak indirildi.');
+    };
 
     // Member Actions
     const handleCreateMember = async (e: React.FormEvent) => {
@@ -452,12 +545,13 @@ export default function AdminWorkspacePage() {
                 </div>
             )}
 
-            {/* 6 Tabs Navigation */}
+            {/* 7 Tabs Navigation */}
             <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 text-xs">
                 {[
                     { key: 'members', label: 'Üyeler', count: members.length },
                     { key: 'groups', label: 'Komite & Ekip Ayarları', count: groups.length },
                     { key: 'roles', label: 'Yetki Matrisi (RBAC)' },
+                    { key: 'attendance', label: '🎯 Katılım & LCV Analitiği', count: allAttendanceRecords.length },
                     { key: 'sessions', label: 'Aktif Oturumlar', count: sessions.length },
                     { key: 'audit', label: 'Denetim İzi (Audit)', count: auditLogs.length },
                     { key: 'settings', label: 'Güvenlik Ayarları' },
@@ -856,7 +950,320 @@ export default function AdminWorkspacePage() {
                         </div>
                     )}
 
-                    {/* ── 4. AKTİF OTURUMLAR TABI ── */}
+                    {/* ── 4. KATILIM & LCV ANALİTİĞİ TABI ── */}
+                    {activeTab === 'attendance' && (
+                        <div className="space-y-6">
+                            {/* Başlık ve İşlem Butonları */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-zinc-800">
+                                <div>
+                                    <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                                        <span>🎯</span>
+                                        <span>Etkinlik Katılım & LCV Analitiği</span>
+                                    </h2>
+                                    <p className="text-xs text-zinc-400 mt-0.5">
+                                        Topluluk üyelerinin takvim etkinliklerine katılım yanıtları, mazeret bildirimleri ve devam oranları.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleExportAttendanceCSV}
+                                        className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-semibold flex items-center gap-1.5 transition-colors border border-zinc-700"
+                                        title="Tüm filtrelenmiş katılım kayıtlarını CSV dosyası olarak dışa aktar"
+                                    >
+                                        <span>📥</span>
+                                        <span>CSV Raporu İndir</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => loadData()}
+                                        className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-medium flex items-center gap-1.5 transition-colors border border-zinc-800"
+                                    >
+                                        <span>🔄</span>
+                                        <span>Yenile</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* KPI İstatistik Kartları */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-1">
+                                    <div className="flex items-center justify-between text-zinc-400 text-xs font-medium">
+                                        <span>Toplam Geri Bildirim</span>
+                                        <span className="text-base">📋</span>
+                                    </div>
+                                    <div className="text-2xl font-black text-white font-mono">
+                                        {allAttendanceRecords.length}
+                                    </div>
+                                    <p className="text-[11px] text-zinc-500 font-mono">
+                                        İncelenen {events.length} etkinlik
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-900/40 space-y-1">
+                                    <div className="flex items-center justify-between text-emerald-400 text-xs font-medium">
+                                        <span>Katılanlar</span>
+                                        <span className="text-base">✅</span>
+                                    </div>
+                                    <div className="text-2xl font-black text-emerald-400 font-mono">
+                                        {allAttendanceRecords.filter(r => r.status === 'attending').length}
+                                    </div>
+                                    <p className="text-[11px] text-emerald-300/80 font-mono">
+                                        %{allAttendanceRecords.length > 0 ? Math.round((allAttendanceRecords.filter(r => r.status === 'attending').length / allAttendanceRecords.length) * 100) : 0} genel katılım oranı
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl bg-rose-950/20 border border-rose-950/40 space-y-1">
+                                    <div className="flex items-center justify-between text-rose-400 text-xs font-medium">
+                                        <span>Katılamayanlar</span>
+                                        <span className="text-base">❌</span>
+                                    </div>
+                                    <div className="text-2xl font-black text-rose-400 font-mono">
+                                        {allAttendanceRecords.filter(r => r.status === 'declined').length}
+                                    </div>
+                                    <p className="text-[11px] text-rose-300/80 font-mono">
+                                        {allAttendanceRecords.filter(r => r.status === 'declined' && r.reason).length} mazeret bildirildi
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-900/40 space-y-1">
+                                    <div className="flex items-center justify-between text-amber-400 text-xs font-medium">
+                                        <span>Belirsiz / Düşünen</span>
+                                        <span className="text-base">⏳</span>
+                                    </div>
+                                    <div className="text-2xl font-black text-amber-400 font-mono">
+                                        {allAttendanceRecords.filter(r => r.status === 'maybe').length}
+                                    </div>
+                                    <p className="text-[11px] text-amber-300/80 font-mono">
+                                        Geri dönüş bekleyenler
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Mazeret Bildirimleri Vitrini (Declined Reasons Breakdown) */}
+                            {allAttendanceRecords.some(r => r.status === 'declined' && r.reason && r.reason.trim().length > 0) && (
+                                <div className="p-4 rounded-xl bg-zinc-900/40 border border-zinc-800 space-y-3">
+                                    <h3 className="text-xs font-bold text-zinc-200 flex items-center gap-2">
+                                        <span>📝</span>
+                                        <span>Son Mazeret Bildirimleri & Açıklamalar</span>
+                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 font-mono">
+                                            {allAttendanceRecords.filter(r => r.status === 'declined' && r.reason && r.reason.trim().length > 0).length} Bildirim
+                                        </span>
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                        {allAttendanceRecords
+                                            .filter(r => r.status === 'declined' && r.reason && r.reason.trim().length > 0)
+                                            .slice(0, 6)
+                                            .map((r, idx) => (
+                                                <div key={idx} className="p-3 rounded-lg bg-zinc-950/70 border border-zinc-800/80 flex flex-col justify-between gap-2">
+                                                    <div>
+                                                        <div className="flex items-center justify-between gap-1 text-[11px]">
+                                                            <span className="font-semibold text-white truncate">{r.user_name}</span>
+                                                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400 font-mono">{r.role}</span>
+                                                        </div>
+                                                        <p className="text-[10px] text-rose-400/90 font-medium truncate mt-0.5">
+                                                            📌 {r.event_title}
+                                                        </p>
+                                                        <p className="text-xs text-zinc-300 italic mt-1.5 pl-2 border-l-2 border-rose-500/50 leading-relaxed">
+                                                            "{r.reason}"
+                                                        </p>
+                                                    </div>
+                                                    <span className="text-[10px] text-zinc-500 font-mono text-right">
+                                                        {r.responded_at ? new Date(r.responded_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Filtreleme ve Arama Araç Çubuğu */}
+                            <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {/* Etkinlik Filtresi */}
+                                    <select
+                                        value={attendanceEventFilter}
+                                        onChange={(e) => setAttendanceEventFilter(e.target.value)}
+                                        className="bg-zinc-950 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-rose-500"
+                                    >
+                                        <option value="all">Tüm Etkinlikler ({events.length})</option>
+                                        {events.map(ev => (
+                                            <option key={ev.id} value={ev.id}>
+                                                {ev.title} ({new Date(ev.start_time).toLocaleDateString('tr-TR')})
+                                            </option>
+                                        ))}
+                                    </select>
+
+                                    {/* Durum Filtresi */}
+                                    <select
+                                        value={attendanceStatusFilter}
+                                        onChange={(e) => setAttendanceStatusFilter(e.target.value)}
+                                        className="bg-zinc-950 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-rose-500"
+                                    >
+                                        <option value="all">Tüm Durumlar</option>
+                                        <option value="attending">🟢 Katılıyor</option>
+                                        <option value="declined">🔴 Katılamıyor</option>
+                                        <option value="maybe">🟡 Belirsiz</option>
+                                    </select>
+
+                                    {/* Arama Inputu */}
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={attendanceSearchQuery}
+                                            onChange={(e) => setAttendanceSearchQuery(e.target.value)}
+                                            placeholder="Üye, etkinlik veya mazeret ara..."
+                                            className="bg-zinc-950 border border-zinc-700 rounded-lg pl-7 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-rose-500 placeholder-zinc-500 w-52 sm:w-64"
+                                        />
+                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 text-[11px]">🔍</span>
+                                    </div>
+                                </div>
+
+                                <div className="text-zinc-400 font-mono text-[11px]">
+                                    {filteredAttendanceRecords.length} / {allAttendanceRecords.length} kayıt gösteriliyor
+                                </div>
+                            </div>
+
+                            {/* Detaylı Katılım Tablosu */}
+                            <div className="space-y-2">
+                                <h3 className="text-xs font-bold text-zinc-300">Detaylı Katılım ve Yanıt Kayıtları</h3>
+                                <div className="overflow-x-auto rounded-xl border border-zinc-800">
+                                    <table className="w-full text-left text-xs border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-zinc-800 bg-zinc-900/50 text-zinc-400 font-semibold">
+                                                <th className="py-2.5 px-3">Üye</th>
+                                                <th className="py-2.5 px-3">Rol</th>
+                                                <th className="py-2.5 px-3">Etkinlik</th>
+                                                <th className="py-2.5 px-3">Katılım Durumu</th>
+                                                <th className="py-2.5 px-3">Mazeret / Açıklama</th>
+                                                <th className="py-2.5 px-3 text-right">Yanıt Zamanı</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-zinc-900 bg-zinc-950">
+                                            {filteredAttendanceRecords.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={6} className="py-8 text-center text-zinc-500 font-mono text-xs">
+                                                        Kriterlere uygun katılım kaydı bulunamadı.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                filteredAttendanceRecords.map((r, idx) => (
+                                                    <tr key={`${r.event_id}_${r.user_id}_${idx}`} className="hover:bg-zinc-900/40 transition-colors">
+                                                        <td className="py-2.5 px-3 font-semibold text-white">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] text-zinc-300 font-bold shrink-0">
+                                                                    {r.user_name.charAt(0).toUpperCase()}
+                                                                </div>
+                                                                <span className="truncate max-w-[140px]">{r.user_name}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-2.5 px-3 text-zinc-400 font-mono text-[11px]">
+                                                            {r.role}
+                                                        </td>
+                                                        <td className="py-2.5 px-3 text-zinc-200">
+                                                            <div>
+                                                                <p className="font-medium text-white truncate max-w-xs">{r.event_title}</p>
+                                                                <p className="text-[10px] text-zinc-500 font-mono">
+                                                                    {new Date(r.event_date).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                                </p>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-2.5 px-3">
+                                                            {r.status === 'attending' && (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-950/70 border border-emerald-800 text-emerald-300 font-semibold text-[11px]">
+                                                                    <span>✓</span> Katılıyor
+                                                                </span>
+                                                            )}
+                                                            {r.status === 'declined' && (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-950/70 border border-rose-800 text-rose-300 font-semibold text-[11px]">
+                                                                    <span>✕</span> Katılamıyor
+                                                                </span>
+                                                            )}
+                                                            {r.status === 'maybe' && (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-950/70 border border-amber-800 text-amber-300 font-semibold text-[11px]">
+                                                                    <span>?</span> Belirsiz
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="py-2.5 px-3 text-zinc-300 max-w-sm">
+                                                            {r.reason ? (
+                                                                <span className="text-zinc-200 italic font-normal text-xs" title={r.reason}>
+                                                                    "{r.reason}"
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-zinc-600 font-mono text-xs">—</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="py-2.5 px-3 text-right font-mono text-[11px] text-zinc-400">
+                                                            {r.responded_at ? new Date(r.responded_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* Topluluk Üyeleri Katılım Karnesi & Devam Oranları */}
+                            <div className="pt-4 border-t border-zinc-800 space-y-3">
+                                <div>
+                                    <h3 className="text-xs font-bold text-zinc-200 flex items-center gap-2">
+                                        <span>📊</span>
+                                        <span>Topluluk Üyeleri Katılım Karnesi (Devam Oranları)</span>
+                                    </h3>
+                                    <p className="text-[11px] text-zinc-400 mt-0.5">
+                                        Kayıtlı üyelerin etkinliklere geri bildirim verme ve katılım sağlama oranları.
+                                    </p>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {memberParticipationSummary.map(ps => {
+                                        const rateColor = ps.rate >= 70 ? 'text-emerald-400' : ps.rate >= 40 ? 'text-amber-400' : 'text-zinc-400';
+                                        const barColor = ps.rate >= 70 ? 'bg-emerald-500' : ps.rate >= 40 ? 'bg-amber-500' : 'bg-rose-500';
+
+                                        return (
+                                            <div key={ps.member.id} className="p-3.5 rounded-xl bg-zinc-900/40 border border-zinc-800 space-y-2.5 hover:border-zinc-700 transition-colors">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="min-w-0">
+                                                        <p className="font-semibold text-white text-xs truncate">{ps.member.display_name}</p>
+                                                        <p className="text-[11px] text-zinc-400 font-mono truncate">{ps.member.email}</p>
+                                                        {ps.member.username && (
+                                                            <span className="text-[10px] text-rose-400 font-mono">@{ps.member.username}</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-right shrink-0">
+                                                        <div className={`text-base font-black font-mono ${rateColor}`}>
+                                                            %{ps.rate}
+                                                        </div>
+                                                        <span className="text-[10px] text-zinc-500 font-mono">Katılım</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* İlerleme Çubuğu */}
+                                                <div className="w-full bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+                                                    <div
+                                                        className={`h-full ${barColor} transition-all duration-500`}
+                                                        style={{ width: `${ps.rate}%` }}
+                                                    />
+                                                </div>
+
+                                                {/* İstatistik Rozetleri */}
+                                                <div className="flex items-center justify-between text-[10px] font-mono pt-1 text-zinc-400 border-t border-zinc-800/60">
+                                                    <span className="text-emerald-400">✓ {ps.attending} Katıldı</span>
+                                                    <span className="text-rose-400">✕ {ps.declined} Katılamadı</span>
+                                                    <span className="text-amber-400">? {ps.maybe} Belirsiz</span>
+                                                    <span className="text-zinc-500">Top: {ps.total}</span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── 5. AKTİF OTURUMLAR TABI ── */}
                     {activeTab === 'sessions' && (
                         <div className="space-y-4">
                             <h2 className="text-sm font-semibold text-white">Aktif Workspace Oturumları</h2>

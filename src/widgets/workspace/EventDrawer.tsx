@@ -18,6 +18,7 @@ import {
 } from '@/shared/api/workspaceTypes';
 import { formatLocalDate } from './NotionCalendar';
 import EventReadOnlyView from './EventReadOnlyView';
+import UploadProgressRing from '@/shared/ui/UploadProgressRing';
 
 interface EventDrawerProps {
     isOpen: boolean;
@@ -648,6 +649,10 @@ export default function EventDrawer({
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [uploadingFileName, setUploadingFileName] = useState('');
+    const [showAdvancedDatetime, setShowAdvancedDatetime] = useState(false);
+    const [showAdvancedAccess, setShowAdvancedAccess] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     // Populate when opening/editing
@@ -867,6 +872,57 @@ export default function EventDrawer({
             return null;
         }
     }, [startDate, endDate, startTime, endTime, isAllDay]);
+
+    // ⚡ Etkinliğe Kalan Süre Rozeti
+    const timeRemainingBadge = useMemo(() => {
+        if (!event) return null;
+        const now = new Date();
+        const start = new Date(event.start_time);
+        const end = new Date(event.end_time);
+
+        if (now >= start && now <= end) {
+            return {
+                text: '🔴 Şu An Devam Ediyor',
+                style: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 animate-pulse font-bold'
+            };
+        }
+
+        const diffMs = start.getTime() - now.getTime();
+        if (diffMs < 0) {
+            return {
+                text: '⌛ Tamamlandı',
+                style: isLight ? 'bg-slate-100 border-slate-300 text-slate-500' : 'bg-zinc-800 border-zinc-700 text-zinc-500'
+            };
+        }
+
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+        if (diffDays === 0) {
+            if (diffHours === 0) {
+                return {
+                    text: `⏳ ${diffMinutes} dk kaldı`,
+                    style: 'bg-rose-500/10 border-rose-500/30 text-rose-400 font-bold'
+                };
+            }
+            return {
+                text: `⚡ Bugün ${start.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} (${diffHours} sa kaldı)`,
+                style: 'bg-amber-500/10 border-amber-500/30 text-amber-400 font-bold'
+            };
+        } else if (diffDays === 1) {
+            return {
+                text: `📅 Yarın ${start.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`,
+                style: 'bg-sky-500/10 border-sky-500/30 text-sky-400 font-bold'
+            };
+        } else {
+            return {
+                text: `⏳ ${diffDays} gün kaldı`,
+                style: isLight ? 'bg-slate-100 border-slate-300 text-slate-700 font-semibold' : 'bg-zinc-800 border-zinc-700 text-zinc-300 font-semibold'
+            };
+        }
+    }, [event, isLight]);
+
 
     // ⚡ Başlangıç Saati Değiştiğinde Akıllı Otomatik Öteleme
     const handleStartTimeChange = (newStartTime: string) => {
@@ -1441,13 +1497,22 @@ export default function EventDrawer({
         }
     };
 
-    // File Upload Handler
+    // File Upload Handler with Progress Ring
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
         setIsUploading(true);
+        setUploadingFileName(file.name);
+        setUploadProgress(15);
         setErrorMsg(null);
+
+        const progressTimer = setInterval(() => {
+            setUploadProgress(prev => {
+                if (prev >= 88) return prev;
+                return prev + Math.floor(Math.random() * 10) + 6;
+            });
+        }, 120);
 
         const formData = new FormData();
         formData.append('file', file);
@@ -1459,17 +1524,28 @@ export default function EventDrawer({
                 body: formData,
             });
             const data = await res.json();
+            clearInterval(progressTimer);
 
             if (res.ok && data.file) {
-                setAttachments([...attachments, data.file]);
-                if (event?.id) setVersion(v => v + 1);
+                setUploadProgress(100);
+                setTimeout(() => {
+                    setAttachments(prev => [...prev, data.file]);
+                    if (event?.id) setVersion(v => v + 1);
+                    setIsUploading(false);
+                    setUploadProgress(0);
+                    setUploadingFileName('');
+                }, 500);
             } else {
+                setIsUploading(false);
+                setUploadProgress(0);
                 setErrorMsg(data.error || 'Dosya yüklenemedi.');
             }
         } catch (err: any) {
+            clearInterval(progressTimer);
+            setIsUploading(false);
+            setUploadProgress(0);
             setErrorMsg(err.message || 'Yükleme sırasında hata oluştu.');
         } finally {
-            setIsUploading(false);
             e.target.value = '';
         }
     };
@@ -1555,11 +1631,6 @@ export default function EventDrawer({
                                     }`}>
                                         {category}
                                     </span>
-                                    {isReadOnly && (
-                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400">
-                                            İzleyici Modu
-                                        </span>
-                                    )}
                                     {!isReadOnly && event && isCreator && (
                                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400">
                                             Düzenleyici
@@ -1573,11 +1644,9 @@ export default function EventDrawer({
                         </div>
 
                         <div className="flex items-center gap-2">
-                            {event && (
-                                <span className={`text-xs px-2.5 py-1 rounded-lg font-mono border font-semibold ${
-                                    isLight ? 'bg-slate-100 text-slate-600 border-slate-300' : 'bg-zinc-800 text-zinc-300 border-zinc-700'
-                                }`} title="Versiyon Kilidi">
-                                    v{version}
+                            {timeRemainingBadge && (
+                                <span className={`text-xs px-2.5 py-1 rounded-lg font-mono border font-semibold flex items-center gap-1.5 shadow-xs ${timeRemainingBadge.style}`}>
+                                    {timeRemainingBadge.text}
                                 </span>
                             )}
                             <button
@@ -2730,83 +2799,110 @@ export default function EventDrawer({
                                     </div>
                                 </div>
 
-                                {/* 📅 Takvime Ekle & Meet & Webhook Aksiyonları */}
-                                <div className={`pt-2.5 border-t flex flex-wrap items-center gap-2 ${
-                                    isLight ? 'border-slate-200' : 'border-zinc-800'
+                                {/* ── PROGRESSIVE DISCLOSURE: GELİŞMİŞ TAKVİM & WEBHOOK ENTEGRASYONLARI ── */}
+                                <div className={`rounded-xl border transition-all ${
+                                    isLight ? 'bg-slate-100/60 border-slate-200' : 'bg-zinc-950/60 border-zinc-800'
                                 }`}>
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            window.open('https://meet.google.com/new', '_blank');
-                                            if (!meetingLink) {
-                                                setMeetingLink('https://meet.google.com/new');
-                                            }
-                                        }}
-                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-colors ${
-                                            isLight
-                                                ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200 shadow-xs'
-                                                : 'bg-blue-950/40 text-blue-300 hover:bg-blue-900/60 border-blue-800'
-                                        }`}
-                                        title="Google Meet Başlat (Yeni Sekme)"
+                                        onClick={() => setShowAdvancedDatetime(!showAdvancedDatetime)}
+                                        className="w-full p-2.5 flex items-center justify-between text-left cursor-pointer hover:opacity-90"
                                     >
-                                        <span>📹</span>
-                                        <span>Google Meet Başlat</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm">⚡</span>
+                                            <div>
+                                                <span className={`text-xs font-bold block ${isLight ? 'text-slate-800' : 'text-zinc-200'}`}>
+                                                    Gelişmiş Entegrasyonlar (Meet, .ics & Webhook)
+                                                </span>
+                                                <span className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                                                    Topluluk Discord/Webhook duyurusu ve Google/Apple takvim bağlantıları
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <span className={`text-xs font-bold transition-transform duration-200 ${showAdvancedDatetime ? 'rotate-180' : ''}`}>
+                                            ▼
+                                        </span>
                                     </button>
 
-                                    <a
-                                        href={getGoogleCalendarUrl()}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-colors ${
-                                            isLight
-                                                ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200 shadow-xs'
-                                                : 'bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/60 border-emerald-800'
-                                        }`}
-                                        title="Google Takvime Ekle"
-                                    >
-                                        <span>📅</span>
-                                        <span>Google Takvime Ekle</span>
-                                    </a>
+                                    {showAdvancedDatetime && (
+                                        <div className="p-3 pt-2 border-t border-slate-200 dark:border-zinc-800/80 space-y-2.5 animate-in fade-in duration-150">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        window.open('https://meet.google.com/new', '_blank');
+                                                        if (!meetingLink) {
+                                                            setMeetingLink('https://meet.google.com/new');
+                                                        }
+                                                    }}
+                                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-colors ${
+                                                        isLight
+                                                            ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200 shadow-xs'
+                                                            : 'bg-blue-950/40 text-blue-300 hover:bg-blue-900/60 border-blue-800'
+                                                    }`}
+                                                    title="Google Meet Başlat (Yeni Sekme)"
+                                                >
+                                                    <span>📹</span>
+                                                    <span>Google Meet Başlat</span>
+                                                </button>
 
-                                    <button
-                                        type="button"
-                                        onClick={handleDownloadICS}
-                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-colors ${
-                                            isLight
-                                                ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300 shadow-xs'
-                                                : 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700 border-zinc-700'
-                                        }`}
-                                        title="Apple & Outlook için .ics İndir"
-                                    >
-                                        <span>📥</span>
-                                        <span>Apple/Outlook (.ics)</span>
-                                    </button>
+                                                <a
+                                                    href={getGoogleCalendarUrl()}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-colors ${
+                                                        isLight
+                                                            ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200 shadow-xs'
+                                                            : 'bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/60 border-emerald-800'
+                                                    }`}
+                                                    title="Google Takvime Ekle"
+                                                >
+                                                    <span>📅</span>
+                                                    <span>Google Takvime Ekle</span>
+                                                </a>
 
-                                    <button
-                                        type="button"
-                                        onClick={handleSendWebhook}
-                                        disabled={isSendingWebhook}
-                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-colors disabled:opacity-50 ${
-                                            isLight
-                                                ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 shadow-xs'
-                                                : 'bg-indigo-950/40 text-indigo-300 hover:bg-indigo-900/60 border-indigo-800'
-                                        }`}
-                                        title="Discord / Webhook ile Topluluğa Bildir"
-                                    >
-                                        <span>📢</span>
-                                        <span>{isSendingWebhook ? 'İletiliyor...' : 'Discord/Webhook ile Duyur'}</span>
-                                    </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleDownloadICS}
+                                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-colors ${
+                                                        isLight
+                                                            ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300 shadow-xs'
+                                                            : 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700 border-zinc-700'
+                                                    }`}
+                                                    title="Apple & Outlook için .ics İndir"
+                                                >
+                                                    <span>📥</span>
+                                                    <span>Apple/Outlook (.ics)</span>
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSendWebhook}
+                                                    disabled={isSendingWebhook}
+                                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-colors disabled:opacity-50 ${
+                                                        isLight
+                                                            ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 shadow-xs'
+                                                            : 'bg-indigo-950/40 text-indigo-300 hover:bg-indigo-900/60 border-indigo-800'
+                                                    }`}
+                                                    title="Discord / Webhook ile Topluluğa Bildir"
+                                                >
+                                                    <span>📢</span>
+                                                    <span>{isSendingWebhook ? 'İletiliyor...' : 'Discord/Webhook ile Duyur'}</span>
+                                                </button>
+                                            </div>
+
+                                            {webhookFeedback && (
+                                                <div className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 animate-in fade-in ${
+                                                    webhookFeedback.startsWith('✓')
+                                                        ? isLight ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-emerald-950/70 border-emerald-800 text-emerald-200'
+                                                        : isLight ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-amber-950/70 border-amber-800 text-amber-200'
+                                                }`}>
+                                                    <span>{webhookFeedback}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
-
-                                {webhookFeedback && (
-                                    <div className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 animate-in fade-in ${
-                                        webhookFeedback.startsWith('✓')
-                                            ? isLight ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-emerald-950/70 border-emerald-800 text-emerald-200'
-                                            : isLight ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-amber-950/70 border-amber-800 text-amber-200'
-                                    }`}>
-                                        <span>{webhookFeedback}</span>
-                                    </div>
-                                )}
                             </div>
                         </>
                     )}
@@ -3413,6 +3509,17 @@ export default function EventDrawer({
                                 </label>
                             </div>
 
+                            {/* 🚀 Upload Progress Ring */}
+                            {isUploading && (
+                                <div className="py-1 animate-in fade-in zoom-in-95 duration-200">
+                                    <UploadProgressRing
+                                        progress={uploadProgress}
+                                        fileName={uploadingFileName || 'Dosya'}
+                                        isLight={isLight}
+                                    />
+                                </div>
+                            )}
+
                             {attachments.length > 0 ? (
                                 <div className="space-y-2">
                                     {attachments.map(att => (
@@ -3940,7 +4047,11 @@ export default function EventDrawer({
                                     <button
                                         type="button"
                                         onClick={onClose}
-                                        className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 dark:bg-zinc-700 dark:hover:bg-zinc-600 shadow transition-colors"
+                                        className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                                            isLight
+                                                ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300 shadow-xs active:scale-98'
+                                                : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border-zinc-700 active:scale-98'
+                                        }`}
                                     >
                                         Kapat
                                     </button>

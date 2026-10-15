@@ -15,6 +15,7 @@ import { createClient } from '@/shared/api/supabase';
 import EventDrawer from './EventDrawer';
 import WeeklyRsvpModal from './WeeklyRsvpModal';
 import { playWorkspaceNotificationSound } from '@/shared/utils/sound';
+import CustomCursor from '@/shared/ui/CustomCursor';
 
 export type CalendarViewMode = 'ay' | '3ay' | '6ay' | 'hafta' | 'gun' | 'liste' | 'pano';
 
@@ -72,6 +73,10 @@ export default function NotionCalendar({
     const [notifFilter, setNotifFilter] = useState<'all' | 'committee' | 'reminder' | 'urgent'>('all');
     const knownNotifIdsRef = React.useRef<Set<string>>(new Set());
     const isFirstNotifLoadRef = React.useRef<boolean>(true);
+
+    // Arka Plan Canlı Eşitleme (Background Sync) State
+    const [isBackgroundSyncing, setIsBackgroundSyncing] = useState<boolean>(false);
+    const [lastSyncedTime, setLastSyncedTime] = useState<Date>(new Date());
 
     // Workspace Light/Dark Theme (Only for /workspace)
     const [workspaceTheme, setWorkspaceTheme] = useState<'dark' | 'light'>('dark');
@@ -333,9 +338,22 @@ export default function NotionCalendar({
         setNotifications(incoming);
     }, []);
 
-    useEffect(() => {
-        fetchInitialData();
+    // Arka Plan Veri Senkronizasyonu (Background Sync Service)
+    const syncWorkspaceData = useCallback(async (silent = true) => {
+        if (!silent) setIsBackgroundSyncing(true);
+        try {
+            await fetchInitialData();
+            setLastSyncedTime(new Date());
+        } finally {
+            if (!silent) {
+                setTimeout(() => setIsBackgroundSyncing(false), 450);
+            }
+        }
     }, [fetchInitialData]);
+
+    useEffect(() => {
+        syncWorkspaceData(true);
+    }, [syncWorkspaceData]);
 
     // Check Notification Permission & Prompt gracefully for permanent device permission
     useEffect(() => {
@@ -371,19 +389,30 @@ export default function NotionCalendar({
             }
         };
 
-        const interval = setInterval(checkLatestNotifications, 10000); // 10 saniye hızlı senkronizasyon
+        const interval = setInterval(() => {
+            checkLatestNotifications();
+            // Düzenli 30 saniyelik arka plan takvim/veri eşitlemesi
+            syncWorkspaceData(true);
+        }, 30000);
+
+        // 10 saniyelik hafif bildirim kontrolü
+        const notifInterval = setInterval(checkLatestNotifications, 10000);
 
         // Sekmeye dönüldüğünde veya pencere odaklandığında gecikmesiz anında senkronize et
-        const onFocus = () => checkLatestNotifications();
+        const onFocus = () => {
+            checkLatestNotifications();
+            syncWorkspaceData(true);
+        };
         window.addEventListener('focus', onFocus);
         document.addEventListener('visibilitychange', onFocus);
 
         return () => {
             clearInterval(interval);
+            clearInterval(notifInterval);
             window.removeEventListener('focus', onFocus);
             document.removeEventListener('visibilitychange', onFocus);
         };
-    }, [isFrozen, handleIncomingNotifications]);
+    }, [isFrozen, handleIncomingNotifications, syncWorkspaceData]);
 
     // Request Desktop Notification Permission (Kalıcı Cihaz İzni)
     const requestNotificationPermission = async () => {
@@ -596,6 +625,8 @@ export default function NotionCalendar({
                 ? 'workspace-light-mode bg-slate-50 text-slate-900 border-slate-200 shadow-slate-200/50'
                 : 'bg-zinc-950 text-zinc-100 border-zinc-800/80 shadow-2xl'
         }`}>
+            {/* 🎯 Manyetik Custom Cursor */}
+            <CustomCursor />
             {workspaceTheme === 'light' && (
                 <style jsx global>{`
                     .workspace-light-mode {
@@ -1038,6 +1069,28 @@ export default function NotionCalendar({
                         )}
                     </div>
 
+                    {/* 🔄 Arka Plan Canlı Senkronizasyon Göstergesi */}
+                    <button
+                        type="button"
+                        onClick={() => syncWorkspaceData(false)}
+                        disabled={isBackgroundSyncing}
+                        className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer ${
+                            isBackgroundSyncing
+                                ? 'bg-rose-500/10 border-rose-500/30 text-rose-500'
+                                : workspaceTheme === 'light'
+                                    ? 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700 shadow-xs'
+                                    : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-300'
+                        }`}
+                        title={`Son Eşitleme: ${lastSyncedTime.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} - Tıklayarak anında yenileyin`}
+                    >
+                        <span className={`text-xs ${isBackgroundSyncing ? 'animate-spin inline-block' : ''}`}>
+                            {isBackgroundSyncing ? '🔄' : '🟢'}
+                        </span>
+                        <span className="hidden md:inline text-[11px] font-medium">
+                            {isBackgroundSyncing ? 'Eşitleniyor...' : 'Senkronize'}
+                        </span>
+                    </button>
+
                     {/* "+ Yeni Etkinlik" Butonu */}
                     <button
                         type="button"
@@ -1325,48 +1378,104 @@ export default function NotionCalendar({
                         : 'border-zinc-800/80 bg-zinc-950'
                 }`}>
                     {/* Takvimler Toggle Listesi */}
-                    <div className="space-y-2.5">
-                        <span className={`text-xs font-semibold uppercase tracking-wider block ${
-                            workspaceTheme === 'light' ? 'text-slate-500' : 'text-zinc-400'
-                        }`}>
-                            Topluluk Takvimleri
-                        </span>
-                        <div className="space-y-1.5">
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between pb-1">
+                            <span className={`text-xs font-bold uppercase tracking-wider block ${
+                                workspaceTheme === 'light' ? 'text-slate-600' : 'text-zinc-300'
+                            }`}>
+                                Topluluk Takvimleri
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (selectedCalendarIds.length === calendars.length) {
+                                        setSelectedCalendarIds([]);
+                                    } else {
+                                        setSelectedCalendarIds(calendars.map(c => c.id));
+                                    }
+                                }}
+                                className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-lg border transition-colors cursor-pointer ${
+                                    workspaceTheme === 'light'
+                                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                        : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border-zinc-800'
+                                }`}
+                            >
+                                {selectedCalendarIds.length === calendars.length ? 'Temizle' : 'Tümü'}
+                            </button>
+                        </div>
+
+                        <div className="space-y-2">
                             {calendars.map(cal => {
                                 const isChecked = selectedCalendarIds.includes(cal.id);
+                                const calEventCount = events.filter(e => e.calendar_id === cal.id).length;
                                 return (
-                                    <label
+                                    <div
                                         key={cal.id}
-                                        className={`flex items-center justify-between p-2 rounded-xl cursor-pointer transition-colors text-xs select-none ${
-                                            workspaceTheme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-zinc-900/70'
+                                        onClick={() => {
+                                            if (isChecked) {
+                                                setSelectedCalendarIds(selectedCalendarIds.filter(id => id !== cal.id));
+                                            } else {
+                                                setSelectedCalendarIds([...selectedCalendarIds, cal.id]);
+                                            }
+                                        }}
+                                        className={`group relative flex items-center justify-between p-2.5 rounded-2xl cursor-pointer transition-all duration-200 text-xs select-none border ${
+                                            isChecked
+                                                ? workspaceTheme === 'light'
+                                                    ? 'bg-white border-slate-300/90 shadow-sm translate-x-1'
+                                                    : 'bg-zinc-900/90 border-zinc-700/80 shadow-md translate-x-1'
+                                                : workspaceTheme === 'light'
+                                                    ? 'bg-slate-50/60 border-slate-200/60 opacity-60 hover:opacity-100 hover:translate-x-0.5'
+                                                    : 'bg-zinc-950/40 border-zinc-900 opacity-50 hover:opacity-100 hover:translate-x-0.5'
                                         }`}
                                     >
-                                        <div className="flex items-center gap-2.5">
+                                        {/* Renkli Sol Glow Çubuğu */}
+                                        <div
+                                            className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full transition-all duration-200"
+                                            style={{
+                                                backgroundColor: cal.color,
+                                                boxShadow: isChecked ? `0 0 10px ${cal.color}` : 'none'
+                                            }}
+                                        />
+
+                                        <div className="flex items-center gap-2.5 pl-2 overflow-hidden">
                                             <span
-                                                className="w-3 h-3 rounded-full shrink-0"
+                                                className={`w-3 h-3 rounded-full shrink-0 transition-transform duration-200 ${
+                                                    isChecked ? 'scale-110 ring-2 ring-white/20' : 'scale-90 opacity-60'
+                                                }`}
                                                 style={{ backgroundColor: cal.color }}
                                             />
-                                            <span className={`font-medium ${
+                                            <span className={`font-semibold truncate ${
                                                 isChecked
-                                                    ? (workspaceTheme === 'light' ? 'text-slate-900 font-semibold' : 'text-zinc-200')
+                                                    ? (workspaceTheme === 'light' ? 'text-slate-900 font-bold' : 'text-zinc-100 font-bold')
                                                     : (workspaceTheme === 'light' ? 'text-slate-400' : 'text-zinc-500')
                                             }`}>
                                                 {cal.title}
                                             </span>
                                         </div>
-                                        <input
-                                            type="checkbox"
-                                            checked={isChecked}
-                                            onChange={() => {
-                                                if (isChecked) {
-                                                    setSelectedCalendarIds(selectedCalendarIds.filter(id => id !== cal.id));
-                                                } else {
-                                                    setSelectedCalendarIds([...selectedCalendarIds, cal.id]);
-                                                }
-                                            }}
-                                            className="rounded border-zinc-700 bg-zinc-800 text-rose-600 focus:ring-0 cursor-pointer"
-                                        />
-                                    </label>
+
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            {calEventCount > 0 && (
+                                                <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full border ${
+                                                    isChecked
+                                                        ? workspaceTheme === 'light'
+                                                            ? 'bg-slate-100 border-slate-300 text-slate-700'
+                                                            : 'bg-zinc-800 border-zinc-700 text-zinc-300'
+                                                        : 'bg-transparent border-transparent opacity-40 text-zinc-500'
+                                                }`}>
+                                                    {calEventCount}
+                                                </span>
+                                            )}
+
+                                            {/* Modern Switch / Toggle Pill */}
+                                            <div
+                                                className={`w-7 h-4 rounded-full p-0.5 transition-colors duration-200 flex items-center ${
+                                                    isChecked ? 'bg-rose-600 justify-end' : (workspaceTheme === 'light' ? 'bg-slate-300 justify-start' : 'bg-zinc-800 justify-start')
+                                                }`}
+                                            >
+                                                <div className="w-3 h-3 rounded-full bg-white shadow-xs transition-transform" />
+                                            </div>
+                                        </div>
+                                    </div>
                                 );
                             })}
                         </div>

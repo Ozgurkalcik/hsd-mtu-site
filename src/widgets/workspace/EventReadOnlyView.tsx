@@ -181,11 +181,11 @@ export default function EventReadOnlyView({
                         <div className="flex items-center gap-2">
                             <span className="text-lg">🎯</span>
                             <h3 className={`text-xs sm:text-sm font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                                Katılım Durumunuz (LCV)
+                                Katılım Durumunuz
                             </h3>
                         </div>
                         {myAttendanceStatus && (
-                            <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border font-mono ${
+                            <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border font-mono animate-pop ${
                                 myAttendanceStatus === 'attending'
                                     ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500'
                                     : myAttendanceStatus === 'declined'
