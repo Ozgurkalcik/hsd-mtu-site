@@ -329,6 +329,7 @@ export class WorkspaceStoreManager {
             message: 'Topluluk Takvimi ve Çekirdek Ekip Çalışma Alanına hoş geldiniz.',
             type: 'announcement',
             is_read: false,
+            is_active: true,
             created_at: now.toISOString()
         });
 
@@ -882,9 +883,13 @@ export class WorkspaceStoreManager {
     // Bildirim Dağıtımı & Anlık Duyuru
     // ============================================
     public getNotifications(userId?: string): WorkspaceNotification[] {
-        if (!userId) return [...this.notifications];
+        if (!userId) {
+            return this.notifications
+                .filter(n => n.is_active !== false)
+                .map(n => ({ ...n }));
+        }
         return this.notifications
-            .filter(n => n.user_id === 'all' || n.user_id === userId)
+            .filter(n => (n.user_id === 'all' || n.user_id === userId) && n.is_active !== false)
             .map(n => {
                 if (n.user_id === 'all') {
                     const isRead = this.notificationReads.has(`${n.id}:${userId}`);
@@ -892,6 +897,158 @@ export class WorkspaceStoreManager {
                 }
                 return { ...n };
             });
+    }
+
+    public getAllNotificationsAdmin(): WorkspaceNotification[] {
+        return this.notifications.map(n => ({
+            ...n,
+            is_active: n.is_active !== false
+        }));
+    }
+
+    public toggleNotificationActive(id: string, isActive: boolean): boolean {
+        const notif = this.notifications.find(n => n.id === id);
+        if (!notif) return false;
+        notif.is_active = isActive;
+        this.logAudit({
+            id: `audit_notif_toggle_${Date.now()}`,
+            user_id: 'admin',
+            user_email: 'admin@hsd-mtu.org',
+            action: isActive ? 'NOTIFICATION_ACTIVATED' : 'NOTIFICATION_DEACTIVATED',
+            entity_type: 'NOTIFICATION',
+            details: `Bildirim #${id} (${notif.title}) durumu '${isActive ? 'Aktif/Yayında' : 'Pasif'}' olarak güncellendi.`,
+            ip_address: '127.0.0.1',
+            created_at: new Date().toISOString()
+        });
+        return true;
+    }
+
+    public toggleNotificationsActive(ids: string[], isActive: boolean): boolean {
+        let count = 0;
+        const idSet = new Set(ids);
+        this.notifications.forEach(n => {
+            if (idSet.has(n.id)) {
+                n.is_active = isActive;
+                count++;
+            }
+        });
+        if (count > 0) {
+            this.logAudit({
+                id: `audit_notifs_bulk_toggle_${Date.now()}`,
+                user_id: 'admin',
+                user_email: 'admin@hsd-mtu.org',
+                action: isActive ? 'NOTIFICATIONS_BULK_ACTIVATED' : 'NOTIFICATIONS_BULK_DEACTIVATED',
+                entity_type: 'NOTIFICATION',
+                details: `${count} adet bildirim topluca '${isActive ? 'Aktif/Yayında' : 'Pasif'}' duruma getirildi.`,
+                ip_address: '127.0.0.1',
+                created_at: new Date().toISOString()
+            });
+        }
+        return count > 0;
+    }
+
+    public deleteNotification(id: string): boolean {
+        const idx = this.notifications.findIndex(n => n.id === id);
+        if (idx === -1) return false;
+        const removed = this.notifications.splice(idx, 1)[0];
+
+        // Remove read tracking records
+        Array.from(this.notificationReads).forEach(key => {
+            if (key.startsWith(`${id}:`)) {
+                this.notificationReads.delete(key);
+            }
+        });
+
+        this.logAudit({
+            id: `audit_notif_del_${Date.now()}`,
+            user_id: 'admin',
+            user_email: 'admin@hsd-mtu.org',
+            action: 'NOTIFICATION_DELETED',
+            entity_type: 'NOTIFICATION',
+            details: `Bildirim yayından kaldırıldı ve silindi: #${id} (${removed.title})`,
+            ip_address: '127.0.0.1',
+            created_at: new Date().toISOString()
+        });
+        return true;
+    }
+
+    public deleteNotifications(ids: string[]): boolean {
+        const idSet = new Set(ids);
+        const prevLength = this.notifications.length;
+        this.notifications = this.notifications.filter(n => !idSet.has(n.id));
+
+        ids.forEach(id => {
+            Array.from(this.notificationReads).forEach(key => {
+                if (key.startsWith(`${id}:`)) {
+                    this.notificationReads.delete(key);
+                }
+            });
+        });
+
+        const deletedCount = prevLength - this.notifications.length;
+        if (deletedCount > 0) {
+            this.logAudit({
+                id: `audit_notifs_bulk_del_${Date.now()}`,
+                user_id: 'admin',
+                user_email: 'admin@hsd-mtu.org',
+                action: 'NOTIFICATIONS_BULK_DELETED',
+                entity_type: 'NOTIFICATION',
+                details: `${deletedCount} adet bildirim yayından kaldırılıp silindi.`,
+                ip_address: '127.0.0.1',
+                created_at: new Date().toISOString()
+            });
+        }
+        return deletedCount > 0;
+    }
+
+    public clearNotificationHistory(filter?: 'all' | 'read' | 'inactive'): boolean {
+        if (!filter || filter === 'all') {
+            const count = this.notifications.length;
+            this.notifications = [];
+            this.notificationReads.clear();
+            this.logAudit({
+                id: `audit_notifs_clear_all_${Date.now()}`,
+                user_id: 'admin',
+                user_email: 'admin@hsd-mtu.org',
+                action: 'NOTIFICATION_HISTORY_CLEARED',
+                entity_type: 'NOTIFICATION',
+                details: `Tüm bildirim geçmişi temizlendi (${count} kayıt).`,
+                ip_address: '127.0.0.1',
+                created_at: new Date().toISOString()
+            });
+            return true;
+        } else if (filter === 'inactive') {
+            const before = this.notifications.length;
+            this.notifications = this.notifications.filter(n => n.is_active !== false);
+            const cleared = before - this.notifications.length;
+            this.logAudit({
+                id: `audit_notifs_clear_inactive_${Date.now()}`,
+                user_id: 'admin',
+                user_email: 'admin@hsd-mtu.org',
+                action: 'INACTIVE_NOTIFICATIONS_CLEARED',
+                entity_type: 'NOTIFICATION',
+                details: `Pasif durumdaki ${cleared} adet bildirim geçmişten temizlendi.`,
+                ip_address: '127.0.0.1',
+                created_at: new Date().toISOString()
+            });
+            return true;
+        } else if (filter === 'read') {
+            const before = this.notifications.length;
+            this.notifications = this.notifications.filter(n => !n.is_read);
+            const cleared = before - this.notifications.length;
+            this.logAudit({
+                id: `audit_notifs_clear_read_${Date.now()}`,
+                user_id: 'admin',
+                user_email: 'admin@hsd-mtu.org',
+                action: 'READ_NOTIFICATIONS_CLEARED',
+                entity_type: 'NOTIFICATION',
+                details: `Okunmuş durumdaki ${cleared} adet bildirim temizlendi.`,
+                ip_address: '127.0.0.1',
+                created_at: new Date().toISOString()
+            });
+            return true;
+        }
+        return false;
     }
 
     public markNotificationAsRead(id: string, userId?: string): boolean {
@@ -949,6 +1106,7 @@ export class WorkspaceStoreManager {
                 message: payload.message,
                 type: notifType,
                 is_read: false,
+                is_active: true,
                 created_at: nowStr
             };
             this.notifications.unshift(notif);
@@ -966,6 +1124,7 @@ export class WorkspaceStoreManager {
                     message: payload.message,
                     type: notifType,
                     is_read: false,
+                    is_active: true,
                     created_at: nowStr
                 };
                 this.notifications.unshift(notif);
@@ -984,6 +1143,7 @@ export class WorkspaceStoreManager {
                     message: payload.message,
                     type: notifType,
                     is_read: false,
+                    is_active: true,
                     created_at: nowStr
                 };
                 this.notifications.unshift(notif);
@@ -1000,6 +1160,7 @@ export class WorkspaceStoreManager {
                     message: payload.message,
                     type: notifType,
                     is_read: false,
+                    is_active: true,
                     created_at: nowStr
                 };
                 this.notifications.unshift(notif);

@@ -1054,7 +1054,12 @@ export class WorkspaceRepository {
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                let query = supabase.from('workspace_notifications').select('*').order('created_at', { ascending: false }).limit(50);
+                let query = supabase
+                    .from('workspace_notifications')
+                    .select('*')
+                    .or('is_active.is.null,is_active.eq.true')
+                    .order('created_at', { ascending: false })
+                    .limit(50);
                 if (userId && userId !== 'all') {
                     query = query.or(`user_id.eq.all,user_id.eq.${userId}`);
                 }
@@ -1069,6 +1074,7 @@ export class WorkspaceRepository {
                     }
                     return data.map(n => ({
                         ...n,
+                        is_active: n.is_active !== false,
                         is_read: n.is_read || readIds.has(n.id)
                     }));
                 }
@@ -1077,6 +1083,100 @@ export class WorkspaceRepository {
             }
         }
         return WorkspaceStoreManager.getInstance().getNotifications(userId);
+    }
+
+    public static async getAllNotificationsAdmin(): Promise<WorkspaceNotification[]> {
+        this.ensureDatabaseConfigured();
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                const { data, error } = await supabase
+                    .from('workspace_notifications')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(200);
+                if (!error && data && data.length > 0) {
+                    return data.map(n => ({
+                        ...n,
+                        is_active: n.is_active !== false
+                    }));
+                }
+            } catch (err) {
+                console.warn('Postgres admin bildirimleri getirme hatası:', err);
+            }
+        }
+        return WorkspaceStoreManager.getInstance().getAllNotificationsAdmin();
+    }
+
+    public static async toggleNotificationActive(id: string, isActive: boolean): Promise<boolean> {
+        this.ensureDatabaseConfigured();
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                await supabase.from('workspace_notifications').update({ is_active: isActive }).eq('id', id);
+            } catch (err) {
+                console.warn('Postgres bildirim aktiflik güncelleme hatası:', err);
+            }
+        }
+        return WorkspaceStoreManager.getInstance().toggleNotificationActive(id, isActive);
+    }
+
+    public static async toggleNotificationsActive(ids: string[], isActive: boolean): Promise<boolean> {
+        this.ensureDatabaseConfigured();
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                await supabase.from('workspace_notifications').update({ is_active: isActive }).in('id', ids);
+            } catch (err) {
+                console.warn('Postgres toplu bildirim aktiflik güncelleme hatası:', err);
+            }
+        }
+        return WorkspaceStoreManager.getInstance().toggleNotificationsActive(ids, isActive);
+    }
+
+    public static async deleteNotification(id: string): Promise<boolean> {
+        this.ensureDatabaseConfigured();
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                await supabase.from('workspace_notifications').delete().eq('id', id);
+            } catch (err) {
+                console.warn('Postgres bildirim silme hatası:', err);
+            }
+        }
+        return WorkspaceStoreManager.getInstance().deleteNotification(id);
+    }
+
+    public static async deleteNotifications(ids: string[]): Promise<boolean> {
+        this.ensureDatabaseConfigured();
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                await supabase.from('workspace_notifications').delete().in('id', ids);
+            } catch (err) {
+                console.warn('Postgres toplu bildirim silme hatası:', err);
+            }
+        }
+        return WorkspaceStoreManager.getInstance().deleteNotifications(ids);
+    }
+
+    public static async clearNotificationHistory(filter?: 'all' | 'read' | 'inactive'): Promise<boolean> {
+        this.ensureDatabaseConfigured();
+        if (this.isSupabaseConfigured()) {
+            try {
+                const supabase = this.getSupabaseClient();
+                if (!filter || filter === 'all') {
+                    await supabase.from('workspace_notifications').delete().neq('id', '___non_existent___');
+                } else if (filter === 'inactive') {
+                    await supabase.from('workspace_notifications').delete().eq('is_active', false);
+                } else if (filter === 'read') {
+                    await supabase.from('workspace_notifications').delete().eq('is_read', true);
+                }
+            } catch (err) {
+                console.warn('Postgres bildirim geçmişi temizleme hatası:', err);
+            }
+        }
+        return WorkspaceStoreManager.getInstance().clearNotificationHistory(filter);
     }
 
     public static async markNotificationAsRead(id: string, userId: string): Promise<boolean> {

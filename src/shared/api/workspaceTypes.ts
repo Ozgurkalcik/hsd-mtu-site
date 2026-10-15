@@ -214,6 +214,7 @@ export interface WorkspaceNotification {
     category?: 'general' | 'committee' | 'reminder' | 'security';
     target_group_id?: string;
     is_read: boolean;
+    is_active?: boolean; // true: yayında / aktif, false: pasif / yayından kaldırılmış
     created_at: string;
 }
 

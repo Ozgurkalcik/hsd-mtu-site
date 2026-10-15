@@ -10,11 +10,12 @@ import {
     WorkspaceSecuritySettings,
     WorkspaceRole,
     WorkspaceEvent,
-    MemberAttendance
+    MemberAttendance,
+    WorkspaceNotification
 } from '@/shared/api/workspaceTypes';
 import { AdminTableSkeleton } from '@/shared/ui/WorkspaceSkeleton';
 
-type AdminTab = 'members' | 'groups' | 'roles' | 'attendance' | 'sessions' | 'audit' | 'settings';
+type AdminTab = 'members' | 'groups' | 'roles' | 'attendance' | 'notifications' | 'sessions' | 'audit' | 'settings';
 
 export default function AdminWorkspacePage() {
     const [activeTab, setActiveTab] = useState<AdminTab>('members');
@@ -72,6 +73,30 @@ export default function AdminWorkspacePage() {
     const [isClearAuditModalOpen, setIsClearAuditModalOpen] = useState(false);
     const [isClearingAudit, setIsClearingAudit] = useState(false);
 
+    // Notification Management State
+    const [notifications, setNotifications] = useState<WorkspaceNotification[]>([]);
+    const [selectedNotifIds, setSelectedNotifIds] = useState<string[]>([]);
+    const [notifSearchQuery, setNotifSearchQuery] = useState<string>('');
+    const [notifStatusFilter, setNotifStatusFilter] = useState<'all' | 'active' | 'passive' | 'announcement' | 'reminder'>('all');
+    const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
+    const [isClearNotifModalOpen, setIsClearNotifModalOpen] = useState(false);
+    const [clearFilterChoice, setClearFilterChoice] = useState<'all' | 'inactive' | 'read'>('all');
+    const [inspectNotification, setInspectNotification] = useState<WorkspaceNotification | null>(null);
+    const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+    const [isBulkActionLoading, setIsBulkActionLoading] = useState(false);
+
+    const [broadcastForm, setBroadcastForm] = useState({
+        title: '',
+        message: '',
+        type: 'announcement' as 'announcement' | 'reminder' | 'info' | 'urgent',
+        targetAudience: 'all' as 'all' | 'group' | 'role' | 'selected',
+        targetGroupId: '',
+        targetRole: 'contributor' as WorkspaceRole,
+        targetUserIds: [] as string[],
+        eventId: '',
+        eventTitle: ''
+    });
+
     const showNotification = (type: 'success' | 'error', text: string) => {
         setStatusMsg({ type, text });
         setTimeout(() => setStatusMsg(null), 4000);
@@ -112,7 +137,7 @@ export default function AdminWorkspacePage() {
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const [memRes, grpRes, rolRes, sesRes, audRes, setRes, evtRes] = await Promise.all([
+            const [memRes, grpRes, rolRes, sesRes, audRes, setRes, evtRes, notifRes] = await Promise.all([
                 fetch('/api/workspace/admin/members').catch(() => null),
                 fetch('/api/workspace/admin/groups').catch(() => null),
                 fetch('/api/workspace/admin/roles').catch(() => null),
@@ -120,6 +145,7 @@ export default function AdminWorkspacePage() {
                 fetch('/api/workspace/admin/audit-logs').catch(() => null),
                 fetch('/api/workspace/admin/settings').catch(() => null),
                 fetch('/api/workspace/events').catch(() => null),
+                fetch('/api/workspace/notifications?scope=admin').catch(() => null),
             ]);
 
             if (memRes && memRes.ok) setMembers((await memRes.json()).members || []);
@@ -136,6 +162,10 @@ export default function AdminWorkspacePage() {
                 const evtData = await evtRes.json();
                 setEvents(evtData.events || []);
             }
+            if (notifRes && notifRes.ok) {
+                const notifData = await notifRes.json();
+                setNotifications(notifData.notifications || []);
+            }
         } catch (err: any) {
             console.error('Admin veri yükleme hatası:', err);
             showNotification('error', 'Veriler yüklenirken hata oluştu.');
@@ -147,6 +177,184 @@ export default function AdminWorkspacePage() {
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    // ───────────────────────────────────────────────
+    // Bildirim Yönetim Fonksiyonları
+    // ───────────────────────────────────────────────
+
+    // Toggle Single Notification Active State (Yayından Kaldır / Yayına Al)
+    const handleToggleNotificationActive = async (id: string, currentActive: boolean) => {
+        setActionLoadingId(id);
+        const nextActive = !currentActive;
+        try {
+            const res = await fetch('/api/workspace/notifications', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, is_active: nextActive })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_active: nextActive } : n));
+                showNotification('success', nextActive ? 'Bildirim yayına alındı.' : 'Bildirim pasife alındı (kullanıcılardan gizlendi).');
+            } else {
+                showNotification('error', data.error || 'Bildirim durumu değiştirilemedi.');
+            }
+        } catch {
+            showNotification('error', 'İşlem sırasında bağlantı hatası oluştu.');
+        } finally {
+            setActionLoadingId(null);
+        }
+    };
+
+    // Bulk Toggle Active State (Seçilenleri Pasife Al / Yayına Al)
+    const handleBulkToggleActive = async (targetActive: boolean) => {
+        if (selectedNotifIds.length === 0) return;
+        setIsBulkActionLoading(true);
+        try {
+            const res = await fetch('/api/workspace/notifications', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: selectedNotifIds, is_active: targetActive })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setNotifications(prev => prev.map(n => selectedNotifIds.includes(n.id) ? { ...n, is_active: targetActive } : n));
+                showNotification('success', targetActive ? `${selectedNotifIds.length} bildirim yayına alındı.` : `${selectedNotifIds.length} bildirim pasife alındı.`);
+                setSelectedNotifIds([]);
+            } else {
+                showNotification('error', data.error || 'Toplu işlem başarısız oldu.');
+            }
+        } catch {
+            showNotification('error', 'Toplu işlem sırasında hata oluştu.');
+        } finally {
+            setIsBulkActionLoading(false);
+        }
+    };
+
+    // Delete Single Notification
+    const handleDeleteNotification = async (id: string) => {
+        if (!window.confirm('Bu bildirimi kalıcı olarak silmek ve yayından kaldırmak istediğinize emin misiniz?')) return;
+        setActionLoadingId(id);
+        try {
+            const res = await fetch('/api/workspace/notifications', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setNotifications(prev => prev.filter(n => n.id !== id));
+                setSelectedNotifIds(prev => prev.filter(x => x !== id));
+                if (inspectNotification?.id === id) setInspectNotification(null);
+                showNotification('success', 'Bildirim yayından kaldırıldı ve silindi.');
+            } else {
+                showNotification('error', data.error || 'Bildirim silinemedi.');
+            }
+        } catch {
+            showNotification('error', 'Silme işlemi sırasında hata oluştu.');
+        } finally {
+            setActionLoadingId(null);
+        }
+    };
+
+    // Bulk Delete Notifications
+    const handleBulkDeleteNotifications = async () => {
+        if (selectedNotifIds.length === 0) return;
+        if (!window.confirm(`Seçilen ${selectedNotifIds.length} adet bildirimi yayından kaldırmak ve silmek istediğinize emin misiniz?`)) return;
+        setIsBulkActionLoading(true);
+        try {
+            const res = await fetch('/api/workspace/notifications', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: selectedNotifIds })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setNotifications(prev => prev.filter(n => !selectedNotifIds.includes(n.id)));
+                setSelectedNotifIds([]);
+                showNotification('success', `${selectedNotifIds.length} adet bildirim yayından kaldırıldı ve silindi.`);
+            } else {
+                showNotification('error', data.error || 'Toplu silme başarısız oldu.');
+            }
+        } catch {
+            showNotification('error', 'Toplu silme işlemi sırasında hata oluştu.');
+        } finally {
+            setIsBulkActionLoading(false);
+        }
+    };
+
+    // Clear Notification History
+    const handleClearNotificationHistory = async () => {
+        setIsBulkActionLoading(true);
+        try {
+            const res = await fetch('/api/workspace/notifications', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ clear_history: true, filter: clearFilterChoice })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                if (clearFilterChoice === 'all') {
+                    setNotifications([]);
+                } else if (clearFilterChoice === 'inactive') {
+                    setNotifications(prev => prev.filter(n => n.is_active !== false));
+                } else if (clearFilterChoice === 'read') {
+                    setNotifications(prev => prev.filter(n => !n.is_read));
+                }
+                setSelectedNotifIds([]);
+                setIsClearNotifModalOpen(false);
+                showNotification('success', data.message || 'Bildirim geçmişi temizlendi.');
+            } else {
+                showNotification('error', data.error || 'Bildirim geçmişi temizlenemedi.');
+            }
+        } catch {
+            showNotification('error', 'Temizleme işlemi sırasında hata oluştu.');
+        } finally {
+            setIsBulkActionLoading(false);
+        }
+    };
+
+    // Dispatch Instant Broadcast
+    const handleDispatchBroadcast = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!broadcastForm.title.trim() || !broadcastForm.message.trim()) {
+            showNotification('error', 'Lütfen bildirim başlığı ve mesajını doldurun.');
+            return;
+        }
+        setIsBulkActionLoading(true);
+        try {
+            const res = await fetch('/api/workspace/notifications', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(broadcastForm)
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showNotification('success', `Duyuru/Bildirim başarıyla dağıtıldı (${data.dispatchedCount || 1} alıcı).`);
+                setIsBroadcastModalOpen(false);
+                setBroadcastForm({
+                    title: '',
+                    message: '',
+                    type: 'announcement',
+                    targetAudience: 'all',
+                    targetGroupId: '',
+                    targetRole: 'contributor',
+                    targetUserIds: [],
+                    eventId: '',
+                    eventTitle: ''
+                });
+                // Yeniden yükle
+                const refreshed = await fetch('/api/workspace/notifications?scope=admin').then(r => r.json()).catch(() => null);
+                if (refreshed?.notifications) setNotifications(refreshed.notifications);
+            } else {
+                showNotification('error', data.error || 'Bildirim dağıtılamadı.');
+            }
+        } catch {
+            showNotification('error', 'Bildirim gönderilirken hata oluştu.');
+        } finally {
+            setIsBulkActionLoading(false);
+        }
+    };
 
     // Katılım & LCV Analitiği Hesaplamaları
     const allAttendanceRecords = React.useMemo(() => {
@@ -552,6 +760,7 @@ export default function AdminWorkspacePage() {
                     { key: 'groups', label: 'Komite & Ekip Ayarları', count: groups.length },
                     { key: 'roles', label: 'Yetki Matrisi (RBAC)' },
                     { key: 'attendance', label: '🎯 Katılım Analitiği', count: allAttendanceRecords.length },
+                    { key: 'notifications', label: '📢 Bildirim & Duyuru Yönetimi', count: notifications.length },
                     { key: 'sessions', label: 'Aktif Oturumlar', count: sessions.length },
                     { key: 'audit', label: 'Denetim İzi (Audit)', count: auditLogs.length },
                     { key: 'settings', label: 'Güvenlik Ayarları' },
@@ -1263,7 +1472,398 @@ export default function AdminWorkspacePage() {
                         </div>
                     )}
 
-                    {/* ── 5. AKTİF OTURUMLAR TABI ── */}
+                    {/* ── 5. BİLDİRİM & DUYURU YÖNETİMİ TABI ── */}
+                    {activeTab === 'notifications' && (
+                        <div className="space-y-5">
+                            {/* Başlık ve Butonlar */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div>
+                                    <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                                        <span>📢</span> Bildirim & Duyuru Yönetimi
+                                    </h2>
+                                    <p className="text-xs text-zinc-400 mt-0.5">
+                                        Aktif bildirimleri görüntüleyin, yayından kaldırın/pasife alın, geçmişi temizleyin veya hedef kitleye anlık duyuru dağıtın.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsClearNotifModalOpen(true)}
+                                        className="px-3 py-1.5 rounded-xl border border-rose-900/60 bg-rose-950/30 hover:bg-rose-950/60 text-rose-300 text-xs font-semibold transition-all flex items-center gap-1.5"
+                                    >
+                                        <span>🧹</span>
+                                        <span>Geçmişi Temizle</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsBroadcastModalOpen(true)}
+                                        className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white text-xs font-semibold shadow-md transition-all flex items-center gap-1.5"
+                                    >
+                                        <span>⚡</span>
+                                        <span>Yeni Duyuru / Bildirim Dağıt</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* KPI İstatistik Kartları */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div className="p-3.5 rounded-xl bg-zinc-900/40 border border-zinc-800 space-y-1">
+                                    <div className="text-[11px] font-medium text-zinc-400">Toplam Bildirim</div>
+                                    <div className="text-xl font-bold text-white font-mono">{notifications.length}</div>
+                                    <div className="text-[10px] text-zinc-500">Sistemdeki tüm kayıtlar</div>
+                                </div>
+                                <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-900/40 space-y-1">
+                                    <div className="text-[11px] font-medium text-emerald-400 flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                        Yayında (Aktif)
+                                    </div>
+                                    <div className="text-xl font-bold text-emerald-300 font-mono">
+                                        {notifications.filter(n => n.is_active !== false).length}
+                                    </div>
+                                    <div className="text-[10px] text-emerald-500/80">Kullanıcılara görünenler</div>
+                                </div>
+                                <div className="p-3.5 rounded-xl bg-amber-950/20 border border-amber-900/40 space-y-1">
+                                    <div className="text-[11px] font-medium text-amber-400 flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-amber-500" />
+                                        Pasife Alınanlar
+                                    </div>
+                                    <div className="text-xl font-bold text-amber-300 font-mono">
+                                        {notifications.filter(n => n.is_active === false).length}
+                                    </div>
+                                    <div className="text-[10px] text-amber-500/80">Yayından kaldırılmışlar</div>
+                                </div>
+                                <div className="p-3.5 rounded-xl bg-zinc-900/40 border border-zinc-800 space-y-1">
+                                    <div className="text-[11px] font-medium text-zinc-400">Okunma Sayısı</div>
+                                    <div className="text-xl font-bold text-zinc-200 font-mono">
+                                        {notifications.filter(n => n.is_read).length}
+                                    </div>
+                                    <div className="text-[10px] text-zinc-500">Okundu işaretlenenler</div>
+                                </div>
+                            </div>
+
+                            {/* Filtre ve Arama Çubuğu */}
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 pt-1">
+                                <div className="relative flex-1 max-w-sm">
+                                    <input
+                                        type="text"
+                                        placeholder="Başlık, içerik veya kullanıcı ara..."
+                                        value={notifSearchQuery}
+                                        onChange={(e) => setNotifSearchQuery(e.target.value)}
+                                        className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
+                                    />
+                                    <span className="absolute left-2.5 top-2 text-zinc-500 text-xs">🔍</span>
+                                    {notifSearchQuery && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setNotifSearchQuery('')}
+                                            className="absolute right-2.5 top-1.5 text-zinc-400 hover:text-white text-xs"
+                                        >
+                                            ✕
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                                    {[
+                                        { key: 'all', label: `Tümü (${notifications.length})` },
+                                        { key: 'active', label: `🟢 Yayında (${notifications.filter(n => n.is_active !== false).length})` },
+                                        { key: 'passive', label: `⏸️ Pasif (${notifications.filter(n => n.is_active === false).length})` },
+                                        { key: 'announcement', label: `📢 Duyurular (${notifications.filter(n => n.type === 'announcement').length})` },
+                                        { key: 'reminder', label: `⏰ Hatırlatıcılar (${notifications.filter(n => n.type === 'reminder').length})` }
+                                    ].map(f => (
+                                        <button
+                                            key={f.key}
+                                            type="button"
+                                            onClick={() => setNotifStatusFilter(f.key as any)}
+                                            className={`px-2.5 py-1 rounded-lg transition-all ${
+                                                notifStatusFilter === f.key
+                                                    ? 'bg-zinc-800 text-white font-semibold shadow-xs'
+                                                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+                                            }`}
+                                        >
+                                            {f.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Toplu İşlem Çubuğu (Seçili bildirimler varsa) */}
+                            {selectedNotifIds.length > 0 && (
+                                <div className="p-2.5 px-3 rounded-xl bg-rose-950/40 border border-rose-800/60 flex flex-wrap items-center justify-between gap-2 animate-in fade-in slide-in-from-top-1 text-xs">
+                                    <div className="flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
+                                        <span className="font-semibold text-rose-200">
+                                            {selectedNotifIds.length} bildirim seçildi
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <button
+                                            type="button"
+                                            disabled={isBulkActionLoading}
+                                            onClick={() => handleBulkToggleActive(false)}
+                                            className="px-2.5 py-1 rounded-lg bg-amber-900/60 hover:bg-amber-800/80 text-amber-200 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
+                                            title="Seçilenleri kullanıcılardan gizle"
+                                        >
+                                            <span>⏸️</span> Seçilenleri Pasife Al
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={isBulkActionLoading}
+                                            onClick={() => handleBulkToggleActive(true)}
+                                            className="px-2.5 py-1 rounded-lg bg-emerald-900/60 hover:bg-emerald-800/80 text-emerald-200 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
+                                            title="Seçilenleri yeniden yayına ver"
+                                        >
+                                            <span>▶️</span> Seçilenleri Yayına Al
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={isBulkActionLoading}
+                                            onClick={handleBulkDeleteNotifications}
+                                            className="px-2.5 py-1 rounded-lg bg-rose-900/60 hover:bg-rose-800/80 text-rose-200 font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
+                                            title="Kalıcı olarak sil"
+                                        >
+                                            <span>🗑️</span> Seçilenleri Sil
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedNotifIds([])}
+                                            className="px-2 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium transition-colors"
+                                            title="Seçimi İptal Et"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Bildirimler Tablosu */}
+                            <div className="overflow-x-auto rounded-xl border border-zinc-800">
+                                <table className="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-zinc-800 text-zinc-400 font-semibold bg-zinc-900/50">
+                                            <th className="py-2.5 px-3 w-8">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={
+                                                        notifications.filter(n => {
+                                                            if (notifStatusFilter === 'active' && n.is_active === false) return false;
+                                                            if (notifStatusFilter === 'passive' && n.is_active !== false) return false;
+                                                            if (notifStatusFilter === 'announcement' && n.type !== 'announcement') return false;
+                                                            if (notifStatusFilter === 'reminder' && n.type !== 'reminder') return false;
+                                                            if (notifSearchQuery.trim()) {
+                                                                const q = notifSearchQuery.toLowerCase();
+                                                                return (n.title || '').toLowerCase().includes(q) ||
+                                                                       (n.message || '').toLowerCase().includes(q) ||
+                                                                       (n.event_title || '').toLowerCase().includes(q) ||
+                                                                       (n.user_id || '').toLowerCase().includes(q);
+                                                            }
+                                                            return true;
+                                                        }).length > 0 &&
+                                                        notifications.filter(n => {
+                                                            if (notifStatusFilter === 'active' && n.is_active === false) return false;
+                                                            if (notifStatusFilter === 'passive' && n.is_active !== false) return false;
+                                                            if (notifStatusFilter === 'announcement' && n.type !== 'announcement') return false;
+                                                            if (notifStatusFilter === 'reminder' && n.type !== 'reminder') return false;
+                                                            if (notifSearchQuery.trim()) {
+                                                                const q = notifSearchQuery.toLowerCase();
+                                                                return (n.title || '').toLowerCase().includes(q) ||
+                                                                       (n.message || '').toLowerCase().includes(q) ||
+                                                                       (n.event_title || '').toLowerCase().includes(q) ||
+                                                                       (n.user_id || '').toLowerCase().includes(q);
+                                                            }
+                                                            return true;
+                                                        }).every(n => selectedNotifIds.includes(n.id))
+                                                    }
+                                                    onChange={(e) => {
+                                                        const currentFiltered = notifications.filter(n => {
+                                                            if (notifStatusFilter === 'active' && n.is_active === false) return false;
+                                                            if (notifStatusFilter === 'passive' && n.is_active !== false) return false;
+                                                            if (notifStatusFilter === 'announcement' && n.type !== 'announcement') return false;
+                                                            if (notifStatusFilter === 'reminder' && n.type !== 'reminder') return false;
+                                                            if (notifSearchQuery.trim()) {
+                                                                const q = notifSearchQuery.toLowerCase();
+                                                                return (n.title || '').toLowerCase().includes(q) ||
+                                                                       (n.message || '').toLowerCase().includes(q) ||
+                                                                       (n.event_title || '').toLowerCase().includes(q) ||
+                                                                       (n.user_id || '').toLowerCase().includes(q);
+                                                            }
+                                                            return true;
+                                                        });
+                                                        if (e.target.checked) {
+                                                            const newSet = new Set([...selectedNotifIds, ...currentFiltered.map(n => n.id)]);
+                                                            setSelectedNotifIds(Array.from(newSet));
+                                                        } else {
+                                                            const filteredIds = new Set(currentFiltered.map(n => n.id));
+                                                            setSelectedNotifIds(selectedNotifIds.filter(id => !filteredIds.has(id)));
+                                                        }
+                                                    }}
+                                                    className="rounded border-zinc-700 bg-zinc-800 text-rose-500 focus:ring-0"
+                                                />
+                                            </th>
+                                            <th className="py-2.5 px-3">Durum & Tip</th>
+                                            <th className="py-2.5 px-3">Başlık & Mesaj</th>
+                                            <th className="py-2.5 px-3">Hedef Kitle</th>
+                                            <th className="py-2.5 px-3">Tarih</th>
+                                            <th className="py-2.5 px-3 text-right">İşlemler</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-zinc-800/60">
+                                        {notifications
+                                            .filter(n => {
+                                                if (notifStatusFilter === 'active' && n.is_active === false) return false;
+                                                if (notifStatusFilter === 'passive' && n.is_active !== false) return false;
+                                                if (notifStatusFilter === 'announcement' && n.type !== 'announcement') return false;
+                                                if (notifStatusFilter === 'reminder' && n.type !== 'reminder') return false;
+                                                if (notifSearchQuery.trim()) {
+                                                    const q = notifSearchQuery.toLowerCase();
+                                                    return (n.title || '').toLowerCase().includes(q) ||
+                                                           (n.message || '').toLowerCase().includes(q) ||
+                                                           (n.event_title || '').toLowerCase().includes(q) ||
+                                                           (n.user_id || '').toLowerCase().includes(q);
+                                                }
+                                                return true;
+                                            })
+                                            .map((notif) => {
+                                                const isSelected = selectedNotifIds.includes(notif.id);
+                                                const isActive = notif.is_active !== false;
+                                                const isLoading = actionLoadingId === notif.id;
+
+                                                return (
+                                                    <tr
+                                                        key={notif.id}
+                                                        className={`hover:bg-zinc-900/40 transition-colors ${
+                                                            isSelected ? 'bg-rose-950/20' : ''
+                                                        } ${!isActive ? 'opacity-70 bg-zinc-950/60' : ''}`}
+                                                    >
+                                                        <td className="py-2.5 px-3">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isSelected}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setSelectedNotifIds(prev => [...prev, notif.id]);
+                                                                    } else {
+                                                                        setSelectedNotifIds(prev => prev.filter(x => x !== notif.id));
+                                                                    }
+                                                                }}
+                                                                className="rounded border-zinc-700 bg-zinc-800 text-rose-500 focus:ring-0"
+                                                            />
+                                                        </td>
+                                                        <td className="py-2.5 px-3">
+                                                            <div className="flex flex-col gap-1 items-start">
+                                                                {/* Aktif / Pasif Badge */}
+                                                                {isActive ? (
+                                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-950 border border-emerald-800/80 text-emerald-300">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                                                        Yayında
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-950/60 border border-amber-800/60 text-amber-300">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                                                        Pasif
+                                                                    </span>
+                                                                )}
+
+                                                                {/* Type badge */}
+                                                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
+                                                                    notif.type === 'announcement' ? 'bg-purple-950/80 border border-purple-800 text-purple-300' :
+                                                                    notif.type === 'reminder' ? 'bg-amber-950/80 border border-amber-800 text-amber-300' :
+                                                                    notif.type === 'urgent' ? 'bg-rose-950/80 border border-rose-800 text-rose-300' :
+                                                                    'bg-blue-950/80 border border-blue-800 text-blue-300'
+                                                                }`}>
+                                                                    {notif.type === 'announcement' ? '📢 Duyuru' :
+                                                                     notif.type === 'reminder' ? '⏰ Hatırlatıcı' :
+                                                                     notif.type === 'urgent' ? '🚨 Acil' : 'ℹ️ Bilgi'}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-2.5 px-3 max-w-sm">
+                                                            <div className="space-y-0.5">
+                                                                <div className="font-semibold text-zinc-100 flex items-center gap-1.5">
+                                                                    <span>{notif.title}</span>
+                                                                    {notif.event_title && (
+                                                                        <span className="px-1.5 py-0.2 rounded bg-zinc-800 text-[10px] text-zinc-400 font-mono truncate max-w-[150px]" title={notif.event_title}>
+                                                                            📅 {notif.event_title}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-zinc-400 text-xs line-clamp-2 leading-relaxed">
+                                                                    {notif.message}
+                                                                </p>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-2.5 px-3">
+                                                            {notif.user_id === 'all' ? (
+                                                                <span className="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 text-[11px] font-medium flex items-center gap-1 w-max">
+                                                                    👥 Tüm Topluluk
+                                                                </span>
+                                                            ) : (
+                                                                <span className="px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-300 text-[11px] font-mono flex items-center gap-1 w-max">
+                                                                    👤 {members.find(m => m.id === notif.user_id)?.display_name || notif.user_id}
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="py-2.5 px-3 text-zinc-400 font-mono text-[11px]">
+                                                            <div>{new Date(notif.created_at).toLocaleDateString('tr-TR')}</div>
+                                                            <div className="text-[10px] text-zinc-500">{new Date(notif.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</div>
+                                                        </td>
+                                                        <td className="py-2.5 px-3 text-right">
+                                                            <div className="flex items-center justify-end gap-1.5">
+                                                                {/* Yayından Kaldır / Yayına Al Butonu */}
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={isLoading}
+                                                                    onClick={() => handleToggleNotificationActive(notif.id, isActive)}
+                                                                    className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition-colors flex items-center gap-1 ${
+                                                                        isActive
+                                                                            ? 'bg-amber-950/50 hover:bg-amber-900/70 text-amber-300 border border-amber-800/60'
+                                                                            : 'bg-emerald-950/50 hover:bg-emerald-900/70 text-emerald-300 border border-emerald-800/60'
+                                                                    }`}
+                                                                    title={isActive ? 'Kullanıcı bildirim menüsünden gizle' : 'Yeniden yayına al'}
+                                                                >
+                                                                    <span>{isActive ? '⏸️ Pasife Al' : '▶️ Yayına Al'}</span>
+                                                                </button>
+
+                                                                {/* İncele */}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setInspectNotification(notif)}
+                                                                    className="px-2 py-1 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 text-[11px] transition-colors"
+                                                                    title="Bildirim Detayı"
+                                                                >
+                                                                    🔍
+                                                                </button>
+
+                                                                {/* Sil */}
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={isLoading}
+                                                                    onClick={() => handleDeleteNotification(notif.id)}
+                                                                    className="px-2 py-1 rounded-lg bg-zinc-900 hover:bg-rose-950/60 hover:text-rose-300 text-zinc-400 text-[11px] border border-zinc-800 transition-colors"
+                                                                    title="Kalıcı Sil"
+                                                                >
+                                                                    🗑️
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+
+                                        {notifications.length === 0 && (
+                                            <tr>
+                                                <td colSpan={6} className="py-12 text-center text-xs text-zinc-500">
+                                                    Henüz hiçbir bildirim veya duyuru kaydı bulunmuyor.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── 6. AKTİF OTURUMLAR TABI ── */}
                     {activeTab === 'sessions' && (
                         <div className="space-y-4">
                             <h2 className="text-sm font-semibold text-white">Aktif Workspace Oturumları</h2>
@@ -1992,6 +2592,372 @@ export default function AdminWorkspacePage() {
                                 type="button"
                                 onClick={() => setNotesModalMember(null)}
                                 className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                            >
+                                Kapat
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal: Bildirim Geçmişini Temizle */}
+            {isClearNotifModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
+                    <div className="w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-2xl p-6 shadow-2xl space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                <span>🧹</span> Bildirim Geçmişini Temizle
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => setIsClearNotifModalOpen(false)}
+                                className="text-zinc-400 hover:text-white text-xs"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <p className="text-xs text-zinc-400 leading-relaxed">
+                            Bildirim geçmişini filtreye göre topluca temizleyebilirsiniz. Bu işlem kalıcıdır ve geri alınamaz.
+                        </p>
+
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-semibold text-zinc-300">Temizleme Kapsamı:</label>
+                            <div className="space-y-2">
+                                {[
+                                    {
+                                        key: 'all',
+                                        title: 'Tüm Bildirim Geçmişini Sıfırla',
+                                        desc: `Sistemdeki tüm bildirimleri siler (${notifications.length} kayıt).`
+                                    },
+                                    {
+                                        key: 'inactive',
+                                        title: 'Sadece Pasif Bildirimleri Temizle',
+                                        desc: `Yayından kaldırılmış pasif bildirimleri siler (${notifications.filter(n => n.is_active === false).length} kayıt).`
+                                    },
+                                    {
+                                        key: 'read',
+                                        title: 'Sadece Okunmuş Bildirimleri Temizle',
+                                        desc: `Okunmuş durumdaki bildirimleri siler (${notifications.filter(n => n.is_read).length} kayıt).`
+                                    }
+                                ].map((opt) => (
+                                    <label
+                                        key={opt.key}
+                                        className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                                            clearFilterChoice === opt.key
+                                                ? 'bg-rose-950/30 border-rose-800 text-white'
+                                                : 'bg-zinc-900/40 border-zinc-800 text-zinc-300 hover:border-zinc-700'
+                                        }`}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="clearFilterChoice"
+                                            value={opt.key}
+                                            checked={clearFilterChoice === opt.key}
+                                            onChange={() => setClearFilterChoice(opt.key as any)}
+                                            className="mt-0.5 text-rose-500 focus:ring-0"
+                                        />
+                                        <div className="space-y-0.5">
+                                            <div className="text-xs font-semibold">{opt.title}</div>
+                                            <div className="text-[11px] text-zinc-500">{opt.desc}</div>
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-rose-950/30 border border-rose-900/60 text-[11px] text-rose-300 leading-relaxed">
+                            ⚠️ Seçilen kriterdeki bildirim kayıtları kalıcı olarak veritabanından silinecektir.
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
+                            <button
+                                type="button"
+                                onClick={() => setIsClearNotifModalOpen(false)}
+                                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white"
+                            >
+                                İptal
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isBulkActionLoading}
+                                onClick={handleClearNotificationHistory}
+                                className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-md transition-all disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                                {isBulkActionLoading ? 'Temizleniyor...' : 'Geçmişi Temizle'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal: Yeni Duyuru / Bildirim Dağıt */}
+            {isBroadcastModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
+                    <div className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-2xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                <span>⚡</span> Anlık Duyuru & Bildirim Dağıtımı
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => setIsBroadcastModalOpen(false)}
+                                className="text-zinc-400 hover:text-white text-xs"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleDispatchBroadcast} className="space-y-3.5 text-xs">
+                            {/* Başlık */}
+                            <div>
+                                <label className="block text-zinc-400 font-semibold mb-1">Bildirim / Duyuru Başlığı *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="Örn: Haftalık Genel Kurul Toplantısı"
+                                    value={broadcastForm.title}
+                                    onChange={(e) => setBroadcastForm(prev => ({ ...prev, title: e.target.value }))}
+                                    className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-200 focus:outline-none focus:border-zinc-600"
+                                />
+                            </div>
+
+                            {/* Mesaj */}
+                            <div>
+                                <label className="block text-zinc-400 font-semibold mb-1">Duyuru Mesajı *</label>
+                                <textarea
+                                    required
+                                    rows={3}
+                                    placeholder="Topluluk üyelerine iletilecek detaylı mesaj..."
+                                    value={broadcastForm.message}
+                                    onChange={(e) => setBroadcastForm(prev => ({ ...prev, message: e.target.value }))}
+                                    className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-200 focus:outline-none focus:border-zinc-600 resize-none"
+                                />
+                            </div>
+
+                            {/* Tip & Etkinlik İlişkisi */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-zinc-400 font-semibold mb-1">Bildirim Tipi</label>
+                                    <select
+                                        value={broadcastForm.type}
+                                        onChange={(e) => setBroadcastForm(prev => ({ ...prev, type: e.target.value as any }))}
+                                        className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-200 focus:outline-none focus:border-zinc-600"
+                                    >
+                                        <option value="announcement">📢 Duyuru</option>
+                                        <option value="reminder">⏰ Hatırlatıcı</option>
+                                        <option value="info">ℹ️ Bilgilendirme</option>
+                                        <option value="urgent">🚨 Acil</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-zinc-400 font-semibold mb-1">İlişkili Etkinlik (İsteğe Bağlı)</label>
+                                    <select
+                                        value={broadcastForm.eventId}
+                                        onChange={(e) => {
+                                            const selId = e.target.value;
+                                            const selEvt = events.find(ev => ev.id === selId);
+                                            setBroadcastForm(prev => ({
+                                                ...prev,
+                                                eventId: selId,
+                                                eventTitle: selEvt?.title || ''
+                                            }));
+                                        }}
+                                        className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-200 focus:outline-none focus:border-zinc-600"
+                                    >
+                                        <option value="">Seçilmedi (Genel Bildirim)</option>
+                                        {events.map(ev => (
+                                            <option key={ev.id} value={ev.id}>{ev.title}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Hedef Kitle */}
+                            <div>
+                                <label className="block text-zinc-400 font-semibold mb-1">Hedef Kitle</label>
+                                <select
+                                    value={broadcastForm.targetAudience}
+                                    onChange={(e) => setBroadcastForm(prev => ({ ...prev, targetAudience: e.target.value as any }))}
+                                    className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-200 focus:outline-none focus:border-zinc-600"
+                                >
+                                    <option value="all">👥 Tüm Topluluk (Herkes)</option>
+                                    <option value="group">🏢 Belirli Bir Komite / Ekip</option>
+                                    <option value="role">🛡️ Belirli Bir Rol</option>
+                                    <option value="selected">👤 Belirli Kullanıcılar</option>
+                                </select>
+                            </div>
+
+                            {/* Komite Seçimi */}
+                            {broadcastForm.targetAudience === 'group' && (
+                                <div>
+                                    <label className="block text-zinc-400 font-semibold mb-1">Komite Seçin</label>
+                                    <select
+                                        value={broadcastForm.targetGroupId}
+                                        onChange={(e) => setBroadcastForm(prev => ({ ...prev, targetGroupId: e.target.value }))}
+                                        className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-200 focus:outline-none focus:border-zinc-600"
+                                    >
+                                        <option value="">Komite Seçiniz...</option>
+                                        {groups.map(g => (
+                                            <option key={g.id} value={g.id}>{g.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            {/* Rol Seçimi */}
+                            {broadcastForm.targetAudience === 'role' && (
+                                <div>
+                                    <label className="block text-zinc-400 font-semibold mb-1">Hedef Rol</label>
+                                    <select
+                                        value={broadcastForm.targetRole}
+                                        onChange={(e) => setBroadcastForm(prev => ({ ...prev, targetRole: e.target.value as WorkspaceRole }))}
+                                        className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-200 focus:outline-none focus:border-zinc-600"
+                                    >
+                                        <option value="super_admin">Kurucu / Süper Yönetici (super_admin)</option>
+                                        <option value="workspace_admin">Workspace Yöneticisi (workspace_admin)</option>
+                                        <option value="editor">Komite Lideri / Editör (editor)</option>
+                                        <option value="contributor">Aktif Üye / Katkıcı (contributor)</option>
+                                        <option value="viewer">Gözlemci / İzleyici (viewer)</option>
+                                    </select>
+                                </div>
+                            )}
+
+                            {/* Belirli Kullanıcılar */}
+                            {broadcastForm.targetAudience === 'selected' && (
+                                <div>
+                                    <label className="block text-zinc-400 font-semibold mb-1">
+                                        Hedef Üyeleri Seçin ({broadcastForm.targetUserIds.length} seçildi)
+                                    </label>
+                                    <div className="max-h-36 overflow-y-auto space-y-1 p-2 rounded-xl bg-zinc-900/60 border border-zinc-800">
+                                        {members.map(m => {
+                                            const isChecked = broadcastForm.targetUserIds.includes(m.id);
+                                            return (
+                                                <label key={m.id} className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-zinc-800/60 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isChecked}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setBroadcastForm(prev => ({ ...prev, targetUserIds: [...prev.targetUserIds, m.id] }));
+                                                            } else {
+                                                                setBroadcastForm(prev => ({ ...prev, targetUserIds: prev.targetUserIds.filter(x => x !== m.id) }));
+                                                            }
+                                                        }}
+                                                        className="rounded border-zinc-700 bg-zinc-800 text-rose-500 focus:ring-0"
+                                                    />
+                                                    <span className="text-zinc-200 font-medium">{m.display_name}</span>
+                                                    <span className="text-[10px] text-zinc-500 font-mono">({m.email})</span>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsBroadcastModalOpen(false)}
+                                    className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white"
+                                >
+                                    İptal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isBulkActionLoading}
+                                    className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white text-xs font-semibold shadow-md transition-all disabled:opacity-50 flex items-center gap-1.5"
+                                >
+                                    {isBulkActionLoading ? 'Gönderiliyor...' : '⚡ Duyuruyu Dağıt'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal: Bildirim Detay İnceleme */}
+            {inspectNotification && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
+                    <div className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-2xl p-6 shadow-2xl space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                <span>🔍</span> Bildirim Detayı
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => setInspectNotification(null)}
+                                className="text-zinc-400 hover:text-white text-xs"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="space-y-3 text-xs">
+                            <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] text-zinc-500 font-mono">ID: {inspectNotification.id}</span>
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                        inspectNotification.is_active !== false
+                                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                            : 'bg-amber-950 text-amber-300 border border-amber-800'
+                                    }`}>
+                                        {inspectNotification.is_active !== false ? '🟢 Yayında' : '⏸️ Pasif'}
+                                    </span>
+                                </div>
+                                <h4 className="text-sm font-bold text-white">{inspectNotification.title}</h4>
+                                <p className="text-zinc-300 leading-relaxed whitespace-pre-wrap">{inspectNotification.message}</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 text-[11px]">
+                                <div className="p-2.5 rounded-lg bg-zinc-900/40 border border-zinc-800/80">
+                                    <div className="text-zinc-500">Hedef Kitle</div>
+                                    <div className="font-semibold text-zinc-200 mt-0.5">
+                                        {inspectNotification.user_id === 'all'
+                                            ? '👥 Tüm Topluluk'
+                                            : `👤 ${members.find(m => m.id === inspectNotification.user_id)?.display_name || inspectNotification.user_id}`}
+                                    </div>
+                                </div>
+                                <div className="p-2.5 rounded-lg bg-zinc-900/40 border border-zinc-800/80">
+                                    <div className="text-zinc-500">Bildirim Tipi</div>
+                                    <div className="font-semibold text-zinc-200 mt-0.5 capitalize">{inspectNotification.type}</div>
+                                </div>
+                                <div className="p-2.5 rounded-lg bg-zinc-900/40 border border-zinc-800/80">
+                                    <div className="text-zinc-500">Tarih</div>
+                                    <div className="font-semibold text-zinc-200 mt-0.5">
+                                        {new Date(inspectNotification.created_at).toLocaleString('tr-TR')}
+                                    </div>
+                                </div>
+                                <div className="p-2.5 rounded-lg bg-zinc-900/40 border border-zinc-800/80">
+                                    <div className="text-zinc-500">İlişkili Etkinlik</div>
+                                    <div className="font-semibold text-zinc-200 mt-0.5">
+                                        {inspectNotification.event_title || 'Yok'}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-3 border-t border-zinc-800">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    handleToggleNotificationActive(inspectNotification.id, inspectNotification.is_active !== false);
+                                    setInspectNotification(prev => prev ? { ...prev, is_active: prev.is_active === false } : null);
+                                }}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                                    inspectNotification.is_active !== false
+                                        ? 'bg-amber-950/60 hover:bg-amber-900 text-amber-300 border border-amber-800'
+                                        : 'bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 border border-emerald-800'
+                                }`}
+                            >
+                                <span>{inspectNotification.is_active !== false ? '⏸️ Yayından Kaldır (Pasife Al)' : '▶️ Yayına Al'}</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setInspectNotification(null)}
+                                className="px-4 py-1.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white hover:bg-zinc-800"
                             >
                                 Kapat
                             </button>
