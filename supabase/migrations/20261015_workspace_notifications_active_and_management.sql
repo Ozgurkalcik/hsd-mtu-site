@@ -1,4 +1,4 @@
-﻿-- Migration: Add is_active column and RLS policies for workspace_notifications management
+-- Migration: Add is_active column and RLS policies for workspace_notifications management
 -- Date: 2026-10-15
 
 ALTER TABLE IF EXISTS public.workspace_notifications
@@ -23,3 +23,19 @@ CREATE POLICY "Allow workspace notifications update access" ON public.workspace_
 DROP POLICY IF EXISTS "Allow workspace notifications delete access" ON public.workspace_notifications;
 CREATE POLICY "Allow workspace notifications delete access" ON public.workspace_notifications
     FOR DELETE USING (true);
+
+-- ==============================================================================
+-- Workspace Event Comments Schema Alignment
+-- ==============================================================================
+ALTER TABLE IF EXISTS public.workspace_event_comments
+ADD COLUMN IF NOT EXISTS user_avatar TEXT;
+
+ALTER TABLE IF EXISTS public.workspace_event_comments
+ADD COLUMN IF NOT EXISTS tag TEXT DEFAULT 'general';
+
+ALTER TABLE IF EXISTS public.workspace_event_comments
+ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT false;
+
+ALTER TABLE IF EXISTS public.workspace_event_comments
+ADD COLUMN IF NOT EXISTS reactions JSONB DEFAULT '{}'::jsonb;
+

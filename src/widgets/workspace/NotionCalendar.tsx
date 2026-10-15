@@ -2097,10 +2097,15 @@ function MultiMonthView({
                                             key={day}
                                             type="button"
                                             onClick={() => onDaySelect(new Date(year, month, day))}
-                                            className={`h-7 rounded-lg flex flex-col items-center justify-center font-medium transition-all ${hasEvent
-                                                    ? 'bg-rose-950/60 text-rose-200 border border-rose-800/80 font-bold hover:scale-105'
-                                                    : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-white'
-                                                }`}
+                                            className={`h-7 rounded-lg flex flex-col items-center justify-center font-medium transition-all ${
+                                                hasEvent
+                                                    ? isLight
+                                                        ? 'bg-rose-100 text-rose-700 border border-rose-300 font-bold hover:scale-105 shadow-xs'
+                                                        : 'bg-rose-950/60 text-rose-200 border border-rose-800/80 font-bold hover:scale-105'
+                                                    : isLight
+                                                        ? 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                                        : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-white'
+                                            }`}
                                         >
                                             <span>{day}</span>
                                             {hasEvent && (
@@ -2113,19 +2118,41 @@ function MultiMonthView({
                         </div>
 
                         {/* Recent Events List for this month */}
-                        <div className="mt-4 pt-3 border-t border-zinc-800/60 space-y-1.5 max-h-28 overflow-y-auto">
-                            {monthEvents.slice(0, 3).map(ev => (
-                                <div
-                                    key={ev.id}
-                                    onClick={() => onEventClick(ev)}
-                                    className="p-1.5 rounded-lg bg-zinc-950/80 border border-zinc-800 text-[11px] flex items-center justify-between cursor-pointer hover:border-zinc-700 transition-colors"
-                                >
-                                    <span className="truncate font-medium text-zinc-200">{ev.title}</span>
-                                    <span className="text-[10px] text-zinc-500 font-mono shrink-0 ml-1">
-                                        {new Date(ev.start_time).getDate()} {MONTHS_TR[month].substring(0, 3)}
-                                    </span>
-                                </div>
-                            ))}
+                        <div className={`mt-4 pt-3 border-t space-y-1.5 max-h-32 overflow-y-auto ${
+                            isLight ? 'border-slate-100' : 'border-zinc-800/60'
+                        }`}>
+                            {monthEvents.length === 0 ? (
+                                <p className={`text-[10px] italic py-1.5 text-center ${
+                                    isLight ? 'text-slate-400' : 'text-zinc-500'
+                                }`}>
+                                    Bu ay planlanmış etkinlik yok
+                                </p>
+                            ) : (
+                                monthEvents.slice(0, 4).map(ev => (
+                                    <div
+                                        key={ev.id}
+                                        onClick={() => onEventClick(ev)}
+                                        className={`p-1.5 rounded-lg text-[11px] flex items-center justify-between cursor-pointer transition-all border ${
+                                            isLight
+                                                ? 'bg-slate-50 hover:bg-slate-100/90 border-slate-200/80 text-slate-800 shadow-xs'
+                                                : 'bg-zinc-800/50 hover:bg-zinc-800/80 border-zinc-700/60 text-zinc-200'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-1.5 overflow-hidden min-w-0">
+                                            <span
+                                                className="w-1.5 h-3 rounded-full shrink-0"
+                                                style={{ backgroundColor: ev.color || '#ef4444' }}
+                                            />
+                                            <span className="truncate font-medium">{ev.title}</span>
+                                        </div>
+                                        <span className={`text-[10px] font-mono shrink-0 ml-1.5 ${
+                                            isLight ? 'text-slate-500 font-semibold' : 'text-zinc-400'
+                                        }`}>
+                                            {new Date(ev.start_time).getDate()} {MONTHS_TR[month].substring(0, 3)}
+                                        </span>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 );

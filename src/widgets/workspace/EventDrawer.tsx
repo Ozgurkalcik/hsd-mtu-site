@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     WorkspaceEvent,
     WorkspaceCalendar,
@@ -520,7 +520,7 @@ export default function EventDrawer({
     const isLight = theme === 'light';
 
     // ── 🎯 SEKME (TAB) YÖNETİMİ (Düzenli & Karışıklıktan Arındırılmış Deneyim) ──
-    type DrawerTab = 'general' | 'datetime' | 'access' | 'rsvp' | 'tasks' | 'communication';
+    type DrawerTab = 'general' | 'datetime' | 'access' | 'rsvp' | 'tasks' | 'communication' | 'all';
     const [activeDrawerTab, setActiveDrawerTab] = useState<DrawerTab>('general');
     const [showTemplates, setShowTemplates] = useState<boolean>(!event);
 
@@ -668,146 +668,165 @@ export default function EventDrawer({
     const [showAdvancedDatetime, setShowAdvancedDatetime] = useState(false);
     const [showAdvancedAccess, setShowAdvancedAccess] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [isAddingComment, setIsAddingComment] = useState(false);
+    const [commentError, setCommentError] = useState<string | null>(null);
+
+    // Track drawer open lifecycle to avoid re-initializing and resetting active tab during background syncs
+    const prevOpenRef = useRef(false);
+    const prevEventIdRef = useRef<string | null | undefined>(undefined);
 
     // Populate when opening/editing
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen) {
+            prevOpenRef.current = false;
+            prevEventIdRef.current = undefined;
+            return;
+        }
 
-        setActiveDrawerTab('general');
-        setShowTemplates(!event);
-        setMemberAttendanceList(event?.member_attendance || []);
+        const eventKey = event?.id || (initialDate ? `new_${initialDate}` : 'new_event');
+        const isFreshOpen = !prevOpenRef.current || prevEventIdRef.current !== eventKey;
 
-        if (event) {
-            if (event.id) {
-                fetch(`/api/workspace/events/${event.id}/attendance`)
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.attendees && Array.isArray(data.attendees)) {
-                            setMemberAttendanceList(data.attendees);
-                        }
-                    })
-                    .catch(() => {});
-            }
+        if (isFreshOpen) {
+            prevOpenRef.current = true;
+            prevEventIdRef.current = eventKey;
 
-            setTitle(event.title || '');
-            const targetCalId = event.calendar_id || calendars[0]?.id || 'cal_core';
-            setCalendarId(targetCalId);
-            setCategory(event.category || 'Toplantı');
-            setColor(COMMITTEE_COLORS[targetCalId] || event.color || '#ef4444');
-            setIsAllDay(Boolean(event.is_all_day));
-            setLocation(event.location || '');
-            setMeetingLink(event.meeting_link || '');
-            setDescription(event.description || '');
-            setStatus(event.status || 'scheduled');
-            setVisibility(event.visibility || 'public');
-            setCustomVisibleMembers((event as any).allowed_member_ids || event.assignees || []);
-            setMemberSearchQuery('');
-            setReminders(event.reminders || []);
-            setAssignees(event.assignees || []);
-            setSubtasks(event.subtasks || []);
-            setComments(event.comments || []);
-            setAttachments(event.attachments || []);
-            setVersion(event.version || 1);
-            setIsShowcase(Boolean(event.is_showcase));
-            setRsvpEnabled(Boolean(event.rsvp_enabled));
-            setRsvpQrEnabled(Boolean(event.rsvp_qr_enabled));
-            setRsvpCapacity(event.rsvp_capacity || '');
+            setActiveDrawerTab('general');
+            setShowTemplates(!event);
+            setMemberAttendanceList(event?.member_attendance || []);
 
-            // Fetch latest comments directly from database
-            if (event.id) {
-                fetch(`/api/workspace/events/${event.id}/comments`)
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.comments && Array.isArray(data.comments)) {
-                            setComments(data.comments);
-                        }
-                    })
-                    .catch(err => console.error('Yorum yükleme hatası:', err));
+            if (event) {
+                if (event.id) {
+                    fetch(`/api/workspace/events/${event.id}/attendance`)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.attendees && Array.isArray(data.attendees)) {
+                                setMemberAttendanceList(data.attendees);
+                            }
+                        })
+                        .catch(() => {});
+                }
 
-                // Fetch RSVP Attendees
-                setIsLoadingAttendees(true);
-                fetch(`/api/workspace/rsvp?event_id=${event.id}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.attendees && Array.isArray(data.attendees)) {
-                            setAttendees(data.attendees);
-                        } else {
-                            setAttendees([]);
-                        }
-                    })
-                    .catch(err => console.error('RSVP yükleme hatası:', err))
-                    .finally(() => setIsLoadingAttendees(false));
+                setTitle(event.title || '');
+                const targetCalId = event.calendar_id || calendars[0]?.id || 'cal_core';
+                setCalendarId(targetCalId);
+                setCategory(event.category || 'Toplantı');
+                setColor(COMMITTEE_COLORS[targetCalId] || event.color || '#ef4444');
+                setIsAllDay(Boolean(event.is_all_day));
+                setLocation(event.location || '');
+                setMeetingLink(event.meeting_link || '');
+                setDescription(event.description || '');
+                setStatus(event.status || 'scheduled');
+                setVisibility(event.visibility || 'public');
+                setCustomVisibleMembers((event as any).allowed_member_ids || event.assignees || []);
+                setMemberSearchQuery('');
+                setReminders(event.reminders || []);
+                setAssignees(event.assignees || []);
+                setSubtasks(event.subtasks || []);
+                setComments(event.comments || []);
+                setAttachments(event.attachments || []);
+                setVersion(event.version || 1);
+                setIsShowcase(Boolean(event.is_showcase));
+                setRsvpEnabled(Boolean(event.rsvp_enabled));
+                setRsvpQrEnabled(Boolean(event.rsvp_qr_enabled));
+                setRsvpCapacity(event.rsvp_capacity || '');
+
+                // Fetch latest comments directly from database
+                if (event.id) {
+                    fetch(`/api/workspace/events/${event.id}/comments`)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.comments && Array.isArray(data.comments)) {
+                                setComments(data.comments);
+                            }
+                        })
+                        .catch(err => console.error('Yorum yükleme hatası:', err));
+
+                    // Fetch RSVP Attendees
+                    setIsLoadingAttendees(true);
+                    fetch(`/api/workspace/rsvp?event_id=${event.id}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.attendees && Array.isArray(data.attendees)) {
+                                setAttendees(data.attendees);
+                            } else {
+                                setAttendees([]);
+                            }
+                        })
+                        .catch(err => console.error('RSVP yükleme hatası:', err))
+                        .finally(() => setIsLoadingAttendees(false));
+                } else {
+                    setAttendees([]);
+                }
+
+                // Parse Dates & Current Member's Attendance
+                try {
+                    const s = new Date(event.start_time);
+                    setStartDate(formatLocalDate(s));
+                    setStartTime(s.toTimeString().substring(0, 5));
+
+                    const e = new Date(event.end_time);
+                    setEndDate(formatLocalDate(e));
+                    setEndTime(e.toTimeString().substring(0, 5));
+                } catch {
+                    const today = formatLocalDate(new Date());
+                    setStartDate(today);
+                    setEndDate(today);
+                }
+
+                // Set my attendance
+                if (currentMember && event.member_attendance) {
+                    const myAtt = event.member_attendance.find(a => a.user_id === currentMember.id);
+                    setMyAttendanceStatus(myAtt?.status || null);
+                    setMyAttendanceReason(myAtt?.reason || '');
+                } else {
+                    setMyAttendanceStatus(null);
+                    setMyAttendanceReason('');
+                }
+                setMyRsvpFeedback(null);
             } else {
+                // New Event Defaults: Use clicked date (initialDate) if available!
+                const baseDate = initialDate ? new Date(initialDate) : new Date();
+                const targetDateStr = formatLocalDate(baseDate);
+
+                setTitle('');
+                const defaultCalId = calendars[0]?.id || 'cal_core';
+                setCalendarId(defaultCalId);
+                setCategory('Toplantı');
+                setColor(COMMITTEE_COLORS[defaultCalId] || '#ef4444');
+                setStartDate(targetDateStr);
+                setStartTime('10:00');
+                setEndDate(targetDateStr);
+                setEndTime('11:00');
+                setIsAllDay(false);
+                setLocation('');
+                setMeetingLink('');
+                setDescription('');
+                setStatus('scheduled');
+                setVisibility('public');
+                setCustomVisibleMembers([]);
+                setMemberSearchQuery('');
+                setReminders([
+                    { id: `rem_default_1`, minutes_before: 60, target: 'all' }
+                ]);
+                setAssignees(currentMember ? [currentMember.id] : []);
+                setSubtasks([]);
+                setComments([]);
+                setAttachments([]);
+                setVersion(1);
+                setIsShowcase(false);
+                setRsvpEnabled(false);
+                setRsvpQrEnabled(false);
+                setRsvpCapacity('');
                 setAttendees([]);
             }
 
-            // Parse Dates & Current Member's Attendance
-            try {
-                const s = new Date(event.start_time);
-                setStartDate(formatLocalDate(s));
-                setStartTime(s.toTimeString().substring(0, 5));
-
-                const e = new Date(event.end_time);
-                setEndDate(formatLocalDate(e));
-                setEndTime(e.toTimeString().substring(0, 5));
-            } catch {
-                const today = formatLocalDate(new Date());
-                setStartDate(today);
-                setEndDate(today);
-            }
-
-            // Set my attendance
-            if (currentMember && event.member_attendance) {
-                const myAtt = event.member_attendance.find(a => a.user_id === currentMember.id);
-                setMyAttendanceStatus(myAtt?.status || null);
-                setMyAttendanceReason(myAtt?.reason || '');
-            } else {
-                setMyAttendanceStatus(null);
-                setMyAttendanceReason('');
-            }
-            setMyRsvpFeedback(null);
-        } else {
-            // New Event Defaults: Use clicked date (initialDate) if available!
-            const baseDate = initialDate ? new Date(initialDate) : new Date();
-            const targetDateStr = formatLocalDate(baseDate);
-
-            setTitle('');
-            const defaultCalId = calendars[0]?.id || 'cal_core';
-            setCalendarId(defaultCalId);
-            setCategory('Toplantı');
-            setColor(COMMITTEE_COLORS[defaultCalId] || '#ef4444');
-            setStartDate(targetDateStr);
-            setStartTime('10:00');
-            setEndDate(targetDateStr);
-            setEndTime('11:00');
-            setIsAllDay(false);
-            setLocation('');
-            setMeetingLink('');
-            setDescription('');
-            setStatus('scheduled');
-            setVisibility('public');
-            setCustomVisibleMembers([]);
-            setMemberSearchQuery('');
-            setReminders([
-                { id: `rem_default_1`, minutes_before: 60, target: 'all' }
-            ]);
-            setAssignees(currentMember ? [currentMember.id] : []);
-            setSubtasks([]);
-            setComments([]);
-            setAttachments([]);
-            setVersion(1);
-            setIsShowcase(false);
-            setRsvpEnabled(false);
-            setRsvpQrEnabled(false);
-            setRsvpCapacity('');
-            setAttendees([]);
+            setErrorMsg(null);
+            setCommentError(null);
+            setAppliedTemplateFeedback(null);
+            setAnnouncementSuccess(false);
+            setAnnouncementMsg('');
+            setReminderTestSuccess(false);
         }
-
-        setErrorMsg(null);
-        setAppliedTemplateFeedback(null);
-        setAnnouncementSuccess(false);
-        setAnnouncementMsg('');
-        setReminderTestSuccess(false);
     }, [isOpen, event, initialDate, calendars, currentMember]);
 
     // Keyboard ESC to close
@@ -1421,10 +1440,14 @@ export default function EventDrawer({
     // Comment Handlers
     const handleAddComment = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newCommentText.trim()) return;
+        if (!newCommentText.trim() || isAddingComment) return;
 
+        setCommentError(null);
+        setIsAddingComment(true);
+
+        const tempId = `com_${Date.now()}`;
         const newCom: WorkspaceComment = {
-            id: `com_${Date.now()}`,
+            id: tempId,
             event_id: event?.id || 'temp',
             user_id: currentMember?.id || 'anon',
             user_name: currentMember?.display_name || 'Topluluk Yöneticisi',
@@ -1436,7 +1459,8 @@ export default function EventDrawer({
             reactions: {},
         };
 
-        setComments([...comments, newCom]);
+        const submittedText = newCommentText.trim();
+        setComments(prev => [...prev, newCom]);
         setNewCommentText('');
 
         if (event?.id) {
@@ -1444,22 +1468,31 @@ export default function EventDrawer({
                 const res = await fetch(`/api/workspace/events/${event.id}/comments`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content: newCom.content, tag: newCommentTag }),
+                    body: JSON.stringify({ content: submittedText, tag: newCommentTag }),
                 });
                 const data = await res.json();
                 if (res.ok && data.comment) {
-                    setComments(prev => prev.map(c => c.id === newCom.id ? data.comment : c));
+                    setComments(prev => prev.map(c => c.id === tempId ? data.comment : c));
                     if (event) {
                         const updated = {
                             ...event,
-                            comments: [...(event.comments || []).filter(c => c.id !== newCom.id), data.comment]
+                            comments: [...(event.comments || []).filter(c => c.id !== tempId), data.comment]
                         };
                         onEventSaved(updated);
                     }
+                } else {
+                    setComments(prev => prev.filter(c => c.id !== tempId));
+                    setCommentError(data.error || 'Yorum kaydedilemedi. Lütfen tekrar deneyin.');
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error('Yorum API hatası:', err);
+                setComments(prev => prev.filter(c => c.id !== tempId));
+                setCommentError('Bağlantı hatası: Yorum sunucuya iletilemedi.');
+            } finally {
+                setIsAddingComment(false);
             }
+        } else {
+            setIsAddingComment(false);
         }
     };
 
@@ -1690,8 +1723,8 @@ export default function EventDrawer({
 
                     {/* ── 1.5. SEKME ÇUBUĞU (TAB NAVIGATION - Yalnızca Düzenleme Modunda) ── */}
                     {!isReadOnly && (
-                        <div className={`flex items-center gap-1.5 px-6 py-2.5 border-b overflow-x-auto shrink-0 scrollbar-none ${
-                            isLight ? 'bg-slate-100/90 border-slate-200' : 'bg-zinc-900/60 border-zinc-800'
+                        <div className={`flex flex-wrap items-center gap-1.5 px-6 py-2.5 border-b shrink-0 ${
+                            isLight ? 'bg-slate-100/95 border-slate-200' : 'bg-zinc-900/80 border-zinc-800'
                         }`}>
                             {[
                                 { id: 'general', label: 'Temel Bilgiler', icon: '📝' },
@@ -1712,6 +1745,7 @@ export default function EventDrawer({
                                         : (attachments.length > 0 ? `${attachments.length}` : undefined) 
                                 },
                                 { id: 'communication', label: 'İletişim & Notlar', icon: '💬', badge: comments.length > 0 ? `${comments.length}` : undefined },
+                                { id: 'all', label: 'Tümünü Gör (Tek Sayfa)', icon: '📄' },
                             ].map(tab => {
                                 const isActive = activeDrawerTab === tab.id;
                                 return (
@@ -1828,7 +1862,7 @@ export default function EventDrawer({
                         )}
 
                         {/* ── PRATİKLİK MERKEZİ: HIZLI KOMİTE ŞABLONLARI (Kullanıcı Dostu Açılır/Kapanır) ── */}
-                        {!event && activeDrawerTab === 'general' && (
+                        {!event && (activeDrawerTab === 'general' || activeDrawerTab === 'all') && (
                             <div className={`p-4 rounded-2xl shadow-sm space-y-3.5 transition-colors ${
                                 isLight
                                     ? 'bg-gradient-to-br from-rose-50/40 via-white to-slate-50 border border-slate-200'
@@ -1940,8 +1974,15 @@ export default function EventDrawer({
                         <form id="event-form" onSubmit={handleSave} className="space-y-6">
 
                             {/* ── SEKMELER: 1. GENEL BİLGİLER BÖLÜMÜ ── */}
-                            {activeDrawerTab === 'general' && (
+                            {(activeDrawerTab === 'general' || activeDrawerTab === 'all') && (
                                 <>
+                                    {activeDrawerTab === 'all' && (
+                                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border ${
+                                            isLight ? 'bg-slate-100 text-slate-800 border-slate-200' : 'bg-zinc-800/80 text-zinc-200 border-zinc-700'
+                                        }`}>
+                                            <span>📝 1. Temel Bilgiler</span>
+                                        </div>
+                                    )}
                                     {/* ── BÖLÜM 0: ETKİNLİĞİ EKLEYEN ÜYE & OLUŞTURULMA BİLGİSİ ── */}
                             {(() => {
                                 const creatorMember = members.find(m => m.id === event?.created_by);
@@ -2178,8 +2219,15 @@ export default function EventDrawer({
                     )}
 
                     {/* ── SEKMELER: 3. ERİŞİM & GÖRÜNÜRLÜK (RBAC) BÖLÜMÜ ── */}
-                    {activeDrawerTab === 'access' && (
+                    {(activeDrawerTab === 'access' || activeDrawerTab === 'all') && (
                         <>
+                            {activeDrawerTab === 'all' && (
+                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border ${
+                                    isLight ? 'bg-slate-100 text-slate-800 border-slate-200' : 'bg-zinc-800/80 text-zinc-200 border-zinc-700'
+                                }`}>
+                                    <span>🛡️ 2. Erişim & Görünürlük (RBAC)</span>
+                                </div>
+                            )}
                             {/* ── BÖLÜM 2.5: ERİŞİM & GÖRÜNÜRLÜK DÜZEYİ (RBAC KORUMALI) ── */}
                             <div className={`p-4 rounded-2xl ${
                                 isLight 
@@ -2505,8 +2553,15 @@ export default function EventDrawer({
                     )}
 
                     {/* ── SEKMELER: 2. ZAMANLAMA, TARİH & KONUM BÖLÜMÜ ── */}
-                    {activeDrawerTab === 'datetime' && (
+                    {(activeDrawerTab === 'datetime' || activeDrawerTab === 'all') && (
                         <>
+                            {activeDrawerTab === 'all' && (
+                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border ${
+                                    isLight ? 'bg-slate-100 text-slate-800 border-slate-200' : 'bg-zinc-800/80 text-zinc-200 border-zinc-700'
+                                }`}>
+                                    <span>⏱️ 3. Zamanlama & Konum</span>
+                                </div>
+                            )}
                             {/* ── BÖLÜM 3: ZAMANLAMA, TARİH & HIZLI SÜRE KISAYOLLARI ── */}
                             <div className={`p-4 rounded-2xl ${
                                 isLight 
@@ -3096,8 +3151,15 @@ export default function EventDrawer({
                     )}
 
                     {/* ── SEKMELER: 4. KAYIT (RSVP) & DİJİTAL QR BİLET AYARLARI ── */}
-                    {activeDrawerTab === 'rsvp' && (
+                    {(activeDrawerTab === 'rsvp' || activeDrawerTab === 'all') && (
                         <>
+                            {activeDrawerTab === 'all' && (
+                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border ${
+                                    isLight ? 'bg-slate-100 text-slate-800 border-slate-200' : 'bg-zinc-800/80 text-zinc-200 border-zinc-700'
+                                }`}>
+                                    <span>🎟️ 4. Kayıt & Katılımcılar (RSVP)</span>
+                                </div>
+                            )}
                             {/* ── BÖLÜM 6.5: 🎟️ ETKİNLİK KAYIT (RSVP) & DİJİTAL QR BİLET AYARLARI ── */}
                             <div className={`p-4 rounded-2xl ${
                                 isLight 
@@ -3204,7 +3266,7 @@ export default function EventDrawer({
                 </form>
 
                 {/* ── SEKMELER: 4. KATILIMCILAR & DAHİLİ EKİP KATILIM ÖZETİ ── */}
-                {activeDrawerTab === 'rsvp' && (
+                {(activeDrawerTab === 'rsvp' || activeDrawerTab === 'all') && (
                     <>
                         {/* 👥 Dahili Ekip Katılım Özeti */}
                         <div className={`p-4 rounded-2xl ${
@@ -3495,8 +3557,15 @@ export default function EventDrawer({
                 )}
 
                 {/* ── SEKMELER: 5. GÖREVLER & DOSYALAR ── */}
-                {activeDrawerTab === 'tasks' && (
+                {(activeDrawerTab === 'tasks' || activeDrawerTab === 'all') && (
                     <>
+                        {activeDrawerTab === 'all' && (
+                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border ${
+                                isLight ? 'bg-slate-100 text-slate-800 border-slate-200' : 'bg-zinc-800/80 text-zinc-200 border-zinc-700'
+                            }`}>
+                                <span>✅ 5. Görevler & Ekli Dosyalar</span>
+                            </div>
+                        )}
                         {/* ── BÖLÜM 7: GÖREV KONTROL LİSTESİ (CHECKLIST & İLERLEME ÇUBUĞU) ── */}
                         <div className={`p-4 rounded-2xl ${
                             isLight 
@@ -3748,8 +3817,15 @@ export default function EventDrawer({
                 )}
 
                 {/* ── SEKMELER: 6. İLETİŞİM, YORUMLAR & GEÇMİŞ ── */}
-                {activeDrawerTab === 'communication' && (
+                {(activeDrawerTab === 'communication' || activeDrawerTab === 'all') && (
                     <>
+                        {activeDrawerTab === 'all' && (
+                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border ${
+                                isLight ? 'bg-slate-100 text-slate-800 border-slate-200' : 'bg-zinc-800/80 text-zinc-200 border-zinc-700'
+                            }`}>
+                                <span>💬 6. İletişim, Yorumlar & Ekip Notları</span>
+                            </div>
+                        )}
                         {/* ── BÖLÜM 9: ⚡ ANLIK DUYURU & EKİP BİLDİRİMİ DAĞITIMI ── */}
                         <div className={`p-4 rounded-2xl ${
                             isLight 
@@ -3900,6 +3976,12 @@ export default function EventDrawer({
                             {/* Yeni Yorum / Ekip Notu Formu */}
                             {canComment ? (
                                 <form onSubmit={handleAddComment} className="space-y-2">
+                                    {commentError && (
+                                        <div className="p-2.5 rounded-xl bg-rose-950/80 border border-rose-700 text-rose-200 text-xs flex items-center justify-between">
+                                            <span>{commentError}</span>
+                                            <button type="button" onClick={() => setCommentError(null)} className="text-rose-400 hover:text-white font-bold ml-2">✕</button>
+                                        </div>
+                                    )}
                                     <div className="flex gap-2">
                                         <select
                                             value={newCommentTag}
@@ -3920,6 +4002,12 @@ export default function EventDrawer({
                                             type="text"
                                             value={newCommentText}
                                             onChange={(e) => setNewCommentText(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && !e.shiftKey) {
+                                                    e.preventDefault();
+                                                    handleAddComment(e);
+                                                }
+                                            }}
                                             placeholder="Bir güncelleme, karar veya ekip notu yazın..."
                                             className={`flex-1 border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-rose-500 font-medium ${
                                                 isLight 
@@ -3929,9 +4017,20 @@ export default function EventDrawer({
                                         />
                                         <button
                                             type="submit"
-                                            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white transition-colors shrink-0 shadow-sm"
+                                            disabled={isAddingComment || !newCommentText.trim()}
+                                            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white transition-colors shrink-0 shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                                         >
-                                            Ekle
+                                            {isAddingComment ? (
+                                                <>
+                                                    <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                                    </svg>
+                                                    <span>Ekleniyor...</span>
+                                                </>
+                                            ) : (
+                                                <span>Ekle</span>
+                                            )}
                                         </button>
                                     </div>
                                 </form>

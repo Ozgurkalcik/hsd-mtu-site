@@ -83,7 +83,9 @@ export async function POST(req: Request) {
             meeting_link,
             visibility,
             subtasks,
-            reminders
+            reminders,
+            comments,
+            attachments
         } = body;
 
         if (!title || !start_time || !end_time) {
@@ -122,8 +124,8 @@ export async function POST(req: Request) {
             created_by: session.member.id,
             version: 1,
             subtasks: Array.isArray(subtasks) ? subtasks : [],
-            comments: [],
-            attachments: [],
+            comments: Array.isArray(comments) ? comments.map((c: any) => ({ ...c, event_id: eventId })) : [],
+            attachments: Array.isArray(attachments) ? attachments : [],
             reminders: Array.isArray(reminders) ? reminders : [],
             edit_history: [
                 {
@@ -142,6 +144,25 @@ export async function POST(req: Request) {
         };
 
         const created = await WorkspaceRepository.createEvent(newEvent);
+
+        // Also persist any initial comments to database
+        if (Array.isArray(comments) && comments.length > 0) {
+            for (const com of comments) {
+                if (com && com.content) {
+                    try {
+                        await WorkspaceRepository.addComment(
+                            eventId,
+                            com.user_id || session.member.id,
+                            com.user_name || session.member.display_name,
+                            com.content,
+                            com.tag || 'general',
+                            Boolean(com.is_pinned),
+                            com.user_avatar || session.member.avatar_url
+                        );
+                    } catch {}
+                }
+            }
+        }
 
         // 📢 Otomatik Komite ve Topluluk Bildirimi Dağıtımı
         // Bir komite ile ilgili etkinlik eklendiğinde veya herkese açık duyurulduğunda diğer tüm üyelere otomatik bildirim iletilir

@@ -743,8 +743,6 @@ export class WorkspaceStoreManager {
         isPinned: boolean = false,
         userAvatar?: string
     ): WorkspaceComment {
-        const event = this.events.get(eventId);
-        if (!event) throw new Error('Etkinlik bulunamadı');
         const comment: WorkspaceComment = {
             id: `com_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
             event_id: eventId,
@@ -757,9 +755,12 @@ export class WorkspaceStoreManager {
             reactions: {},
             created_at: new Date().toISOString()
         };
-        event.comments.push(comment);
-        event.version += 1;
-        event.updated_at = new Date().toISOString();
+        const event = this.events.get(eventId);
+        if (event) {
+            event.comments.push(comment);
+            event.version += 1;
+            event.updated_at = new Date().toISOString();
+        }
         return comment;
     }
 

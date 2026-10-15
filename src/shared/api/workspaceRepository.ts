@@ -404,7 +404,20 @@ export class WorkspaceRepository {
                     .select('*')
                     .eq('event_id', eventId)
                     .order('created_at', { ascending: true });
-                if (!error && data && data.length > 0) return data as WorkspaceComment[];
+                if (!error && Array.isArray(data)) {
+                    return data.map((row: any) => ({
+                        id: row.id,
+                        event_id: row.event_id,
+                        user_id: row.user_id,
+                        user_name: row.user_name || 'Topluluk Üyesi',
+                        user_avatar: row.user_avatar || undefined,
+                        content: row.content || '',
+                        tag: row.tag || 'general',
+                        is_pinned: Boolean(row.is_pinned),
+                        reactions: row.reactions && typeof row.reactions === 'object' ? row.reactions : {},
+                        created_at: row.created_at || new Date().toISOString()
+                    }));
+                }
             } catch (err) {
                 console.warn('Postgres yorum okuma hatası:', err);
             }
@@ -442,20 +455,51 @@ export class WorkspaceRepository {
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                const { data, error } = await supabase
+                // 1) First attempt: insert full object (with extended fields)
+                let { data, error } = await supabase
                     .from('workspace_event_comments')
                     .insert(newComment)
                     .select()
                     .single();
 
+                // 2) If failed due to missing column (schema cache / unmigrated), fallback to standard schema columns
+                if (error) {
+                    console.warn('Postgres genişletilmiş yorum ekleme hatası, temel şemayla deneniyor:', error.message);
+                    const fallbackPayload = {
+                        id: newComment.id,
+                        event_id: newComment.event_id,
+                        user_id: newComment.user_id,
+                        user_name: newComment.user_name,
+                        content: newComment.content,
+                        created_at: newComment.created_at
+                    };
+                    const fallbackRes = await supabase
+                        .from('workspace_event_comments')
+                        .insert(fallbackPayload)
+                        .select()
+                        .single();
+                    if (!fallbackRes.error && fallbackRes.data) {
+                        data = { ...newComment, ...fallbackRes.data };
+                        error = null;
+                    }
+                }
+
                 if (!error && data) {
                     try {
                         WorkspaceStoreManager.getInstance().addComment(eventId, userId, userName, content, tag, isPinned, userAvatar);
                     } catch {}
-                    return data as WorkspaceComment;
-                }
-                if (error) {
-                    console.warn('Postgres yorum ekleme uyarısı:', error);
+                    return {
+                        id: data.id || newComment.id,
+                        event_id: data.event_id || newComment.event_id,
+                        user_id: data.user_id || newComment.user_id,
+                        user_name: data.user_name || newComment.user_name,
+                        user_avatar: data.user_avatar || userAvatar,
+                        content: data.content || newComment.content,
+                        tag: data.tag || tag,
+                        is_pinned: Boolean(data.is_pinned ?? isPinned),
+                        reactions: data.reactions && typeof data.reactions === 'object' ? data.reactions : {},
+                        created_at: data.created_at || nowIso
+                    };
                 }
             } catch (err) {
                 console.warn('Postgres yorum ekleme hatası:', err);
@@ -471,11 +515,41 @@ export class WorkspaceRepository {
 
     public static async toggleCommentPin(eventId: string, commentId: string): Promise<WorkspaceComment | null> {
         this.ensureDatabaseConfigured();
-        const updated = WorkspaceStoreManager.getInstance().toggleCommentPin(eventId, commentId);
-        if (updated && this.isSupabaseConfigured()) {
+        let updated: WorkspaceComment | null = null;
+        try {
+            updated = WorkspaceStoreManager.getInstance().toggleCommentPin(eventId, commentId);
+        } catch {}
+
+        if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                await supabase.from('workspace_event_comments').update({ is_pinned: updated.is_pinned }).eq('id', commentId);
+                let nextPinned = updated ? updated.is_pinned : true;
+                if (!updated) {
+                    const { data } = await supabase.from('workspace_event_comments').select('*').eq('id', commentId).single();
+                    if (data) {
+                        nextPinned = !Boolean(data.is_pinned);
+                    }
+                }
+                const { data: updatedDb, error } = await supabase
+                    .from('workspace_event_comments')
+                    .update({ is_pinned: nextPinned })
+                    .eq('id', commentId)
+                    .select()
+                    .single();
+                if (!error && updatedDb) {
+                    return {
+                        id: updatedDb.id,
+                        event_id: updatedDb.event_id,
+                        user_id: updatedDb.user_id,
+                        user_name: updatedDb.user_name,
+                        user_avatar: updatedDb.user_avatar,
+                        content: updatedDb.content,
+                        tag: updatedDb.tag || 'general',
+                        is_pinned: Boolean(updatedDb.is_pinned),
+                        reactions: updatedDb.reactions && typeof updatedDb.reactions === 'object' ? updatedDb.reactions : {},
+                        created_at: updatedDb.created_at
+                    };
+                }
             } catch (err) {
                 console.warn('Postgres yorum sabitleme güncelleme hatası:', err);
             }
@@ -485,11 +559,54 @@ export class WorkspaceRepository {
 
     public static async toggleCommentReaction(eventId: string, commentId: string, emoji: string, userName: string): Promise<WorkspaceComment | null> {
         this.ensureDatabaseConfigured();
-        const updated = WorkspaceStoreManager.getInstance().toggleCommentReaction(eventId, commentId, emoji, userName);
-        if (updated && this.isSupabaseConfigured()) {
+        let updated: WorkspaceComment | null = null;
+        try {
+            updated = WorkspaceStoreManager.getInstance().toggleCommentReaction(eventId, commentId, emoji, userName);
+        } catch {}
+
+        if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                await supabase.from('workspace_event_comments').update({ reactions: updated.reactions }).eq('id', commentId);
+                let nextReactions: Record<string, string[]> = (updated && updated.reactions) ? updated.reactions : {};
+                if (!updated) {
+                    const { data } = await supabase.from('workspace_event_comments').select('*').eq('id', commentId).single();
+                    if (data) {
+                        const reactions = (data.reactions && typeof data.reactions === 'object') ? { ...data.reactions } : {};
+                        const userList: string[] = Array.isArray(reactions[emoji]) ? [...reactions[emoji]] : [];
+                        const userIdx = userList.indexOf(userName);
+                        if (userIdx >= 0) {
+                            userList.splice(userIdx, 1);
+                        } else {
+                            userList.push(userName);
+                        }
+                        if (userList.length === 0) {
+                            delete reactions[emoji];
+                        } else {
+                            reactions[emoji] = userList;
+                        }
+                        nextReactions = reactions;
+                    }
+                }
+                const { data: updatedDb, error } = await supabase
+                    .from('workspace_event_comments')
+                    .update({ reactions: nextReactions })
+                    .eq('id', commentId)
+                    .select()
+                    .single();
+                if (!error && updatedDb) {
+                    return {
+                        id: updatedDb.id,
+                        event_id: updatedDb.event_id,
+                        user_id: updatedDb.user_id,
+                        user_name: updatedDb.user_name,
+                        user_avatar: updatedDb.user_avatar,
+                        content: updatedDb.content,
+                        tag: updatedDb.tag || 'general',
+                        is_pinned: Boolean(updatedDb.is_pinned),
+                        reactions: updatedDb.reactions && typeof updatedDb.reactions === 'object' ? updatedDb.reactions : {},
+                        created_at: updatedDb.created_at
+                    };
+                }
             } catch (err) {
                 console.warn('Postgres yorum reaksiyon güncelleme hatası:', err);
             }
@@ -499,15 +616,20 @@ export class WorkspaceRepository {
 
     public static async deleteComment(eventId: string, commentId: string): Promise<boolean> {
         this.ensureDatabaseConfigured();
-        const deleted = WorkspaceStoreManager.getInstance().deleteComment(eventId, commentId);
-        if (deleted && this.isSupabaseConfigured()) {
+        let deleted = false;
+        if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                await supabase.from('workspace_event_comments').delete().eq('id', commentId);
+                const { error } = await supabase.from('workspace_event_comments').delete().eq('id', commentId);
+                if (!error) deleted = true;
             } catch (err) {
                 console.warn('Postgres yorum silme hatası:', err);
             }
         }
+        try {
+            const storeDeleted = WorkspaceStoreManager.getInstance().deleteComment(eventId, commentId);
+            if (storeDeleted) deleted = true;
+        } catch {}
         return deleted;
     }
 
