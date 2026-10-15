@@ -48,3 +48,20 @@ ADD COLUMN IF NOT EXISTS allowed_committee_ids JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE IF EXISTS public.workspace_events
 ADD COLUMN IF NOT EXISTS allowed_member_ids JSONB DEFAULT '[]'::jsonb;
 
+-- ==============================================================================
+-- Workspace Groups & Members Schema & RLS Alignment (Komite Üye Atama İzinleri)
+-- ==============================================================================
+ALTER TABLE IF EXISTS public.workspace_groups ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow workspace groups update access" ON public.workspace_groups;
+CREATE POLICY "Allow workspace groups update access" ON public.workspace_groups
+    FOR UPDATE TO authenticated, anon USING (true) WITH CHECK (true);
+
+ALTER TABLE IF EXISTS public.workspace_members ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow workspace members update group_id" ON public.workspace_members;
+CREATE POLICY "Allow workspace members update group_id" ON public.workspace_members
+    FOR UPDATE TO authenticated, anon USING (true) WITH CHECK (true);
+
+
+
