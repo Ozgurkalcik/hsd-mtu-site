@@ -115,8 +115,9 @@ export async function PATCH(req: Request, context: RouteParams) {
                     eventTitle: result.event.title,
                     title: `🗓️ Etkinlik Tarihi Güncellendi: ${result.event.title}`,
                     message: `"${result.event.title}" etkinliği ${session.member.display_name} tarafından yeni bir tarihe taşındı: ${newDateFormatted}`,
-                    targetAudience: result.event.visibility === 'admin_only' ? 'role' : 'all',
+                    targetAudience: result.event.visibility === 'admin_only' ? 'role' : (result.event.visibility === 'committee' ? 'group' : 'all'),
                     targetRole: result.event.visibility === 'admin_only' ? 'workspace_admin' : undefined,
+                    targetGroupId: result.event.visibility === 'committee' && result.event.allowed_committee_ids?.length ? result.event.allowed_committee_ids[0] : undefined,
                     type: 'urgent'
                 });
             } catch (notifErr) {

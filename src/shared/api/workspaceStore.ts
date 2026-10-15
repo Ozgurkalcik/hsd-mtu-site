@@ -587,6 +587,40 @@ export class WorkspaceStoreManager {
             if (vis === 'private') {
                 return viewerMember && (e.created_by === viewerMember.id || viewerMember.role === 'super_admin');
             }
+            if (vis === 'committee') {
+                if (!viewerMember) return false;
+                if (viewerMember.role === 'super_admin' || viewerMember.role === 'workspace_admin' || viewerMember.role === 'editor' || e.created_by === viewerMember.id) return true;
+                const allowed = (e as any).allowed_committee_ids || [];
+                if (!Array.isArray(allowed) || allowed.length === 0) return false;
+                if (allowed.includes('cal_core') || allowed.includes('all')) return true;
+                if (viewerMember.group_id && allowed.includes(viewerMember.group_id)) return true;
+                const calToGroupMap: Record<string, string> = {
+                    cal_proj: 'grp_project',
+                    cal_event: 'grp_event_sponsor',
+                    cal_social: 'grp_social_design',
+                    cal_medium: 'grp_medium',
+                    cal_mgmt: 'grp_mgmt',
+                    cal_ai: 'grp_ai'
+                };
+                const groupToCalMap: Record<string, string> = {
+                    grp_project: 'cal_proj',
+                    grp_event_sponsor: 'cal_event',
+                    grp_social_design: 'cal_social',
+                    grp_medium: 'cal_medium',
+                    grp_mgmt: 'cal_mgmt',
+                    grp_ai: 'cal_ai'
+                };
+                if (viewerMember.group_id && groupToCalMap[viewerMember.group_id] && allowed.includes(groupToCalMap[viewerMember.group_id])) {
+                    return true;
+                }
+                for (const cId of allowed) {
+                    if (calToGroupMap[cId] && viewerMember.group_id === calToGroupMap[cId]) return true;
+                }
+                if (Array.isArray(e.assignees) && (e.assignees.includes(viewerMember.id) || e.assignees.includes(viewerMember.username))) {
+                    return true;
+                }
+                return false;
+            }
             if (vis === 'custom') {
                 if (!viewerMember) return false;
                 if (viewerMember.role === 'super_admin' || e.created_by === viewerMember.id) return true;

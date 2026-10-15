@@ -100,7 +100,7 @@ export async function POST(req: Request) {
         }
 
         // Görünürlük Seviyesi Doğrulama
-        const validVisibility = (visibility === 'admin_only' || visibility === 'private' || visibility === 'custom')
+        const validVisibility = (visibility === 'admin_only' || visibility === 'private' || visibility === 'custom' || visibility === 'committee')
             ? visibility
             : 'public';
 
@@ -121,6 +121,9 @@ export async function POST(req: Request) {
             allowed_member_ids: validVisibility === 'custom' && Array.isArray((body as any).allowed_member_ids)
                 ? (body as any).allowed_member_ids
                 : (validVisibility === 'custom' && Array.isArray(assignees) ? assignees : []),
+            allowed_committee_ids: validVisibility === 'committee' && Array.isArray((body as any).allowed_committee_ids)
+                ? (body as any).allowed_committee_ids
+                : (validVisibility === 'committee' && calendar_id ? [calendar_id] : []),
             location: location || '',
             meeting_link: meeting_link || '',
             status: 'scheduled',
@@ -179,8 +182,8 @@ export async function POST(req: Request) {
             const cal = calendars.find(c => c.id === (calendar_id || 'cal_core'));
             const committeeTitle = cal ? cal.title : 'Topluluk';
 
-            if (validVisibility === 'public' || validVisibility === 'admin_only') {
-                const targetAudience = validVisibility === 'admin_only' ? 'role' : 'all';
+            if (validVisibility === 'public' || validVisibility === 'admin_only' || validVisibility === 'committee') {
+                const targetAudience = validVisibility === 'admin_only' ? 'role' : (validVisibility === 'committee' ? 'group' : 'all');
                 await WorkspaceRepository.dispatchInstantNotification({
                     eventId: created.id,
                     eventTitle: created.title,
@@ -188,6 +191,7 @@ export async function POST(req: Request) {
                     message: `${session.member.display_name} tarafından yeni bir etkinlik oluşturuldu: "${created.title}". (${new Date(start_time).toLocaleDateString('tr-TR')}${location ? ` - ${location}` : ''})`,
                     targetAudience: targetAudience as any,
                     targetRole: validVisibility === 'admin_only' ? 'workspace_admin' : undefined,
+                    targetGroupId: validVisibility === 'committee' && created.allowed_committee_ids?.length ? created.allowed_committee_ids[0] : undefined,
                     type: 'announcement'
                 });
             }

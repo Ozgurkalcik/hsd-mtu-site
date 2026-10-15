@@ -55,6 +55,16 @@ export const COMMITTEE_COLORS: Record<string, string> = {
     cal_mgmt: '#8b5cf6',    // Yönetim & Koordinasyon Takvimi (Mor)
 };
 
+export const DEFAULT_WORKSPACE_CALENDARS: WorkspaceCalendar[] = [
+    { id: 'cal_core', title: 'Genel Topluluk Takvimi', color: '#ef4444', is_private: false },
+    { id: 'cal_proj', title: 'Proje Komitesi Takvimi', color: '#3b82f6', is_private: false },
+    { id: 'cal_event', title: 'Etkinlik & Sponsorluk Komitesi', color: '#f97316', is_private: false },
+    { id: 'cal_social', title: 'Sosyal Medya & Tasarım Komitesi', color: '#ec4899', is_private: false },
+    { id: 'cal_medium', title: 'Medium Komitesi Takvimi', color: '#eab308', is_private: false },
+    { id: 'cal_mgmt', title: 'Yönetim & Koordinasyon Takvimi', color: '#8b5cf6', is_private: true },
+    { id: 'cal_ai', title: 'Ar-Ge & Yapay Zeka Komitesi', color: '#10b981', is_private: false },
+];
+
 // ⚡ 4 Çekirdek Komiteye Özel Gelişmiş Etkinlik Şablonları (Templates)
 interface CommitteeTemplate {
     id: string;
@@ -540,7 +550,9 @@ export default function EventDrawer({
     const [status, setStatus] = useState<'scheduled' | 'in_progress' | 'completed' | 'cancelled'>('scheduled');
     const [visibility, setVisibility] = useState<EventVisibility>('public');
     const [customVisibleMembers, setCustomVisibleMembers] = useState<string[]>([]);
+    const [customVisibleCommittees, setCustomVisibleCommittees] = useState<string[]>([]);
     const [memberSearchQuery, setMemberSearchQuery] = useState('');
+    const availableCommittees = calendars && calendars.length > 0 ? calendars : DEFAULT_WORKSPACE_CALENDARS;
     const [reminders, setReminders] = useState<WorkspaceReminder[]>([]);
     const [customReminderVal, setCustomReminderVal] = useState<number>(30);
     const [customReminderUnit, setCustomReminderUnit] = useState<'minutes' | 'hours' | 'days'>('minutes');
@@ -718,6 +730,7 @@ export default function EventDrawer({
                 setStatus(event.status || 'scheduled');
                 setVisibility(event.visibility || 'public');
                 setCustomVisibleMembers((event as any).allowed_member_ids || event.assignees || []);
+                setCustomVisibleCommittees((event as any).allowed_committee_ids || []);
                 setMemberSearchQuery('');
                 setReminders(event.reminders || []);
                 setAssignees(event.assignees || []);
@@ -804,6 +817,7 @@ export default function EventDrawer({
                 setStatus('scheduled');
                 setVisibility('public');
                 setCustomVisibleMembers([]);
+                setCustomVisibleCommittees([]);
                 setMemberSearchQuery('');
                 setReminders([
                     { id: `rem_default_1`, minutes_before: 60, target: 'all' }
@@ -1145,6 +1159,7 @@ export default function EventDrawer({
             status,
             visibility,
             allowed_member_ids: visibility === 'custom' ? customVisibleMembers : undefined,
+            allowed_committee_ids: visibility === 'committee' ? customVisibleCommittees : undefined,
             is_showcase: isShowcase,
             rsvp_enabled: rsvpEnabled,
             rsvp_qr_enabled: rsvpQrEnabled,
@@ -1740,7 +1755,7 @@ export default function EventDrawer({
                             {[
                                 { id: 'general', label: 'Temel Bilgiler', icon: '📝' },
                                 { id: 'datetime', label: 'Zaman & Konum', icon: '⏱️', badge: reminders.length > 0 ? `${reminders.length}` : undefined },
-                                { id: 'access', label: 'Erişim (RBAC)', icon: '🛡️', badge: visibility === 'admin_only' ? 'Admin' : visibility === 'private' ? 'Özel' : undefined },
+                                { id: 'access', label: 'Erişim (RBAC)', icon: '🛡️', badge: visibility === 'admin_only' ? 'Admin' : visibility === 'private' ? 'Özel' : visibility === 'committee' ? `${customVisibleCommittees.length} Komite` : visibility === 'custom' ? `${customVisibleMembers.length} Üye` : undefined },
                                 { 
                                     id: 'rsvp', 
                                     label: 'Kayıt & Katılımcılar', 
@@ -2259,14 +2274,15 @@ export default function EventDrawer({
                                     <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded ${
                                         isLight ? 'text-slate-600 bg-slate-200/80 border border-slate-300/70' : 'text-zinc-400 bg-zinc-800'
                                     }`}>
-                                        {visibility === 'public' ? '🌍 Herkese Açık' : visibility === 'admin_only' ? '🛡️ Yönetici Özel' : visibility === 'custom' ? `👥 Belirli Kullanıcılar (${customVisibleMembers.length})` : '🔒 Gizli'}
+                                        {visibility === 'public' ? '🌍 Herkese Açık' : visibility === 'admin_only' ? '🛡️ Yönetici Özel' : visibility === 'committee' ? `🏛️ Belirli Komiteler (${customVisibleCommittees.length})` : visibility === 'custom' ? `👥 Belirli Kullanıcılar (${customVisibleMembers.length})` : '🔒 Gizli'}
                                     </span>
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
                                     {/* 1. Tüm Topluluk */}
                                     <button
                                         type="button"
+                                        disabled={isReadOnly}
                                         onClick={() => setVisibility('public')}
                                         className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
                                             visibility === 'public'
@@ -2276,7 +2292,7 @@ export default function EventDrawer({
                                                 : isLight
                                                     ? 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80'
                                                     : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50'
-                                        }`}
+                                        } ${isReadOnly ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
                                     >
                                         <div>
                                             <div className="flex items-center justify-between mb-1">
@@ -2295,6 +2311,7 @@ export default function EventDrawer({
                                     {/* 2. Sadece Adminler */}
                                     <button
                                         type="button"
+                                        disabled={isReadOnly}
                                         onClick={() => setVisibility('admin_only')}
                                         className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
                                             visibility === 'admin_only'
@@ -2304,7 +2321,7 @@ export default function EventDrawer({
                                                 : isLight
                                                     ? 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80'
                                                     : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50'
-                                        }`}
+                                        } ${isReadOnly ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
                                     >
                                         <div>
                                             <div className="flex items-center justify-between mb-1">
@@ -2320,9 +2337,51 @@ export default function EventDrawer({
                                         </div>
                                     </button>
 
-                                    {/* 3. Belirli Kullanıcılar */}
+                                    {/* 3. Belirli Komiteler */}
                                     <button
                                         type="button"
+                                        disabled={isReadOnly}
+                                        onClick={() => {
+                                            setVisibility('committee');
+                                            if (customVisibleCommittees.length === 0 && calendarId) {
+                                                setCustomVisibleCommittees([calendarId]);
+                                            }
+                                        }}
+                                        className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                                            visibility === 'committee'
+                                                ? isLight
+                                                    ? 'bg-purple-50/90 border-purple-500 shadow-sm ring-1 ring-purple-500/30'
+                                                    : 'bg-zinc-800/90 border-purple-500 shadow-md ring-1 ring-purple-500/30'
+                                                : isLight
+                                                    ? 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80'
+                                                    : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50'
+                                        } ${isReadOnly ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
+                                    >
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-base">🏛️</span>
+                                                {visibility === 'committee' && (
+                                                    <span className={`text-[10px] font-bold ${isLight ? 'text-purple-700' : 'text-purple-400'}`}>✓ Seçili</span>
+                                                )}
+                                            </div>
+                                            <p className={`text-xs font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>Belirli Komiteler</p>
+                                            <p className={`text-[10px] mt-0.5 leading-snug ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                                                Yalnızca seçtiğiniz komitelerin üyeleri ve yöneticiler görebilir.
+                                            </p>
+                                        </div>
+                                        {visibility === 'committee' && customVisibleCommittees.length > 0 && (
+                                            <span className={`text-[10px] font-bold mt-2 inline-block px-1.5 py-0.5 rounded w-fit ${
+                                                isLight ? 'bg-purple-100 text-purple-800' : 'bg-purple-900/50 text-purple-300'
+                                            }`}>
+                                                {customVisibleCommittees.length} Komite Seçildi
+                                            </span>
+                                        )}
+                                    </button>
+
+                                    {/* 4. Belirli Kullanıcılar */}
+                                    <button
+                                        type="button"
+                                        disabled={isReadOnly}
                                         onClick={() => setVisibility('custom')}
                                         className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
                                             visibility === 'custom'
@@ -2332,7 +2391,7 @@ export default function EventDrawer({
                                                 : isLight
                                                     ? 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80'
                                                     : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50'
-                                        }`}
+                                        } ${isReadOnly ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
                                     >
                                         <div>
                                             <div className="flex items-center justify-between mb-1">
@@ -2348,9 +2407,10 @@ export default function EventDrawer({
                                         </div>
                                     </button>
 
-                                    {/* 4. Sadece Ben */}
+                                    {/* 5. Sadece Ben */}
                                     <button
                                         type="button"
+                                        disabled={isReadOnly}
                                         onClick={() => setVisibility('private')}
                                         className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
                                             visibility === 'private'
@@ -2360,7 +2420,7 @@ export default function EventDrawer({
                                                 : isLight
                                                     ? 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80'
                                                     : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50'
-                                        }`}
+                                        } ${isReadOnly ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
                                     >
                                         <div>
                                             <div className="flex items-center justify-between mb-1">
@@ -2376,6 +2436,150 @@ export default function EventDrawer({
                                         </div>
                                     </button>
                                 </div>
+
+                                {/* 🏛️ Belirli Komiteler Seçim Paneli */}
+                                {visibility === 'committee' && (
+                                    <div className={`p-4 rounded-xl border space-y-3.5 ${
+                                        isLight ? 'bg-white border-purple-200/80 shadow-xs' : 'bg-zinc-950/80 border-purple-900/40 shadow-sm'
+                                    }`}>
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-base">🏛️</span>
+                                                <div>
+                                                    <h5 className={`text-xs font-bold ${isLight ? 'text-slate-800' : 'text-zinc-200'}`}>
+                                                        Erişim İzni Verilecek Komiteler ({customVisibleCommittees.length} / {availableCommittees.length})
+                                                    </h5>
+                                                    <p className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                                                        Etkinliği yalnızca seçili komitelerin üyeleri ve liderleri görüntüleyebilir.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            {!isReadOnly && (
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setCustomVisibleCommittees(availableCommittees.map(c => c.id))}
+                                                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                                                            isLight ? 'bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200' : 'bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 border border-purple-800/60'
+                                                        }`}
+                                                    >
+                                                        Tümünü Seç
+                                                    </button>
+                                                    {customVisibleCommittees.length > 0 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setCustomVisibleCommittees([])}
+                                                            className="text-[11px] text-rose-500 hover:text-rose-600 font-semibold px-2 py-1 cursor-pointer"
+                                                        >
+                                                            Temizle
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Seçili Komite Rozetleri (Chips) */}
+                                        {customVisibleCommittees.length > 0 ? (
+                                            <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                                {customVisibleCommittees.map(cId => {
+                                                    const cObj = availableCommittees.find(c => c.id === cId);
+                                                    const cTitle = cObj?.title || cId;
+                                                    const cColor = cObj?.color || COMMITTEE_COLORS[cId] || '#8b5cf6';
+                                                    return (
+                                                        <span
+                                                            key={cId}
+                                                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
+                                                                isLight
+                                                                    ? 'bg-purple-50 border-purple-200 text-purple-900'
+                                                                    : 'bg-purple-950/50 border-purple-800/60 text-purple-200'
+                                                            }`}
+                                                        >
+                                                            <span
+                                                                className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs"
+                                                                style={{ backgroundColor: cColor }}
+                                                            />
+                                                            <span>{cTitle}</span>
+                                                            {!isReadOnly && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setCustomVisibleCommittees(prev => prev.filter(id => id !== cId))}
+                                                                    className="text-purple-500 hover:text-purple-700 hover:bg-purple-200/50 dark:hover:bg-purple-900 rounded p-0.5 transition-colors cursor-pointer"
+                                                                    title="Kaldır"
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            )}
+                                                        </span>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className={`p-2.5 rounded-lg border text-xs flex items-center gap-2 ${
+                                                isLight ? 'bg-amber-50/70 border-amber-200 text-amber-800' : 'bg-amber-950/30 border-amber-800/50 text-amber-300'
+                                            }`}>
+                                                <span>⚠️</span>
+                                                <span>Lütfen aşağıdan en az bir komite seçin. Hiçbir komite seçilmezse yalnızca yöneticiler görebilir.</span>
+                                            </div>
+                                        )}
+
+                                        {/* Komite Seçim Kartları */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                                            {availableCommittees.map(cal => {
+                                                const isSelected = customVisibleCommittees.includes(cal.id);
+                                                const calColor = COMMITTEE_COLORS[cal.id] || cal.color || '#8b5cf6';
+                                                return (
+                                                    <div
+                                                        key={cal.id}
+                                                        onClick={() => {
+                                                            if (isReadOnly) return;
+                                                            setCustomVisibleCommittees(prev =>
+                                                                isSelected ? prev.filter(id => id !== cal.id) : [...prev, cal.id]
+                                                            );
+                                                        }}
+                                                        className={`p-3 rounded-xl border transition-all flex items-center justify-between ${
+                                                            isSelected
+                                                                ? isLight
+                                                                    ? 'bg-purple-50/90 border-purple-400 shadow-xs ring-1 ring-purple-400/30'
+                                                                    : 'bg-purple-950/40 border-purple-500 shadow-xs ring-1 ring-purple-500/30'
+                                                                : isLight
+                                                                    ? 'bg-slate-50/70 border-slate-200 hover:bg-white hover:border-slate-300'
+                                                                    : 'bg-zinc-900/60 border-zinc-800 hover:bg-zinc-900 hover:border-zinc-700'
+                                                        } ${isReadOnly ? 'cursor-default' : 'cursor-pointer'}`}
+                                                    >
+                                                        <div className="flex items-center gap-2.5 min-w-0">
+                                                            <span
+                                                                className="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs"
+                                                                style={{ backgroundColor: calColor }}
+                                                            />
+                                                            <div className="truncate">
+                                                                <p className={`text-xs font-bold truncate ${isLight ? 'text-slate-800' : 'text-zinc-100'}`}>
+                                                                    {cal.title}
+                                                                </p>
+                                                                {cal.description && (
+                                                                    <p className={`text-[10px] truncate ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                                                                        {cal.description}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="shrink-0 ml-2">
+                                                            <div className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold transition-all ${
+                                                                isSelected
+                                                                    ? 'bg-purple-600 text-white shadow-xs'
+                                                                    : isLight
+                                                                        ? 'border border-slate-300 bg-white text-transparent'
+                                                                        : 'border border-zinc-700 bg-zinc-800 text-transparent'
+                                                            }`}>
+                                                                ✓
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* 👥 Belirli Kullanıcılar Arama & Çoklu Seçim Paneli */}
                                 {visibility === 'custom' && (

@@ -39,3 +39,12 @@ ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT false;
 ALTER TABLE IF EXISTS public.workspace_event_comments
 ADD COLUMN IF NOT EXISTS reactions JSONB DEFAULT '{}'::jsonb;
 
+-- ==============================================================================
+-- Workspace Events Visibility Schema Alignment (Belirli Komiteler & Kullanıcılar)
+-- ==============================================================================
+ALTER TABLE IF EXISTS public.workspace_events
+ADD COLUMN IF NOT EXISTS allowed_committee_ids JSONB DEFAULT '[]'::jsonb;
+
+ALTER TABLE IF EXISTS public.workspace_events
+ADD COLUMN IF NOT EXISTS allowed_member_ids JSONB DEFAULT '[]'::jsonb;
+
