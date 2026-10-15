@@ -307,16 +307,26 @@ export default function WeeklyRsvpModal({
                                         </p>
                                     )}
 
-                                    {/* RSVP Buttons Panel */}
-                                    <div className={`p-3.5 rounded-xl border space-y-3 ${
-                                        isLight 
-                                            ? 'bg-slate-50/70 border-slate-200' 
-                                            : 'bg-zinc-950/80 border-zinc-800/80'
-                                    }`}>
-                                        <div className="flex items-center justify-between gap-2">
-                                            <span className={`text-xs font-bold ${isLight ? 'text-slate-800' : 'text-zinc-200'}`}>
-                                                Bu etkinliğe katılacak mısınız?
-                                            </span>
+                                    {/* Organizer or RSVP Buttons Panel */}
+                                    {event.created_by === currentUser?.id ? (
+                                        <div className={`p-3 rounded-xl border flex items-center justify-between gap-2 ${
+                                            isLight ? 'bg-amber-50/80 border-amber-200 text-amber-900' : 'bg-amber-950/30 border-amber-800/60 text-amber-300'
+                                        }`}>
+                                            <div className="flex items-center gap-2 text-xs font-semibold">
+                                                <span>👑</span>
+                                                <span>Bu etkinliğin düzenleyicisisiniz. Katılım yanıtları ve gerekçeler yönetim panelinize iletilmektedir.</span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className={`p-3.5 rounded-xl border space-y-3 ${
+                                            isLight 
+                                                ? 'bg-slate-50/70 border-slate-200' 
+                                                : 'bg-zinc-950/80 border-zinc-800/80'
+                                        }`}>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className={`text-xs font-bold ${isLight ? 'text-slate-800' : 'text-zinc-200'}`}>
+                                                    Bu etkinliğe katılacak mısınız?
+                                                </span>
 
                                             {activeStatus && (
                                                 <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border font-mono ${
@@ -474,7 +484,8 @@ export default function WeeklyRsvpModal({
                                                 {feedback}
                                             </div>
                                         )}
-                                    </div>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })

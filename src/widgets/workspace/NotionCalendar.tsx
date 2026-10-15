@@ -14,8 +14,16 @@ import { useFrozen } from '@/shared/lib/FrozenSection';
 import { createClient } from '@/shared/api/supabase';
 import EventDrawer from './EventDrawer';
 import WeeklyRsvpModal from './WeeklyRsvpModal';
+import { playWorkspaceNotificationSound } from '@/shared/utils/sound';
 
 export type CalendarViewMode = 'ay' | '3ay' | '6ay' | 'hafta' | 'gun' | 'liste' | 'pano';
+
+export const formatLocalDate = (d: Date): string => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
 
 const DAYS_TR = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
 const DAYS_SHORT_TR = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
@@ -62,6 +70,8 @@ export default function NotionCalendar({
     const [desktopNotifAllowed, setDesktopNotifAllowed] = useState(false);
     const [showPermissionBanner, setShowPermissionBanner] = useState(false);
     const [notifFilter, setNotifFilter] = useState<'all' | 'committee' | 'reminder' | 'urgent'>('all');
+    const knownNotifIdsRef = React.useRef<Set<string>>(new Set());
+    const isFirstNotifLoadRef = React.useRef<boolean>(true);
 
     // Workspace Light/Dark Theme (Only for /workspace)
     const [workspaceTheme, setWorkspaceTheme] = useState<'dark' | 'light'>('dark');
@@ -105,7 +115,7 @@ export default function NotionCalendar({
     // 🎯 Haftalık LCV Katılım Modal State & Otomatik Bildirim
     const [isWeeklyRsvpOpen, setIsWeeklyRsvpOpen] = useState(false);
 
-    // Önümüzdeki 7 gün içindeki etkinlik sayısı
+    // Önümüzdeki 7 gün içindeki etkinlikler (Genel Liste)
     const upcomingWeeklyEvents = useMemo(() => {
         const now = Date.now();
         const sevenDaysLater = now + 7 * 24 * 60 * 60 * 1000;
@@ -120,16 +130,46 @@ export default function NotionCalendar({
         });
     }, [events]);
 
-    // Girişte 7 gün içinde bekleyen etkinlik varsa şık menüyü otomatik aç (Günde 1 kez veya oturumda)
+    // Kullanıcının doğrudan katılması hedeflenen ve HENÜZ cevap vermediği etkinlikler
+    const pendingWeeklyRsvpEvents = useMemo(() => {
+        if (!currentUser) return [];
+        const now = Date.now();
+        const sevenDaysLater = now + 7 * 24 * 60 * 60 * 1000;
+        const isUserAdmin = currentUser.role === 'super_admin' || currentUser.role === 'workspace_admin';
+
+        return events.filter(ev => {
+            if (ev.status === 'cancelled') return false;
+            // Etkinliği bizzat oluşturan kişiye (organizatöre) katılım popup'ı açma
+            if (ev.created_by === currentUser.id) return false;
+
+            // Eğer yönetici ise ve atanmışlar (assignees) listesinde açıkça yoksa admini gereksiz rahatsız etme
+            if (isUserAdmin && (!ev.assignees || !ev.assignees.includes(currentUser.id))) {
+                return false;
+            }
+
+            // Eğer kullanıcı bu etkinliğe zaten katılım bildirdiyse tekrar sorma
+            const alreadyResponded = ev.member_attendance?.some(a => a.user_id === currentUser.id && a.status);
+            if (alreadyResponded) return false;
+
+            try {
+                const startMs = new Date(ev.start_time).getTime();
+                return startMs >= now && startMs <= sevenDaysLater;
+            } catch {
+                return false;
+            }
+        });
+    }, [events, currentUser]);
+
+    // Girişte sadece kullanıcının bekleyen ve cevaplamadığı etkinlik varsa popup'ı aç
     useEffect(() => {
-        if (!currentUser || upcomingWeeklyEvents.length === 0) return;
-        const todayKey = `hsd_weekly_rsvp_prompt_${new Date().toISOString().slice(0, 10)}`;
+        if (!currentUser || pendingWeeklyRsvpEvents.length === 0) return;
+        const todayKey = `hsd_weekly_rsvp_prompt_${formatLocalDate(new Date())}`;
         const alreadyPrompted = sessionStorage.getItem(todayKey);
         if (!alreadyPrompted) {
             setIsWeeklyRsvpOpen(true);
             sessionStorage.setItem(todayKey, 'true');
         }
-    }, [currentUser, upcomingWeeklyEvents.length]);
+    }, [currentUser, pendingWeeklyRsvpEvents.length]);
 
     // User Profile Dropdown Menu State
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -242,7 +282,7 @@ export default function NotionCalendar({
 
             if (notifRes && notifRes.ok) {
                 const notifData = await notifRes.json();
-                setNotifications(notifData.notifications || []);
+                handleIncomingNotifications(notifData.notifications || []);
             }
 
             if (memRes && memRes.ok) {
@@ -255,6 +295,43 @@ export default function NotionCalendar({
             console.error('Workspace verileri yüklenirken hata:', err);
         }
     }, [selectedCalendarIds.length, isAdmin]);
+
+    // Gelen Bildirimleri İşleme, Ses Çalma ve Masaüstü Bildirimi Gönderme
+    const handleIncomingNotifications = useCallback((incoming: WorkspaceNotification[]) => {
+        if (isFirstNotifLoadRef.current) {
+            incoming.forEach(n => knownNotifIdsRef.current.add(n.id));
+            isFirstNotifLoadRef.current = false;
+            setNotifications(incoming);
+            return;
+        }
+
+        const newUnread = incoming.filter(n => !n.is_read && !knownNotifIdsRef.current.has(n.id));
+        if (newUnread.length > 0) {
+            // 🔊 Tescilli Web Audio API Bildirim Zilini Çal
+            playWorkspaceNotificationSound(0.2);
+
+            // 💻 Masaüstü OS Bildirimi Tetikle
+            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+                const latest = newUnread[0];
+                try {
+                    const osNotif = new Notification(latest.title || 'HSD MTÜ Topluluk Bildirimi', {
+                        body: latest.message,
+                        icon: '/icon.png',
+                        tag: latest.id,
+                    });
+                    osNotif.onclick = () => {
+                        window.focus();
+                        setIsNotifOpen(true);
+                    };
+                } catch {
+                    // Tarayıcı bildirim sessiz hatasını yut
+                }
+            }
+        }
+
+        incoming.forEach(n => knownNotifIdsRef.current.add(n.id));
+        setNotifications(incoming);
+    }, []);
 
     useEffect(() => {
         fetchInitialData();
@@ -277,25 +354,36 @@ export default function NotionCalendar({
         }
     }, []);
 
-    // Polling for Notifications (respects useFrozen)
+    // Hızlı Polling (10 saniye) ve Sekmeye Odaklanıldığında Anında Kontrol (respects useFrozen)
     useEffect(() => {
         if (isFrozen) return; // Background Throttling: Pause polling when section is frozen
 
-        const interval = setInterval(async () => {
+        const checkLatestNotifications = async () => {
             if (document.hidden) return; // Pause when tab is hidden
             try {
                 const res = await fetch('/api/workspace/notifications');
                 if (res.ok) {
                     const data = await res.json();
-                    setNotifications(data.notifications || []);
+                    handleIncomingNotifications(data.notifications || []);
                 }
             } catch {
                 // Silently ignore network hiccups during background sync
             }
-        }, 30000); // Every 30 seconds
+        };
 
-        return () => clearInterval(interval);
-    }, [isFrozen]);
+        const interval = setInterval(checkLatestNotifications, 10000); // 10 saniye hızlı senkronizasyon
+
+        // Sekmeye dönüldüğünde veya pencere odaklandığında gecikmesiz anında senkronize et
+        const onFocus = () => checkLatestNotifications();
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onFocus);
+
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onFocus);
+        };
+    }, [isFrozen, handleIncomingNotifications]);
 
     // Request Desktop Notification Permission (Kalıcı Cihaz İzni)
     const requestNotificationPermission = async () => {
@@ -434,10 +522,10 @@ export default function NotionCalendar({
         try {
             const oldStart = new Date(ev.start_time);
             const oldEnd = new Date(ev.end_time);
-            const durationMs = oldEnd.getTime() - oldStart.getTime();
+            const durationMs = Math.max(15 * 60 * 1000, oldEnd.getTime() - oldStart.getTime());
 
-            const targetD = new Date(targetDateStr);
-            const newStart = new Date(targetD.getFullYear(), targetD.getMonth(), targetD.getDate(), oldStart.getHours(), oldStart.getMinutes());
+            const [y, m, d] = targetDateStr.split('-').map(Number);
+            const newStart = new Date(y, m - 1, d, oldStart.getHours(), oldStart.getMinutes(), 0);
             const newEnd = new Date(newStart.getTime() + durationMs);
 
             // Optimistic Update
@@ -448,7 +536,7 @@ export default function NotionCalendar({
             };
             setEvents(events.map(e => e.id === ev.id ? updatedEv : e));
 
-            // Server Update with Concurrency Lock
+            // Server Update with Concurrency Lock & Automatic Notification
             const res = await fetch(`/api/workspace/events/${ev.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -456,6 +544,7 @@ export default function NotionCalendar({
                     start_time: newStart.toISOString(),
                     end_time: newEnd.toISOString(),
                     version: ev.version,
+                    change_summary: `Tarih taşındı: ${formatLocalDate(newStart)}`,
                 }),
             });
 
@@ -913,6 +1002,38 @@ export default function NotionCalendar({
                                         </p>
                                     )}
                                 </div>
+
+                                {/* Bildirim Sesi Test & Masaüstü İzin Çubuğu */}
+                                <div className={`mt-3 pt-2.5 border-t flex items-center justify-between gap-2 text-[11px] ${
+                                    workspaceTheme === 'light' ? 'border-slate-100 text-slate-500' : 'border-zinc-800 text-zinc-400'
+                                }`}>
+                                    <button
+                                        type="button"
+                                        onClick={() => playWorkspaceNotificationSound(0.25)}
+                                        className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:text-rose-500 hover:bg-rose-500/10 transition-all cursor-pointer font-medium"
+                                        title="HSD Özel Bildirim Sesini Çal"
+                                    >
+                                        <span>🔊</span>
+                                        <span>Bildirim Sesini Test Et</span>
+                                    </button>
+
+                                    {!desktopNotifAllowed ? (
+                                        <button
+                                            type="button"
+                                            onClick={requestNotificationPermission}
+                                            className="flex items-center gap-1 px-2 py-1 rounded-lg text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 font-bold transition-all cursor-pointer"
+                                            title="Tarayıcı Masaüstü Bildirim İzni İste"
+                                        >
+                                            <span>💻</span>
+                                            <span>Masaüstü İzni Ver</span>
+                                        </button>
+                                    ) : (
+                                        <span className="flex items-center gap-1 text-[10px] text-emerald-500 font-medium">
+                                            <span>✓</span>
+                                            <span>Masaüstü Aktif</span>
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -1296,7 +1417,7 @@ export default function NotionCalendar({
                             theme={workspaceTheme}
                             onEventClick={handleOpenEditEvent}
                             onDayClick={(dateStr) => {
-                                const todayStr = new Date().toISOString().split('T')[0];
+                                const todayStr = formatLocalDate(new Date());
                                 const isPast = dateStr < todayStr;
                                 const canCreatePast = isAdmin || currentUser?.role === 'super_admin' || currentUser?.role === 'workspace_admin';
 
@@ -1470,20 +1591,20 @@ function MonthView({
 
     const calendarCells = useMemo(() => {
         const cells: Array<{ dateStr: string; dayNum: number; isCurrentMonth: boolean; isToday: boolean }> = [];
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = formatLocalDate(new Date());
 
         // Previous month filler
         for (let i = firstDayIndex - 1; i >= 0; i--) {
             const d = prevMonthDays - i;
             const pmDate = new Date(year, month - 1, d);
-            const dateStr = pmDate.toISOString().split('T')[0];
+            const dateStr = formatLocalDate(pmDate);
             cells.push({ dateStr, dayNum: d, isCurrentMonth: false, isToday: dateStr === todayStr });
         }
 
         // Current month days
         for (let d = 1; d <= daysInMonth; d++) {
             const mDate = new Date(year, month, d);
-            const dateStr = mDate.toISOString().split('T')[0];
+            const dateStr = formatLocalDate(mDate);
             cells.push({ dateStr, dayNum: d, isCurrentMonth: true, isToday: dateStr === todayStr });
         }
 
@@ -1492,7 +1613,7 @@ function MonthView({
         let nextD = 1;
         while (cells.length < total) {
             const nmDate = new Date(year, month + 1, nextD);
-            const dateStr = nmDate.toISOString().split('T')[0];
+            const dateStr = formatLocalDate(nmDate);
             cells.push({ dateStr, dayNum: nextD, isCurrentMonth: false, isToday: dateStr === todayStr });
             nextD++;
         }
@@ -1504,10 +1625,17 @@ function MonthView({
     const eventsByDate = useMemo(() => {
         const map = new Map<string, WorkspaceEvent[]>();
         events.forEach(e => {
-            const dateKey = e.start_time.split('T')[0];
-            const list = map.get(dateKey) || [];
-            list.push(e);
-            map.set(dateKey, list);
+            try {
+                const dateKey = formatLocalDate(new Date(e.start_time));
+                const list = map.get(dateKey) || [];
+                list.push(e);
+                map.set(dateKey, list);
+            } catch {
+                const fallback = e.start_time.split('T')[0];
+                const list = map.get(fallback) || [];
+                list.push(e);
+                map.set(fallback, list);
+            }
         });
         return map;
     }, [events]);
@@ -1692,7 +1820,13 @@ function MultiMonthView({
                                 {Array.from({ length: daysInMonth }).map((_, i) => {
                                     const day = i + 1;
                                     const dayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                                    const dayEvents = monthEvents.filter(e => e.start_time.startsWith(dayStr));
+                                    const dayEvents = monthEvents.filter(e => {
+                                        try {
+                                            return formatLocalDate(new Date(e.start_time)) === dayStr;
+                                        } catch {
+                                            return e.start_time.startsWith(dayStr);
+                                        }
+                                    });
                                     const hasEvent = dayEvents.length > 0;
 
                                     return (
@@ -1770,7 +1904,7 @@ function WeekView({
         return Array.from({ length: 7 }, (_, i) => {
             const dayDate = new Date(monday);
             dayDate.setDate(monday.getDate() + i);
-            const dateStr = dayDate.toISOString().split('T')[0];
+            const dateStr = formatLocalDate(dayDate);
             return {
                 name: DAYS_SHORT_TR[i],
                 dateStr,
@@ -1880,8 +2014,14 @@ interface DayViewProps {
 
 function DayView({ currentDate, events, theme = 'dark', onEventClick }: DayViewProps) {
     const isLight = theme === 'light';
-    const dateStr = currentDate.toISOString().split('T')[0];
-    const dayEvents = events.filter(e => e.start_time.startsWith(dateStr));
+    const dateStr = formatLocalDate(currentDate);
+    const dayEvents = events.filter(e => {
+        try {
+            return formatLocalDate(new Date(e.start_time)) === dateStr;
+        } catch {
+            return e.start_time.startsWith(dateStr);
+        }
+    });
     const hours = Array.from({ length: 16 }, (_, i) => i + 8); // 08:00 - 23:00
 
     return (

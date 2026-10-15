@@ -39,7 +39,17 @@ export async function PATCH(req: Request, context: RouteParams) {
             );
         }
 
+        const currentEvent = await WorkspaceRepository.getEventById(id);
+        if (!currentEvent) {
+            return NextResponse.json(
+                { error: 'Etkinlik bulunamadı.' },
+                { status: 404 }
+            );
+        }
+
+        const isCreator = currentEvent.created_by === session.member.id;
         const canEdit = session.permissions?.can_edit ||
+            isCreator ||
             session.member.role === 'super_admin' ||
             session.member.role === 'workspace_admin' ||
             session.member.role?.toLowerCase().includes('admin') ||
@@ -89,6 +99,31 @@ export async function PATCH(req: Request, context: RouteParams) {
             );
         }
 
+        // 🗓️ Otomatik Tarih Güncelleme & Taşıma Bildirimi Dağıtımı
+        if (updates.start_time && updates.start_time !== currentEvent.start_time) {
+            try {
+                const newDateFormatted = new Date(updates.start_time).toLocaleDateString('tr-TR', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                    weekday: 'long',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                await WorkspaceRepository.dispatchInstantNotification({
+                    eventId: result.event.id,
+                    eventTitle: result.event.title,
+                    title: `🗓️ Etkinlik Tarihi Güncellendi: ${result.event.title}`,
+                    message: `"${result.event.title}" etkinliği ${session.member.display_name} tarafından yeni bir tarihe taşındı: ${newDateFormatted}`,
+                    targetAudience: result.event.visibility === 'admin_only' ? 'role' : 'all',
+                    targetRole: result.event.visibility === 'admin_only' ? 'workspace_admin' : undefined,
+                    type: 'urgent'
+                });
+            } catch (notifErr) {
+                console.warn('Tarih güncelleme bildirimi iletilemedi:', notifErr);
+            }
+        }
+
         return NextResponse.json({ success: true, event: result.event });
     } catch (err: any) {
         return NextResponse.json(
@@ -121,15 +156,14 @@ export async function DELETE(req: Request, context: RouteParams) {
             session.member.role?.toLowerCase().includes('lead') ||
             session.member.role?.toLowerCase().includes('editor');
 
-        if (!canDelete) {
-            const existing = await WorkspaceRepository.getEventById(id);
-            const isAssignee = existing?.assignees?.includes(session.member.id);
-            if (!isAssignee) {
-                return NextResponse.json(
-                    { error: 'Etkinlik silme yetkiniz bulunmamaktadır.' },
-                    { status: 403 }
-                );
-            }
+        const existing = await WorkspaceRepository.getEventById(id);
+        const isCreator = existing?.created_by === session.member.id;
+        const isAssignee = existing?.assignees?.includes(session.member.id);
+        if (!canDelete && !isCreator && !isAssignee) {
+            return NextResponse.json(
+                { error: 'Etkinlik silme yetkiniz bulunmamaktadır.' },
+                { status: 403 }
+            );
         }
 
         const deleted = await WorkspaceRepository.deleteEvent(id);

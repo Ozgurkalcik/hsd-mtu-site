@@ -16,6 +16,8 @@ import {
     RolePermissions,
     MemberAttendance
 } from '@/shared/api/workspaceTypes';
+import { formatLocalDate } from './NotionCalendar';
+import EventReadOnlyView from './EventReadOnlyView';
 
 interface EventDrawerProps {
     isOpen: boolean;
@@ -556,6 +558,27 @@ export default function EventDrawer({
         currentMember?.role === 'contributor'
     );
 
+    // 🛡️ Yetki Modeli: Düzenleme vs. Görüntüleme (Etkinliği Düzenle vs. Etkinliği Görüntüle)
+    const isCreator = Boolean(event && currentMember && event.created_by === currentMember.id);
+    const isAdmin = Boolean(
+        currentMember?.role === 'super_admin' ||
+        currentMember?.role === 'workspace_admin' ||
+        currentMember?.role?.toLowerCase().includes('admin') ||
+        currentMember?.role?.toLowerCase().includes('lead')
+    );
+    const hasEditPermission = Boolean(userPermissions?.can_edit);
+    const canEditEvent = !event 
+        ? (userPermissions?.can_create ?? true) 
+        : (isCreator || isAdmin || hasEditPermission);
+    const isReadOnly = Boolean(event && !canEditEvent);
+    const canDeleteEvent = Boolean(event && (isCreator || isAdmin || userPermissions?.can_delete));
+
+    // Bireysel LCV Katılım Durumu (Görüntüleme Modunda Anında Yanıt)
+    const [myAttendanceStatus, setMyAttendanceStatus] = useState<'attending' | 'declined' | 'maybe' | null>(null);
+    const [myAttendanceReason, setMyAttendanceReason] = useState<string>('');
+    const [isSubmittingMyRsvp, setIsSubmittingMyRsvp] = useState<boolean>(false);
+    const [myRsvpFeedback, setMyRsvpFeedback] = useState<string | null>(null);
+
     // Sekmeler Arası Hızlı İlerleme
     const TABS_ORDER: DrawerTab[] = ['general', 'datetime', 'access', 'rsvp', 'tasks', 'communication'];
     const goToNextTab = () => {
@@ -582,11 +605,10 @@ export default function EventDrawer({
     }, [event]);
 
     const canEditPast = useMemo(() => {
-        if (!isEventPast) return true;
-        if (currentMember?.role === 'super_admin' || currentMember?.role === 'workspace_admin') return true;
-        if (currentMember?.group_id) return true;
+        if (!isEventPast) return canEditEvent;
+        if (isAdmin) return true;
         return false;
-    }, [isEventPast, currentMember]);
+    }, [isEventPast, canEditEvent, isAdmin]);
 
     // Active Tab for Markdown
     const [descTab, setDescTab] = useState<'write' | 'preview'>('write');
@@ -697,27 +719,35 @@ export default function EventDrawer({
                 setAttendees([]);
             }
 
-            // Parse Dates
+            // Parse Dates & Current Member's Attendance
             try {
                 const s = new Date(event.start_time);
-                setStartDate(s.toISOString().split('T')[0]);
+                setStartDate(formatLocalDate(s));
                 setStartTime(s.toTimeString().substring(0, 5));
 
                 const e = new Date(event.end_time);
-                setEndDate(e.toISOString().split('T')[0]);
+                setEndDate(formatLocalDate(e));
                 setEndTime(e.toTimeString().substring(0, 5));
             } catch {
-                const today = new Date().toISOString().split('T')[0];
+                const today = formatLocalDate(new Date());
                 setStartDate(today);
                 setEndDate(today);
             }
+
+            // Set my attendance
+            if (currentMember && event.member_attendance) {
+                const myAtt = event.member_attendance.find(a => a.user_id === currentMember.id);
+                setMyAttendanceStatus(myAtt?.status || null);
+                setMyAttendanceReason(myAtt?.reason || '');
+            } else {
+                setMyAttendanceStatus(null);
+                setMyAttendanceReason('');
+            }
+            setMyRsvpFeedback(null);
         } else {
             // New Event Defaults: Use clicked date (initialDate) if available!
             const baseDate = initialDate ? new Date(initialDate) : new Date();
-            const year = baseDate.getFullYear();
-            const month = String(baseDate.getMonth() + 1).padStart(2, '0');
-            const day = String(baseDate.getDate()).padStart(2, '0');
-            const targetDateStr = `${year}-${month}-${day}`;
+            const targetDateStr = formatLocalDate(baseDate);
 
             setTitle('');
             setCalendarId(calendars[0]?.id || 'cal_core');
@@ -804,15 +834,70 @@ export default function EventDrawer({
     const handleSetDuration = (durationMinutes: number) => {
         if (!startTime || !startDate) return;
         const [h, m] = startTime.split(':').map(Number);
-        const sDate = new Date(`${startDate}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`);
+        const [sy, sm, sd] = startDate.split('-').map(Number);
+        const sDate = new Date(sy, sm - 1, sd, h, m, 0);
         const eDate = new Date(sDate.getTime() + durationMinutes * 60 * 1000);
 
-        setEndDate(eDate.toISOString().split('T')[0]);
+        setEndDate(formatLocalDate(eDate));
         setEndTime(eDate.toTimeString().substring(0, 5));
         setIsAllDay(false);
     };
 
-    // ⚡ Pratiklik: Tarih Hızlı Kısayolları
+    // ⚡ Akıllı Süre Göstergesi (Hesaplanan Süre)
+    const calculatedDurationStr = useMemo(() => {
+        if (isAllDay) return 'Tüm Gün';
+        if (!startDate || !endDate || !startTime || !endTime) return null;
+        try {
+            const [sy, sm, sd] = startDate.split('-').map(Number);
+            const [sh, smin] = startTime.split(':').map(Number);
+            const [ey, em, ed] = endDate.split('-').map(Number);
+            const [eh, emin] = endTime.split(':').map(Number);
+
+            const startMs = new Date(sy, sm - 1, sd, sh, smin).getTime();
+            const endMs = new Date(ey, em - 1, ed, eh, emin).getTime();
+            const diffMinutes = Math.round((endMs - startMs) / (1000 * 60));
+
+            if (diffMinutes <= 0) return 'Geçersiz zaman aralığı (Bitiş başlangıçtan önce)';
+            const hours = Math.floor(diffMinutes / 60);
+            const mins = diffMinutes % 60;
+            if (hours === 0) return `${mins} dakika`;
+            if (mins === 0) return `${hours} saat`;
+            return `${hours} saat ${mins} dakika`;
+        } catch {
+            return null;
+        }
+    }, [startDate, endDate, startTime, endTime, isAllDay]);
+
+    // ⚡ Başlangıç Saati Değiştiğinde Akıllı Otomatik Öteleme
+    const handleStartTimeChange = (newStartTime: string) => {
+        setStartTime(newStartTime);
+        if (startDate === endDate && startTime && endTime) {
+            try {
+                const [oldSh, oldSm] = startTime.split(':').map(Number);
+                const [oldEh, oldEm] = endTime.split(':').map(Number);
+                const oldDuration = (oldEh * 60 + oldEm) - (oldSh * 60 + oldSm);
+                const safeDuration = oldDuration > 0 ? oldDuration : 60;
+
+                const [newSh, newSm] = newStartTime.split(':').map(Number);
+                const newEndTotalMins = newSh * 60 + newSm + safeDuration;
+                const newEh = Math.floor(newEndTotalMins / 60) % 24;
+                const newEm = newEndTotalMins % 60;
+                setEndTime(`${String(newEh).padStart(2, '0')}:${String(newEm).padStart(2, '0')}`);
+            } catch {
+                // Keep existing endTime
+            }
+        }
+    };
+
+    // ⚡ Başlangıç Tarihi Değiştiğinde Bitiş Tarihini Eşitleme
+    const handleStartDateChange = (newStartDate: string) => {
+        setStartDate(newStartDate);
+        if (endDate < newStartDate) {
+            setEndDate(newStartDate);
+        }
+    };
+
+    // ⚡ Pratiklik: Tarih Hızlı Kısayolları (Yerel Saat Güvenli)
     const handleQuickDate = (preset: 'today' | 'tomorrow' | 'friday' | 'saturday' | 'sunday' | 'next_week') => {
         const now = new Date();
         const target = new Date();
@@ -837,9 +922,46 @@ export default function EventDrawer({
             target.setDate(now.getDate() + 7);
         }
 
-        const dateStr = target.toISOString().split('T')[0];
+        const dateStr = formatLocalDate(target);
         setStartDate(dateStr);
         setEndDate(dateStr);
+    };
+
+    // ⚡ İzleyici / Üye Bireysel LCV Katılım Bildirimi Gönderici
+    const handleMyRsvp = async (status: 'attending' | 'declined' | 'maybe', reasonText?: string) => {
+        if (!event || !currentMember) return;
+        setIsSubmittingMyRsvp(true);
+        setMyRsvpFeedback(null);
+        try {
+            const res = await fetch(`/api/workspace/events/${event.id}/attendance`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    status,
+                    reason: (status === 'declined' || status === 'maybe') ? (reasonText || myAttendanceReason) : undefined
+                })
+            });
+            const data = await res.json();
+            if (res.ok && data.success && data.event) {
+                setMyAttendanceStatus(status);
+                if (reasonText !== undefined) setMyAttendanceReason(reasonText);
+                setMemberAttendanceList(data.event.member_attendance || []);
+                setMyRsvpFeedback(status === 'attending' 
+                    ? '✅ Katılım durumunuz "Katılıyorum" olarak kaydedildi!' 
+                    : status === 'declined' 
+                        ? '❌ Katılamayacağınız gerekçenizle organizatöre iletildi.' 
+                        : '🟡 Kararsızlık durumunuz iletildi.');
+                if (onEventSaved) {
+                    onEventSaved(data.event);
+                }
+            } else {
+                setMyRsvpFeedback(`⚠️ Hata: ${data.error || 'İşlem başarısız'}`);
+            }
+        } catch {
+            setMyRsvpFeedback('⚠️ Sunucu ile bağlantı kurulamadı.');
+        } finally {
+            setIsSubmittingMyRsvp(false);
+        }
     };
 
     // ⚡ Pratiklik: Hazır Konum & Platform Seçici
@@ -1427,12 +1549,22 @@ export default function EventDrawer({
                                 <h2 className={`text-base sm:text-lg font-bold tracking-tight flex items-center gap-2 ${
                                     isLight ? 'text-slate-900' : 'text-white'
                                 }`}>
-                                    {event ? 'Etkinliği Düzenle' : 'Yeni Topluluk Etkinliği'}
+                                    {isReadOnly ? 'Etkinliği Görüntüle' : (event ? 'Etkinliği Düzenle' : 'Yeni Topluluk Etkinliği')}
                                     <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full font-mono border ${
                                         isLight ? 'bg-slate-100 text-slate-700 border-slate-300' : 'bg-zinc-800 text-rose-300 border-zinc-700/80'
                                     }`}>
                                         {category}
                                     </span>
+                                    {isReadOnly && (
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400">
+                                            İzleyici Modu
+                                        </span>
+                                    )}
+                                    {!isReadOnly && event && isCreator && (
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                                            Düzenleyici
+                                        </span>
+                                    )}
                                 </h2>
                                 <p className={`text-xs font-medium ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
                                     HSD Malatya Turgut Özal Üniversitesi Çekirdek Ekip Çalışma Alanı
@@ -1464,63 +1596,65 @@ export default function EventDrawer({
                         </div>
                     </div>
 
-                    {/* ── 1.5. SEKME ÇUBUĞU (TAB NAVIGATION - HSD Modern Görünüm) ── */}
-                    <div className={`flex items-center gap-1.5 px-6 py-2.5 border-b overflow-x-auto shrink-0 scrollbar-none ${
-                        isLight ? 'bg-slate-100/90 border-slate-200' : 'bg-zinc-900/60 border-zinc-800'
-                    }`}>
-                        {[
-                            { id: 'general', label: 'Temel Bilgiler', icon: '📝' },
-                            { id: 'datetime', label: 'Zaman & Konum', icon: '⏱️', badge: reminders.length > 0 ? `${reminders.length}` : undefined },
-                            { id: 'access', label: 'Erişim (RBAC)', icon: '🛡️', badge: visibility === 'admin_only' ? 'Admin' : visibility === 'private' ? 'Özel' : undefined },
-                            { 
-                                id: 'rsvp', 
-                                label: 'Kayıt & Katılımcılar', 
-                                icon: '🎟️', 
-                                badge: `${(attendees.length || 0) + (memberAttendanceList.length || 0)}` 
-                            },
-                            { 
-                                id: 'tasks', 
-                                label: 'Görevler & Dosyalar', 
-                                icon: '✅', 
-                                badge: subtasks.length > 0 
-                                    ? `${subtasks.filter(s => s.is_completed).length}/${subtasks.length}` 
-                                    : (attachments.length > 0 ? `${attachments.length}` : undefined) 
-                            },
-                            { id: 'communication', label: 'İletişim & Notlar', icon: '💬', badge: comments.length > 0 ? `${comments.length}` : undefined },
-                        ].map(tab => {
-                            const isActive = activeDrawerTab === tab.id;
-                            return (
-                                <button
-                                    key={tab.id}
-                                    type="button"
-                                    onClick={() => setActiveDrawerTab(tab.id as DrawerTab)}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                                        isActive
-                                            ? isLight
-                                                ? 'bg-white text-rose-600 shadow-sm border border-slate-200 ring-1 ring-rose-500/20'
-                                                : 'bg-zinc-800 text-rose-400 shadow-md border border-zinc-700 ring-1 ring-rose-500/30'
-                                            : isLight
-                                                ? 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-                                                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
-                                    }`}
-                                >
-                                    <span>{tab.icon}</span>
-                                    <span>{tab.label}</span>
-                                    {tab.badge && (
-                                        <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold ${
+                    {/* ── 1.5. SEKME ÇUBUĞU (TAB NAVIGATION - Yalnızca Düzenleme Modunda) ── */}
+                    {!isReadOnly && (
+                        <div className={`flex items-center gap-1.5 px-6 py-2.5 border-b overflow-x-auto shrink-0 scrollbar-none ${
+                            isLight ? 'bg-slate-100/90 border-slate-200' : 'bg-zinc-900/60 border-zinc-800'
+                        }`}>
+                            {[
+                                { id: 'general', label: 'Temel Bilgiler', icon: '📝' },
+                                { id: 'datetime', label: 'Zaman & Konum', icon: '⏱️', badge: reminders.length > 0 ? `${reminders.length}` : undefined },
+                                { id: 'access', label: 'Erişim (RBAC)', icon: '🛡️', badge: visibility === 'admin_only' ? 'Admin' : visibility === 'private' ? 'Özel' : undefined },
+                                { 
+                                    id: 'rsvp', 
+                                    label: 'Kayıt & Katılımcılar', 
+                                    icon: '🎟️', 
+                                    badge: `${(attendees.length || 0) + (memberAttendanceList.length || 0)}` 
+                                },
+                                { 
+                                    id: 'tasks', 
+                                    label: 'Görevler & Dosyalar', 
+                                    icon: '✅', 
+                                    badge: subtasks.length > 0 
+                                        ? `${subtasks.filter(s => s.is_completed).length}/${subtasks.length}` 
+                                        : (attachments.length > 0 ? `${attachments.length}` : undefined) 
+                                },
+                                { id: 'communication', label: 'İletişim & Notlar', icon: '💬', badge: comments.length > 0 ? `${comments.length}` : undefined },
+                            ].map(tab => {
+                                const isActive = activeDrawerTab === tab.id;
+                                return (
+                                    <button
+                                        key={tab.id}
+                                        type="button"
+                                        onClick={() => setActiveDrawerTab(tab.id as DrawerTab)}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
                                             isActive
-                                                ? 'bg-rose-500 text-white'
+                                                ? isLight
+                                                    ? 'bg-white text-rose-600 shadow-sm border border-slate-200 ring-1 ring-rose-500/20'
+                                                    : 'bg-zinc-800 text-rose-400 shadow-md border border-zinc-700 ring-1 ring-rose-500/30'
                                                 : isLight
-                                                    ? 'bg-slate-200 text-slate-700'
-                                                    : 'bg-zinc-950 text-zinc-400'
-                                        }`}>
-                                            {tab.badge}
-                                        </span>
-                                    )}
-                                </button>
-                            );
-                        })}
-                    </div>
+                                                    ? 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                                                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
+                                        }`}
+                                    >
+                                        <span>{tab.icon}</span>
+                                        <span>{tab.label}</span>
+                                        {tab.badge && (
+                                            <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold ${
+                                                isActive
+                                                    ? 'bg-rose-500 text-white'
+                                                    : isLight
+                                                        ? 'bg-slate-200 text-slate-700'
+                                                        : 'bg-zinc-950 text-zinc-400'
+                                            }`}>
+                                                {tab.badge}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
 
                     {/* ── 2. SCROLLABLE BODY ── */}
                     <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
@@ -1554,8 +1688,38 @@ export default function EventDrawer({
                             </div>
                         )}
 
-                        {/* Flash Şablon Başarı Bildirimi */}
-                        {appliedTemplateFeedback && (
+                        {isReadOnly && event ? (
+                            <EventReadOnlyView
+                                event={event}
+                                currentMember={currentMember}
+                                members={members}
+                                isLight={isLight}
+                                startDate={startDate}
+                                startTime={startTime}
+                                endDate={endDate}
+                                endTime={endTime}
+                                isAllDay={isAllDay}
+                                calculatedDurationStr={calculatedDurationStr}
+                                location={location}
+                                meetingLink={meetingLink}
+                                description={description}
+                                subtasks={subtasks}
+                                attachments={attachments}
+                                comments={comments}
+                                myAttendanceStatus={myAttendanceStatus}
+                                myAttendanceReason={myAttendanceReason}
+                                isSubmittingMyRsvp={isSubmittingMyRsvp}
+                                myRsvpFeedback={myRsvpFeedback}
+                                onMyRsvp={handleMyRsvp}
+                                canComment={canComment}
+                                newCommentText={newCommentText}
+                                onNewCommentTextChange={setNewCommentText}
+                                onAddComment={() => handleAddComment({ preventDefault: () => {} } as React.FormEvent)}
+                            />
+                        ) : (
+                            <>
+                                {/* Flash Şablon Başarı Bildirimi */}
+                                {appliedTemplateFeedback && (
                             <div className="p-3.5 rounded-xl bg-emerald-950/80 border border-emerald-600 text-emerald-200 text-xs font-bold flex items-center justify-between shadow-md animate-in fade-in slide-in-from-top-1">
                                 <div className="flex items-center gap-2">
                                     <span className="text-base text-emerald-400">⚡</span>
@@ -2240,7 +2404,7 @@ export default function EventDrawer({
                                             <input
                                                 type="date"
                                                 value={startDate}
-                                                onChange={(e) => setStartDate(e.target.value)}
+                                                onChange={(e) => handleStartDateChange(e.target.value)}
                                                 className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-rose-500 ${
                                                     isLight
                                                         ? 'bg-white border-slate-300 text-slate-800'
@@ -2252,7 +2416,7 @@ export default function EventDrawer({
                                                 <input
                                                     type="time"
                                                     value={startTime}
-                                                    onChange={(e) => setStartTime(e.target.value)}
+                                                    onChange={(e) => handleStartTimeChange(e.target.value)}
                                                     className={`w-28 border rounded-xl px-2.5 py-2 text-xs font-mono font-bold focus:outline-none focus:border-rose-500 ${
                                                         isLight
                                                             ? 'bg-white border-slate-300 text-slate-800'
@@ -2296,6 +2460,21 @@ export default function EventDrawer({
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Canlı Otomatik Süre Göstergesi */}
+                                {calculatedDurationStr && (
+                                    <div className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-semibold ${
+                                        calculatedDurationStr.includes('Geçersiz')
+                                            ? 'bg-rose-500/10 border-rose-500/30 text-rose-500'
+                                            : isLight
+                                                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                                                : 'bg-emerald-950/40 border-emerald-800/60 text-emerald-300'
+                                    }`}>
+                                        <span className="text-sm">⏱️</span>
+                                        <span>Etkinlik Süresi:</span>
+                                        <span className="font-mono font-bold">{calculatedDurationStr}</span>
+                                    </div>
+                                )}
                             </div>
 
                             {/* ── BÖLÜM 3.5: PROFESYONEL HATIRLATICI MEKANİZMASI ── */}
@@ -3734,6 +3913,8 @@ export default function EventDrawer({
                         )}
                     </>
                 )}
+                            </>
+                        )}
 
                     </div>
 
@@ -3741,76 +3922,104 @@ export default function EventDrawer({
                     <div className={`p-4 border-t flex flex-col sm:flex-row items-center justify-between gap-3 backdrop-blur-md shrink-0 ${
                         isLight ? 'border-slate-200 bg-slate-50/95' : 'border-zinc-800 bg-zinc-900/90'
                     }`}>
-                        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
-                            {event && canEditPast && (
-                                <button
-                                    type="button"
-                                    onClick={handleDelete}
-                                    disabled={isDeleting}
-                                    className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors ${
-                                        isLight 
-                                            ? 'text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200' 
-                                            : 'text-rose-400 hover:text-rose-300 hover:bg-rose-950/60 border border-rose-900/50'
-                                    }`}
-                                >
-                                    {isDeleting ? 'Siliniyor...' : 'Etkinliği Sil'}
-                                </button>
-                            )}
-
-                            {/* Sekmeler Arası Hızlı Adım Butonları */}
-                            <div className="flex items-center gap-1.5">
-                                {activeDrawerTab !== 'general' && (
+                        {isReadOnly && event ? (
+                            <>
+                                <div className="flex items-center gap-2">
+                                    <span className={`text-xs px-3 py-1 rounded-full font-semibold border ${
+                                        isLight ? 'bg-slate-100 border-slate-300 text-slate-600' : 'bg-zinc-800 border-zinc-700 text-zinc-400'
+                                    }`}>
+                                        👁️ Etkinliği Görüntüleme Modu
+                                    </span>
+                                    <span className={`text-[11px] hidden sm:inline ${
+                                        isLight ? 'text-slate-500' : 'text-zinc-500'
+                                    }`}>
+                                        Yalnızca etkinlik sahibi veya yöneticiler düzenleyebilir.
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                                     <button
                                         type="button"
-                                        onClick={goToPrevTab}
-                                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
-                                            isLight
-                                                ? 'border-slate-300 text-slate-700 hover:bg-slate-100'
-                                                : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'
-                                        }`}
+                                        onClick={onClose}
+                                        className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 dark:bg-zinc-700 dark:hover:bg-zinc-600 shadow transition-colors"
                                     >
-                                        ← Önceki
+                                        Kapat
                                     </button>
-                                )}
-                                {activeDrawerTab !== 'communication' && (
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+                                    {event && canDeleteEvent && (
+                                        <button
+                                            type="button"
+                                            onClick={handleDelete}
+                                            disabled={isDeleting}
+                                            className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors ${
+                                                isLight 
+                                                    ? 'text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200' 
+                                                    : 'text-rose-400 hover:text-rose-300 hover:bg-rose-950/60 border border-rose-900/50'
+                                            }`}
+                                        >
+                                            {isDeleting ? 'Siliniyor...' : 'Etkinliği Sil'}
+                                        </button>
+                                    )}
+
+                                    {/* Sekmeler Arası Hızlı Adım Butonları */}
+                                    <div className="flex items-center gap-1.5">
+                                        {activeDrawerTab !== 'general' && (
+                                            <button
+                                                type="button"
+                                                onClick={goToPrevTab}
+                                                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+                                                    isLight
+                                                        ? 'border-slate-300 text-slate-700 hover:bg-slate-100'
+                                                        : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'
+                                                }`}
+                                            >
+                                                ← Önceki
+                                            </button>
+                                        )}
+                                        {activeDrawerTab !== 'communication' && (
+                                            <button
+                                                type="button"
+                                                onClick={goToNextTab}
+                                                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+                                                    isLight
+                                                        ? 'border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                                                        : 'border-rose-800 bg-rose-950/40 text-rose-300 hover:bg-rose-900/50'
+                                                }`}
+                                            >
+                                                Sonraki →
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                                     <button
                                         type="button"
-                                        onClick={goToNextTab}
-                                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
-                                            isLight
-                                                ? 'border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100'
-                                                : 'border-rose-800 bg-rose-950/40 text-rose-300 hover:bg-rose-900/50'
+                                        onClick={onClose}
+                                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
+                                            isLight 
+                                                ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/80' 
+                                                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
                                         }`}
                                     >
-                                        Sonraki →
+                                        {isEventPast && !canEditPast ? 'Kapat' : 'İptal'}
                                     </button>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
-                                    isLight 
-                                        ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/80' 
-                                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
-                                }`}
-                            >
-                                {isEventPast && !canEditPast ? 'Kapat' : 'İptal'}
-                            </button>
-                            {(!isEventPast || canEditPast) && (
-                                <button
-                                    type="submit"
-                                    form="event-form"
-                                    disabled={isSaving}
-                                    className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 shadow-lg shadow-rose-950/40 transition-all disabled:opacity-50"
-                                >
-                                    {isSaving ? 'Kaydediliyor...' : (event ? 'Güncelle' : 'Etkinliği Oluştur')}
-                                </button>
-                            )}
-                        </div>
+                                    {(!isEventPast || canEditPast) && (
+                                        <button
+                                            type="submit"
+                                            form="event-form"
+                                            disabled={isSaving}
+                                            className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 shadow-lg shadow-rose-950/40 transition-all disabled:opacity-50"
+                                        >
+                                            {isSaving ? 'Kaydediliyor...' : (event ? 'Güncelle' : 'Etkinliği Oluştur')}
+                                        </button>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
 
                 </div>
