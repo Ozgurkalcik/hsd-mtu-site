@@ -1506,11 +1506,11 @@ export class WorkspaceRepository {
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                // 1. workspace_events içindeki vitrin etkinlikleri
+                // 1. workspace_events içindeki vitrin etkinlikleri (Yalnızca kullanıcının vitrine eklediği: is_showcase = true)
                 const { data: wsEvents } = await supabase
                     .from('workspace_events')
                     .select('*')
-                    .or('is_showcase.eq.true,visibility.eq.public')
+                    .eq('is_showcase', true)
                     .order('start_time', { ascending: false });
 
                 if (wsEvents && wsEvents.length > 0) {
@@ -1558,7 +1558,7 @@ export class WorkspaceRepository {
         if (results.length === 0) {
             const memoryEvents = WorkspaceStoreManager.getInstance().getEvents();
             memoryEvents
-                .filter(e => e.is_showcase || e.visibility === 'public')
+                .filter(e => Boolean(e.is_showcase))
                 .forEach(ev => {
                     results.push({
                         id: ev.id,

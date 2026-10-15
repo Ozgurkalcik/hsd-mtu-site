@@ -1692,6 +1692,17 @@ export default function EventDrawer({
                                             Düzenleyici
                                         </span>
                                     )}
+                                    {isShowcase ? (
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 flex items-center gap-1">
+                                            <span>🌟</span> Ana Sayfada Yayında
+                                        </span>
+                                    ) : (
+                                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+                                            isLight ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-zinc-800/80 border-zinc-700 text-zinc-400'
+                                        }`}>
+                                            🔒 Yalnızca Çalışma Alanı
+                                        </span>
+                                    )}
                                 </h2>
                                 <p className={`text-xs font-medium ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
                                     HSD Malatya Turgut Özal Üniversitesi Çekirdek Ekip Çalışma Alanı
@@ -4393,7 +4404,26 @@ export default function EventDrawer({
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                                <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
+                                    {/* 🌟 Ana Sayfa Vitrin Hızlı Seçimi */}
+                                    <label className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold cursor-pointer select-none transition-colors ${
+                                        isShowcase
+                                            ? isLight
+                                                ? 'bg-rose-50 border-rose-300 text-rose-700 font-bold shadow-xs'
+                                                : 'bg-rose-950/60 border-rose-700 text-rose-300 font-bold shadow-sm'
+                                            : isLight
+                                                ? 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
+                                                : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-600'
+                                    }`}>
+                                        <input
+                                            type="checkbox"
+                                            checked={isShowcase}
+                                            onChange={(e) => setIsShowcase(e.target.checked)}
+                                            className="w-4 h-4 rounded accent-rose-600 cursor-pointer"
+                                        />
+                                        <span>🌟 Ana Sayfada Yayınla</span>
+                                    </label>
+
                                     <button
                                         type="button"
                                         onClick={onClose}

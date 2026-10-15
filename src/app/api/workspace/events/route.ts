@@ -85,7 +85,11 @@ export async function POST(req: Request) {
             subtasks,
             reminders,
             comments,
-            attachments
+            attachments,
+            is_showcase,
+            rsvp_enabled,
+            rsvp_qr_enabled,
+            rsvp_capacity
         } = body;
 
         if (!title || !start_time || !end_time) {
@@ -121,6 +125,10 @@ export async function POST(req: Request) {
             meeting_link: meeting_link || '',
             status: 'scheduled',
             visibility: validVisibility,
+            is_showcase: Boolean(is_showcase),
+            rsvp_enabled: Boolean(rsvp_enabled),
+            rsvp_qr_enabled: Boolean(rsvp_qr_enabled),
+            rsvp_capacity: rsvp_capacity || null,
             created_by: session.member.id,
             version: 1,
             subtasks: Array.isArray(subtasks) ? subtasks : [],
