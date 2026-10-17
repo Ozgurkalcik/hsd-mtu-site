@@ -532,7 +532,7 @@ export default function EventDrawer({
     // ── 🎯 SEKME (TAB) YÖNETİMİ (Düzenli & Karışıklıktan Arındırılmış Deneyim) ──
     type DrawerTab = 'general' | 'datetime' | 'access' | 'rsvp' | 'tasks' | 'communication' | 'all';
     const [activeDrawerTab, setActiveDrawerTab] = useState<DrawerTab>('general');
-    const [showTemplates, setShowTemplates] = useState<boolean>(!event);
+    const [showTemplates, setShowTemplates] = useState<boolean>(false);
 
     // Form State
     const [title, setTitle] = useState('');
@@ -1753,15 +1753,8 @@ export default function EventDrawer({
                             isLight ? 'bg-slate-100/95 border-slate-200' : 'bg-zinc-900/80 border-zinc-800'
                         }`}>
                             {[
-                                { id: 'general', label: 'Temel Bilgiler', icon: '📝' },
-                                { id: 'datetime', label: 'Zaman & Konum', icon: '⏱️', badge: reminders.length > 0 ? `${reminders.length}` : undefined },
+                                { id: 'general', label: 'Etkinlik & Zamanlama', icon: '📝' },
                                 { id: 'access', label: 'Erişim (RBAC)', icon: '🛡️', badge: visibility === 'admin_only' ? 'Admin' : visibility === 'private' ? 'Özel' : visibility === 'committee' ? `${customVisibleCommittees.length} Komite` : visibility === 'custom' ? `${customVisibleMembers.length} Üye` : undefined },
-                                { 
-                                    id: 'rsvp', 
-                                    label: 'Kayıt & Katılımcılar', 
-                                    icon: '🎟️', 
-                                    badge: `${(attendees.length || 0) + (memberAttendanceList.length || 0)}` 
-                                },
                                 { 
                                     id: 'tasks', 
                                     label: 'Görevler & Dosyalar', 
@@ -1770,8 +1763,14 @@ export default function EventDrawer({
                                         ? `${subtasks.filter(s => s.is_completed).length}/${subtasks.length}` 
                                         : (attachments.length > 0 ? `${attachments.length}` : undefined) 
                                 },
+                                { 
+                                    id: 'rsvp', 
+                                    label: 'Kayıt (RSVP)', 
+                                    icon: '🎟️', 
+                                    badge: (attendees.length || 0) + (memberAttendanceList.length || 0) > 0 ? `${(attendees.length || 0) + (memberAttendanceList.length || 0)}` : undefined 
+                                },
                                 { id: 'communication', label: 'İletişim & Notlar', icon: '💬', badge: comments.length > 0 ? `${comments.length}` : undefined },
-                                { id: 'all', label: 'Tümünü Gör (Tek Sayfa)', icon: '📄' },
+                                { id: 'all', label: 'Tümü (Tek Sayfa)', icon: '📄' },
                             ].map(tab => {
                                 const isActive = activeDrawerTab === tab.id;
                                 return (
@@ -2768,7 +2767,7 @@ export default function EventDrawer({
                     )}
 
                     {/* ── SEKMELER: 2. ZAMANLAMA, TARİH & KONUM BÖLÜMÜ ── */}
-                    {(activeDrawerTab === 'datetime' || activeDrawerTab === 'all') && (
+                    {(activeDrawerTab === 'general' || activeDrawerTab === 'datetime' || activeDrawerTab === 'all') && (
                         <>
                             {activeDrawerTab === 'all' && (
                                 <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border ${

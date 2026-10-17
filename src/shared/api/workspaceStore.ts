@@ -319,20 +319,6 @@ export class WorkspaceStoreManager {
         this.events.set(sampleEvent2.id, sampleEvent2);
         this.events.set(sampleEvent3.id, sampleEvent3);
 
-        // Başlangıç Bildirimi
-        this.notifications.push({
-            id: 'notif_welcome',
-            user_id: 'all',
-            event_id: sampleEvent1.id,
-            event_title: sampleEvent1.title,
-            title: 'HSD MTÜ Workspace Başlatıldı',
-            message: 'Topluluk Takvimi ve Çekirdek Ekip Çalışma Alanına hoş geldiniz.',
-            type: 'announcement',
-            is_read: false,
-            is_active: true,
-            created_at: now.toISOString()
-        });
-
         // Başlangıç Denetim İzi
         this.logAudit({
             id: 'audit_init',

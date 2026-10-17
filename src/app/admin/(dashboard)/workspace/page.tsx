@@ -63,6 +63,8 @@ export default function AdminWorkspacePage() {
     const [selectedGroup, setSelectedGroup] = useState<WorkspaceGroup | null>(null);
     const [memberSearchQuery, setMemberSearchQuery] = useState('');
     const [togglingMemberId, setTogglingMemberId] = useState<string | null>(null);
+    const [isSettingLead, setIsSettingLead] = useState(false);
+    const [communityMemberSearch, setCommunityMemberSearch] = useState('');
 
     // Member Notes & Evaluation Modal
     const [notesModalMember, setNotesModalMember] = useState<WorkspaceMember | null>(null);
@@ -415,6 +417,18 @@ export default function AdminWorkspacePage() {
         });
     }, [members, allAttendanceRecords]);
 
+    const filteredCommunityMembers = React.useMemo(() => {
+        if (!communityMemberSearch.trim()) return members;
+        const q = communityMemberSearch.toLowerCase().trim();
+        return members.filter(m =>
+            m.display_name.toLowerCase().includes(q) ||
+            m.email.toLowerCase().includes(q) ||
+            (m.username && m.username.toLowerCase().includes(q)) ||
+            (m.role && m.role.toLowerCase().includes(q)) ||
+            groups.some(g => (g.members?.includes(m.id) || g.members?.includes(m.email)) && g.name.toLowerCase().includes(q))
+        );
+    }, [members, groups, communityMemberSearch]);
+
     const handleExportAttendanceCSV = () => {
         if (filteredAttendanceRecords.length === 0) {
             showNotification('error', 'Dışa aktarılacak katılım kaydı bulunamadı.');
@@ -518,20 +532,51 @@ export default function AdminWorkspacePage() {
     // Hızlı Rol Güncelleme
     const handleUpdateMemberRole = async (memberId: string, nextRole: WorkspaceRole) => {
         try {
+            const cleanId = memberId.trim();
             const res = await fetch('/api/workspace/admin/members', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: memberId, role: nextRole }),
+                body: JSON.stringify({ id: cleanId, role: nextRole }),
             });
             const data = await res.json();
             if (res.ok && data.member) {
-                setMembers(prev => prev.map(m => m.id === memberId ? data.member : m));
+                setMembers(prev => prev.map(m => (m.id === cleanId || m.id === data.member?.id || m.email === data.member?.email) ? { ...m, ...data.member, role: nextRole } : m));
                 showNotification('success', `✓ Rol güncellendi: ${nextRole}`);
             } else {
                 showNotification('error', data.error || 'Rol güncellenemedi.');
             }
         } catch {
             showNotification('error', 'Rol güncellenirken hata oluştu.');
+        }
+    };
+
+    // Komite Başkanı Atama / Kaldırma
+    const handleSetGroupLead = async (groupId: string, memberId: string, memberName: string, makeLead: boolean) => {
+        setIsSettingLead(true);
+        try {
+            const nextLeadId = makeLead ? memberId : null;
+            const nextLeadName = makeLead ? memberName : null;
+            const res = await fetch('/api/workspace/admin/groups', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: groupId,
+                    lead_id: nextLeadId,
+                    lead_name: nextLeadName
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setGroups(prev => prev.map(g => g.id === groupId ? { ...g, lead_id: nextLeadId || undefined, lead_name: nextLeadName || undefined } : g));
+                setSelectedGroup(prev => prev?.id === groupId ? { ...prev, lead_id: nextLeadId || undefined, lead_name: nextLeadName || undefined } : prev);
+                showNotification('success', makeLead ? `👑 ${memberName} komite başkanı olarak atandı.` : 'Komite başkanlığı kaldırıldı.');
+            } else {
+                showNotification('error', data.error || 'Komite başkanı güncellenemedi.');
+            }
+        } catch {
+            showNotification('error', 'İşlem sırasında hata oluştu.');
+        } finally {
+            setIsSettingLead(false);
         }
     };
 
@@ -812,24 +857,47 @@ export default function AdminWorkspacePage() {
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div className="flex items-center gap-2">
                                     <h2 className="text-sm font-bold text-white">Topluluk Üyeleri</h2>
                                     <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 font-mono font-semibold">
-                                        {members.length} Üye
+                                        {filteredCommunityMembers.length} / {members.length} Üye
                                     </span>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setNewMemberForm({ display_name: '', username: '', email: '', password: '', role: 'editor', group_id: '' });
-                                        setIsAddMemberOpen(true);
-                                    }}
-                                    className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md shadow-rose-950/40 transition-all flex items-center gap-1.5"
-                                >
-                                    <span>+</span>
-                                    <span>Yeni Üye Ekle</span>
-                                </button>
+                                <div className="flex items-center gap-3">
+                                    {/* Canlı Üye Arama Çubuğu */}
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={communityMemberSearch}
+                                            onChange={(e) => setCommunityMemberSearch(e.target.value)}
+                                            placeholder="Üye ara (Ad, @kullanıcı, e-posta, rol)..."
+                                            className="w-56 sm:w-72 bg-zinc-950 border border-zinc-700/80 rounded-xl pl-8 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-rose-500 transition-all"
+                                        />
+                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 text-xs">🔍</span>
+                                        {communityMemberSearch && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setCommunityMemberSearch('')}
+                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 text-xs cursor-pointer"
+                                            >
+                                                ✕
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setNewMemberForm({ display_name: '', username: '', email: '', password: '', role: 'editor', group_id: '' });
+                                            setIsAddMemberOpen(true);
+                                        }}
+                                        className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md shadow-rose-950/40 transition-all flex items-center gap-1.5 shrink-0"
+                                    >
+                                        <span>+</span>
+                                        <span>Yeni Üye Ekle</span>
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="overflow-x-auto">
@@ -847,7 +915,13 @@ export default function AdminWorkspacePage() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-zinc-900">
-                                        {members.map(m => {
+                                        {filteredCommunityMembers.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={8} className="py-8 text-center text-zinc-500 text-xs">
+                                                    🔍 &ldquo;{communityMemberSearch}&rdquo; kriterine uygun üye bulunamadı.
+                                                </td>
+                                            </tr>
+                                        ) : filteredCommunityMembers.map(m => {
                                             const memberGroups = groups.filter(g => g.members.includes(m.id));
                                             return (
                                                 <tr key={m.id} className="hover:bg-zinc-900/50 transition-colors">
@@ -992,13 +1066,24 @@ export default function AdminWorkspacePage() {
                                 {/* Sağ: Seçili Komite Üye Yönetimi */}
                                 {selectedGroup && (
                                     <div className="md:col-span-2 p-4 rounded-xl bg-zinc-900/40 border border-zinc-800 space-y-4">
-                                        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-800 pb-3 gap-2">
                                             <div>
                                                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
                                                     <span className="w-3 h-3 rounded-full" style={{ backgroundColor: selectedGroup.color }} />
                                                     {selectedGroup.name} — Üye Listesi ({(selectedGroup.members || []).length} Üye)
                                                 </h3>
                                                 <p className="text-xs text-zinc-400 mt-0.5">{selectedGroup.description}</p>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <span className="text-xs text-zinc-400">Komite Başkanı:</span>
+                                                {selectedGroup.lead_id ? (
+                                                    <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/40 text-amber-300 font-bold text-xs flex items-center gap-1.5 shadow-xs">
+                                                        <span>👑</span>
+                                                        <span>{selectedGroup.lead_name || members.find(m => m.id === selectedGroup.lead_id)?.display_name || 'Atandı'}</span>
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs italic text-zinc-500">Henüz atanmadı</span>
+                                                )}
                                             </div>
                                         </div>
 
@@ -1022,34 +1107,61 @@ export default function AdminWorkspacePage() {
                                                     const groupMembersList = Array.isArray(selectedGroup.members) ? selectedGroup.members : [];
                                                     const isMemberOfGroup = groupMembersList.includes(m.id) || groupMembersList.includes(m.email) || (Boolean(m.username) && groupMembersList.includes(m.username!));
                                                     const isToggling = togglingMemberId === m.id;
+                                                    const isLeadOfGroup = selectedGroup.lead_id === m.id || (Boolean(selectedGroup.lead_name) && selectedGroup.lead_name === m.display_name);
                                                     return (
                                                         <div
                                                             key={m.id}
                                                             className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800/80 text-xs"
                                                         >
                                                             <div>
-                                                                <p className="font-semibold text-white">{m.display_name}</p>
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="font-semibold text-white">{m.display_name}</p>
+                                                                    {isLeadOfGroup && (
+                                                                        <span className="px-1.5 py-0.2 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold">
+                                                                            👑 Komite Başkanı
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                                 <p className="text-[11px] text-zinc-400 font-mono">{m.email}</p>
                                                             </div>
 
-                                                            <button
-                                                                type="button"
-                                                                disabled={isToggling}
-                                                                onClick={() => handleToggleGroupMember(selectedGroup.id, m.id, !isMemberOfGroup)}
-                                                                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${isMemberOfGroup
-                                                                        ? 'bg-rose-950/70 text-rose-300 border border-rose-800 hover:bg-rose-900'
-                                                                        : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-                                                                    } ${isToggling ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-                                                            >
-                                                                {isToggling ? (
-                                                                    <span className="flex items-center gap-1.5">
-                                                                        <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                                                        <span>İşleniyor...</span>
-                                                                    </span>
-                                                                ) : (
-                                                                    <span>{isMemberOfGroup ? 'Komiteden Çıkar' : '+ Dahil Et'}</span>
+                                                            <div className="flex items-center gap-2">
+                                                                {isMemberOfGroup && (
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={isSettingLead}
+                                                                        onClick={() => handleSetGroupLead(selectedGroup.id, m.id, m.display_name, !isLeadOfGroup)}
+                                                                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+                                                                            isLeadOfGroup
+                                                                                ? 'bg-amber-950/80 text-amber-300 border border-amber-600 hover:bg-amber-900'
+                                                                                : 'bg-zinc-800/90 text-zinc-300 hover:text-amber-300 hover:bg-zinc-700 border border-zinc-700'
+                                                                        } ${isSettingLead ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                                                        title={isLeadOfGroup ? 'Komite başkanlığını kaldır' : 'Bu üyeyi komite başkanı ata'}
+                                                                    >
+                                                                        <span>👑</span>
+                                                                        <span>{isLeadOfGroup ? 'Başkanlığı Kaldır' : 'Başkan Ata'}</span>
+                                                                    </button>
                                                                 )}
-                                                            </button>
+
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={isToggling}
+                                                                    onClick={() => handleToggleGroupMember(selectedGroup.id, m.id, !isMemberOfGroup)}
+                                                                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${isMemberOfGroup
+                                                                            ? 'bg-rose-950/70 text-rose-300 border border-rose-800 hover:bg-rose-900'
+                                                                            : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                                                                        } ${isToggling ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                                >
+                                                                    {isToggling ? (
+                                                                        <span className="flex items-center gap-1.5">
+                                                                            <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                                                            <span>İşleniyor...</span>
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span>{isMemberOfGroup ? 'Komiteden Çıkar' : '+ Dahil Et'}</span>
+                                                                    )}
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     );
                                                 })}

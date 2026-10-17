@@ -128,15 +128,17 @@ export async function PATCH(req: Request) {
             );
         }
 
+        const targetMemberId = targetMember.id;
+
         if (newPassword) {
-            const passChanged = await WorkspaceRepository.changeMemberPassword(id, newPassword);
+            const passChanged = await WorkspaceRepository.changeMemberPassword(targetMemberId, newPassword);
             if (!passChanged) {
                 return NextResponse.json({ error: 'Şifre güncellenemedi.' }, { status: 404 });
             }
         }
 
         if (body.newNote && body.newNote.content) {
-            await WorkspaceRepository.addMemberNote(id, {
+            await WorkspaceRepository.addMemberNote(targetMemberId, {
                 author_id: session.member.id,
                 author_name: session.member.display_name,
                 content: body.newNote.content.trim()
@@ -144,7 +146,7 @@ export async function PATCH(req: Request) {
         }
 
         if (body.deleteNoteId) {
-            await WorkspaceRepository.deleteMemberNote(id, body.deleteNoteId);
+            await WorkspaceRepository.deleteMemberNote(targetMemberId, body.deleteNoteId);
         }
 
         const cleanUpdates = { ...updates };
@@ -152,10 +154,10 @@ export async function PATCH(req: Request) {
         delete cleanUpdates.deleteNoteId;
 
         if (Object.keys(cleanUpdates).length > 0) {
-            await WorkspaceRepository.updateMember(id, cleanUpdates);
+            await WorkspaceRepository.updateMember(targetMemberId, cleanUpdates);
         }
 
-        const updated = await WorkspaceRepository.getMemberById(id);
+        const updated = (await WorkspaceRepository.getMemberById(targetMemberId)) || { ...targetMember, ...cleanUpdates };
         return NextResponse.json({ success: true, member: updated });
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 500 });

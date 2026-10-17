@@ -57,6 +57,8 @@ export interface WorkspaceGroup {
     description: string;
     color: string;
     role_key: string;
+    lead_id?: string; // Komite Başkanı Üye ID
+    lead_name?: string; // Komite Başkanı Adı
     members: string[]; // member ids or emails
 }
 

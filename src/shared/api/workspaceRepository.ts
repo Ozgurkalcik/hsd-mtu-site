@@ -827,18 +827,26 @@ export class WorkspaceRepository {
 
     public static async getMemberById(id: string): Promise<WorkspaceMember | null> {
         this.ensureDatabaseConfigured();
+        if (!id) return null;
+        const cleanId = String(id).trim();
         let found: WorkspaceMember | null = null;
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                const { data, error } = await supabase.from('workspace_members').select('*').eq('id', id).single();
+                const { data, error } = await supabase
+                    .from('workspace_members')
+                    .select('*')
+                    .or(`id.eq.${cleanId},email.eq.${cleanId.toLowerCase()},username.eq.${cleanId.toLowerCase()}`)
+                    .maybeSingle();
                 if (!error && data) found = data as WorkspaceMember;
             } catch (err) {
                 console.warn('Postgres üye getirme hatası:', err);
             }
         }
         if (!found) {
-            found = WorkspaceStoreManager.getInstance().getMemberById(id) || null;
+            found = WorkspaceStoreManager.getInstance().getMemberById(cleanId) ||
+                WorkspaceStoreManager.getInstance().getMemberByEmail(cleanId) ||
+                WorkspaceStoreManager.getInstance().getMemberByUsername(cleanId) || null;
         }
         return await this.resolveMemberAvatar(found);
     }
@@ -1372,7 +1380,8 @@ export class WorkspaceRepository {
                 let query = supabase
                     .from('workspace_notifications')
                     .select('*')
-                    .or('is_active.is.null,is_active.eq.true')
+                    .neq('is_active', false)
+                    .neq('id', 'notif_welcome')
                     .order('created_at', { ascending: false })
                     .limit(50);
                 if (userId && userId !== 'all') {
@@ -1387,17 +1396,20 @@ export class WorkspaceRepository {
                             reads.forEach(r => readIds.add(r.notification_id));
                         }
                     }
-                    return data.map(n => ({
-                        ...n,
-                        is_active: n.is_active !== false,
-                        is_read: n.is_read || readIds.has(n.id)
-                    }));
+                    return data
+                        .filter(n => n.id !== 'notif_welcome' && !n.title?.includes('Workspace Başlatıldı'))
+                        .map(n => ({
+                            ...n,
+                            is_active: n.is_active !== false,
+                            is_read: n.is_read || readIds.has(n.id)
+                        }));
                 }
             } catch (err) {
                 console.warn('Postgres bildirim getirme hatası:', err);
             }
         }
-        return WorkspaceStoreManager.getInstance().getNotifications(userId);
+        return WorkspaceStoreManager.getInstance().getNotifications(userId)
+            .filter(n => n.id !== 'notif_welcome' && !n.title?.includes('Workspace Başlatıldı'));
     }
 
     public static async getAllNotificationsAdmin(): Promise<WorkspaceNotification[]> {
@@ -1408,19 +1420,23 @@ export class WorkspaceRepository {
                 const { data, error } = await supabase
                     .from('workspace_notifications')
                     .select('*')
+                    .neq('id', 'notif_welcome')
                     .order('created_at', { ascending: false })
                     .limit(200);
                 if (!error && data && data.length > 0) {
-                    return data.map(n => ({
-                        ...n,
-                        is_active: n.is_active !== false
-                    }));
+                    return data
+                        .filter(n => n.id !== 'notif_welcome' && !n.title?.includes('Workspace Başlatıldı'))
+                        .map(n => ({
+                            ...n,
+                            is_active: n.is_active !== false
+                        }));
                 }
             } catch (err) {
                 console.warn('Postgres admin bildirimleri getirme hatası:', err);
             }
         }
-        return WorkspaceStoreManager.getInstance().getAllNotificationsAdmin();
+        return WorkspaceStoreManager.getInstance().getAllNotificationsAdmin()
+            .filter(n => n.id !== 'notif_welcome' && !n.title?.includes('Workspace Başlatıldı'));
     }
 
     public static async toggleNotificationActive(id: string, isActive: boolean): Promise<boolean> {
@@ -1535,11 +1551,68 @@ export class WorkspaceRepository {
 
     public static async dispatchInstantNotification(params: any): Promise<WorkspaceNotification[]> {
         this.ensureDatabaseConfigured();
-        const dispatched = WorkspaceStoreManager.getInstance().dispatchInstantNotification(params);
+        let dispatched = WorkspaceStoreManager.getInstance().dispatchInstantNotification(params);
+
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                await supabase.from('workspace_notifications').insert(dispatched);
+                // Eğer serverless soğuk başlangıçta in-memory liste boşsa, üyeleri doğrudan Supabase'den çek
+                if (dispatched.length === 0) {
+                    const nowStr = new Date().toISOString();
+                    const notifType = params.type || 'announcement';
+
+                    if (params.targetAudience === 'group' && params.targetGroupId) {
+                        const { data: grp } = await supabase
+                            .from('workspace_groups')
+                            .select('name, members')
+                            .eq('id', params.targetGroupId)
+                            .maybeSingle();
+
+                        if (grp) {
+                            let memberIds: string[] = [];
+                            if (Array.isArray(grp.members)) memberIds = grp.members;
+                            else if (typeof grp.members === 'string') {
+                                try { memberIds = JSON.parse(grp.members); } catch {}
+                            }
+                            dispatched = memberIds.map(mId => ({
+                                id: `notif_${Date.now()}_${mId}`,
+                                user_id: mId,
+                                event_id: params.eventId,
+                                event_title: params.eventTitle,
+                                title: `[${grp.name || 'Komite'}] ${params.title}`,
+                                message: params.message,
+                                type: notifType,
+                                is_read: false,
+                                is_active: true,
+                                created_at: nowStr
+                            }));
+                        }
+                    } else if (params.targetAudience === 'role' && params.targetRole) {
+                        const { data: roleMembers } = await supabase
+                            .from('workspace_members')
+                            .select('id')
+                            .eq('role', params.targetRole);
+
+                        if (roleMembers && roleMembers.length > 0) {
+                            dispatched = roleMembers.map(m => ({
+                                id: `notif_${Date.now()}_${m.id}`,
+                                user_id: m.id,
+                                event_id: params.eventId,
+                                event_title: params.eventTitle,
+                                title: params.title,
+                                message: params.message,
+                                type: notifType,
+                                is_read: false,
+                                is_active: true,
+                                created_at: nowStr
+                            }));
+                        }
+                    }
+                }
+
+                if (dispatched.length > 0) {
+                    await supabase.from('workspace_notifications').insert(dispatched);
+                }
             } catch (err) {
                 console.warn('Postgres bildirim dağıtma hatası:', err);
             }
@@ -1699,36 +1772,7 @@ export class WorkspaceRepository {
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                // 1. workspace_events içindeki vitrin etkinlikleri (Yalnızca kullanıcının vitrine eklediği: is_showcase = true)
-                const { data: wsEvents } = await supabase
-                    .from('workspace_events')
-                    .select('*')
-                    .eq('is_showcase', true)
-                    .order('start_time', { ascending: false });
-
-                if (wsEvents && wsEvents.length > 0) {
-                    wsEvents.forEach((ev: any) => {
-                        results.push({
-                            id: ev.id,
-                            title: ev.title,
-                            description: ev.description || '',
-                            event_date: ev.start_time,
-                            end_date: ev.end_time,
-                            category: ev.category || 'Etkinlik',
-                            location: ev.location || 'HSD MTÜ Kampüs / Online',
-                            image_url: null,
-                            join_link: ev.meeting_link || null,
-                            is_active: ev.status !== 'cancelled',
-                            is_workspace: true,
-                            rsvp_enabled: Boolean(ev.rsvp_enabled),
-                            rsvp_qr_enabled: Boolean(ev.rsvp_qr_enabled),
-                            rsvp_capacity: ev.rsvp_capacity,
-                            color: ev.color || '#dc2626'
-                        });
-                    });
-                }
-
-                // 2. Klasik events tablosundaki etkinlikler (varsa)
+                // Yalnızca klasik events tablosundaki halka açık etkinlikler (workspace_events kesinlikle ana sayfaya sızdırılmaz)
                 const { data: legacyEvents } = await supabase
                     .from('events')
                     .select('*')
@@ -1737,42 +1781,13 @@ export class WorkspaceRepository {
 
                 if (legacyEvents && legacyEvents.length > 0) {
                     legacyEvents.forEach((ev: any) => {
-                        if (!results.some(r => r.id === ev.id || r.title === ev.title)) {
-                            results.push(ev);
-                        }
+                        results.push(ev);
                     });
                 }
             } catch (err) {
                 console.warn('Vitrin etkinlikleri çekme hatası:', err);
             }
         }
-
-        // Eğer veritabanından çekilemediyse bellek deposundaki vitrin etkinliklerini döndür
-        if (results.length === 0) {
-            const memoryEvents = WorkspaceStoreManager.getInstance().getEvents();
-            memoryEvents
-                .filter(e => Boolean(e.is_showcase))
-                .forEach(ev => {
-                    results.push({
-                        id: ev.id,
-                        title: ev.title,
-                        description: ev.description || '',
-                        event_date: ev.start_time,
-                        end_date: ev.end_time,
-                        category: ev.category || 'Etkinlik',
-                        location: ev.location || 'HSD MTÜ Kampüs / Online',
-                        image_url: null,
-                        join_link: ev.meeting_link || null,
-                        is_active: ev.status !== 'cancelled',
-                        is_workspace: true,
-                        rsvp_enabled: Boolean(ev.rsvp_enabled),
-                        rsvp_qr_enabled: Boolean(ev.rsvp_qr_enabled),
-                        rsvp_capacity: ev.rsvp_capacity,
-                        color: ev.color || '#dc2626'
-                    });
-                });
-        }
-
         return results;
     }
 
