@@ -30,6 +30,14 @@ DROP POLICY IF EXISTS "Allow workspace members update all" ON public.workspace_m
 CREATE POLICY "Allow workspace members update all" ON public.workspace_members
     FOR UPDATE TO authenticated, anon USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Allow workspace members insert all" ON public.workspace_members;
+CREATE POLICY "Allow workspace members insert all" ON public.workspace_members
+    FOR INSERT TO authenticated, anon WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow workspace members delete all" ON public.workspace_members;
+CREATE POLICY "Allow workspace members delete all" ON public.workspace_members
+    FOR DELETE TO authenticated, anon USING (true);
+
 -- 4. workspace_groups RLS Güncelleme Yetkisi (Komite Başkanı ve Üye Atamaları)
 ALTER TABLE IF EXISTS public.workspace_groups ENABLE ROW LEVEL SECURITY;
 
