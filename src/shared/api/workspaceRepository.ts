@@ -833,12 +833,32 @@ export class WorkspaceRepository {
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                const { data, error } = await supabase
+                // 1. Birincil anahtar ID ile sorgula
+                const { data: byId } = await supabase
                     .from('workspace_members')
                     .select('*')
-                    .or(`id.eq.${cleanId},email.eq.${cleanId.toLowerCase()},username.eq.${cleanId.toLowerCase()}`)
+                    .eq('id', cleanId)
                     .maybeSingle();
-                if (!error && data) found = data as WorkspaceMember;
+
+                if (byId) {
+                    found = byId as WorkspaceMember;
+                } else if (cleanId.includes('@')) {
+                    // 2. E-posta adresi ile sorgula
+                    const { data: byEmail } = await supabase
+                        .from('workspace_members')
+                        .select('*')
+                        .eq('email', cleanId.toLowerCase())
+                        .maybeSingle();
+                    if (byEmail) found = byEmail as WorkspaceMember;
+                } else {
+                    // 3. Kullanıcı adı ile sorgula
+                    const { data: byUser } = await supabase
+                        .from('workspace_members')
+                        .select('*')
+                        .eq('username', cleanId.toLowerCase())
+                        .maybeSingle();
+                    if (byUser) found = byUser as WorkspaceMember;
+                }
             } catch (err) {
                 console.warn('Postgres üye getirme hatası:', err);
             }
@@ -949,30 +969,76 @@ export class WorkspaceRepository {
 
     public static async updateMember(id: string, updates: Partial<WorkspaceMember>): Promise<WorkspaceMember | null> {
         this.ensureDatabaseConfigured();
-        const updated = WorkspaceStoreManager.getInstance().updateMember(id, updates);
+        const cleanId = String(id).trim();
+        let dbMember: WorkspaceMember | null = null;
+
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                await supabase.from('workspace_members').update(updates).eq('id', id);
+                // 1. Önce doğrudan ID ile güncelle
+                const { data, error } = await supabase
+                    .from('workspace_members')
+                    .update(updates)
+                    .eq('id', cleanId)
+                    .select('*')
+                    .maybeSingle();
+
+                if (!error && data) {
+                    dbMember = data as WorkspaceMember;
+                } else if (cleanId.includes('@')) {
+                    // ID ile bulunamazsa ve e-posta ise e-posta ile güncelle
+                    const { data: emailData, error: emailErr } = await supabase
+                        .from('workspace_members')
+                        .update(updates)
+                        .eq('email', cleanId.toLowerCase())
+                        .select('*')
+                        .maybeSingle();
+                    if (!emailErr && emailData) dbMember = emailData as WorkspaceMember;
+                }
             } catch (err) {
                 console.warn('Postgres üye güncelleme hatası:', err);
             }
         }
-        return updated || null;
+
+        // 2. Bellek yöneticisini güncelle (asla hata fırlatıp üst akışı kesmez)
+        let storeMember: WorkspaceMember | null = null;
+        try {
+            storeMember = WorkspaceStoreManager.getInstance().updateMember(cleanId, updates);
+        } catch (memErr) {
+            console.warn('Hafıza üye güncelleme uyarısı:', memErr);
+        }
+
+        return dbMember || storeMember || null;
     }
 
     public static async deleteMember(id: string): Promise<boolean> {
         this.ensureDatabaseConfigured();
-        const deleted = WorkspaceStoreManager.getInstance().deleteMember(id);
-        if (deleted && this.isSupabaseConfigured()) {
+        const cleanId = String(id).trim();
+        let deletedInDb = false;
+
+        if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
-                await supabase.from('workspace_members').delete().eq('id', id);
+                const { error } = await supabase.from('workspace_members').delete().eq('id', cleanId);
+                if (!error) {
+                    deletedInDb = true;
+                } else if (cleanId.includes('@')) {
+                    const { error: emailErr } = await supabase.from('workspace_members').delete().eq('email', cleanId.toLowerCase());
+                    if (!emailErr) deletedInDb = true;
+                }
             } catch (err) {
                 console.warn('Postgres üye silme hatası:', err);
             }
         }
-        return deleted;
+
+        let deletedInStore = false;
+        try {
+            deletedInStore = WorkspaceStoreManager.getInstance().deleteMember(cleanId);
+        } catch {
+            // ignore
+        }
+
+        return deletedInDb || deletedInStore;
     }
 
     public static async changeMemberPassword(emailOrIdOrUsername: string, newPassword: string): Promise<boolean> {
@@ -1722,7 +1788,7 @@ export class WorkspaceRepository {
         note: { author_id: string; author_name: string; content: string }
     ): Promise<WorkspaceMember | null> {
         this.ensureDatabaseConfigured();
-        const updated = WorkspaceStoreManager.getInstance().addMemberNote(memberId, note);
+        let dbMember: WorkspaceMember | null = null;
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
@@ -1736,30 +1802,34 @@ export class WorkspaceRepository {
                     created_at: new Date().toISOString()
                 };
                 const updatedNotes = [newNoteObj, ...notes];
-                await supabase.from('workspace_members').update({ member_notes: updatedNotes }).eq('id', memberId);
+                const { data } = await supabase.from('workspace_members').update({ member_notes: updatedNotes }).eq('id', memberId).select('*').maybeSingle();
+                if (data) dbMember = data as WorkspaceMember;
             } catch (err) {
                 console.warn('Postgres üye notu ekleme hatası:', err);
             }
         }
-        return updated;
+        const updated = WorkspaceStoreManager.getInstance().addMemberNote(memberId, note);
+        return dbMember || updated;
     }
 
     public static async deleteMemberNote(memberId: string, noteId: string): Promise<WorkspaceMember | null> {
         this.ensureDatabaseConfigured();
-        const updated = WorkspaceStoreManager.getInstance().deleteMemberNote(memberId, noteId);
+        let dbMember: WorkspaceMember | null = null;
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
                 const member = await this.getMemberById(memberId);
                 if (member?.member_notes) {
                     const filtered = member.member_notes.filter(n => n.id !== noteId);
-                    await supabase.from('workspace_members').update({ member_notes: filtered }).eq('id', memberId);
+                    const { data } = await supabase.from('workspace_members').update({ member_notes: filtered }).eq('id', memberId).select('*').maybeSingle();
+                    if (data) dbMember = data as WorkspaceMember;
                 }
             } catch (err) {
                 console.warn('Postgres üye notu silme hatası:', err);
             }
         }
-        return updated;
+        const updated = WorkspaceStoreManager.getInstance().deleteMemberNote(memberId, noteId);
+        return dbMember || updated;
     }
 
     // ==========================================

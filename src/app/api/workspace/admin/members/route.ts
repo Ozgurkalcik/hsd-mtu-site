@@ -105,7 +105,11 @@ export async function PATCH(req: Request) {
             return NextResponse.json({ error: 'Üye ID zorunludur.' }, { status: 400 });
         }
 
-        const targetMember = await WorkspaceRepository.getMemberById(id);
+        const cleanId = String(id).trim();
+        let targetMember = await WorkspaceRepository.getMemberById(cleanId);
+        if (!targetMember && cleanId.includes('@')) {
+            targetMember = await WorkspaceRepository.getMemberByEmail(cleanId);
+        }
 
         if (!targetMember) {
             return NextResponse.json({ error: 'Üye bulunamadı.' }, { status: 404 });
@@ -181,7 +185,11 @@ export async function DELETE(req: Request) {
             return NextResponse.json({ error: 'Kendi aktif yönetici hesabınızı silemezsiniz.' }, { status: 400 });
         }
 
-        const targetMember = await WorkspaceRepository.getMemberById(id);
+        const cleanId = String(id).trim();
+        let targetMember = await WorkspaceRepository.getMemberById(cleanId);
+        if (!targetMember && cleanId.includes('@')) {
+            targetMember = await WorkspaceRepository.getMemberByEmail(cleanId);
+        }
 
         if (!targetMember) {
             return NextResponse.json({ error: 'Üye bulunamadı.' }, { status: 404 });
@@ -195,9 +203,9 @@ export async function DELETE(req: Request) {
             );
         }
 
-        const deleted = await WorkspaceRepository.deleteMember(id);
+        const deleted = await WorkspaceRepository.deleteMember(targetMember.id);
         if (!deleted) {
-            return NextResponse.json({ error: 'Üye bulunamadı.' }, { status: 404 });
+            return NextResponse.json({ error: 'Üye silinemedi.' }, { status: 500 });
         }
 
         return NextResponse.json({ success: true });
