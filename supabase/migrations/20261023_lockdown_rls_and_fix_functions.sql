@@ -41,7 +41,7 @@ ALTER TABLE IF EXISTS public.workspace_events ENABLE ROW LEVEL SECURITY;
 
 -- 2.1. Dinamik Politika Temizliği: Geçmiş migration'lardan kalan TÜM politikaları sıfırla
 -- (PostgreSQL RLS permissive OR kuralı nedeniyle eski bir politikanın bile kalması veri sızıntısına yol açabilir)
-DO $
+DO $$
 DECLARE
     pol RECORD;
 BEGIN
@@ -52,7 +52,7 @@ BEGIN
     LOOP
         EXECUTE format('DROP POLICY IF EXISTS %I ON public.workspace_events', pol.policyname);
     END LOOP;
-END $;
+END $$;
 
 -- 2.2. Bilinen tarihsel politikaların açık DROP listesi (Ek güvenlik garantisi)
 DROP POLICY IF EXISTS "Allow workspace events read access" ON public.workspace_events;
@@ -162,7 +162,7 @@ REVOKE ALL ON public.workspace_event_subtasks FROM authenticated;
 -- ==============================================================================
 ALTER TABLE IF EXISTS public.workspace_groups ENABLE ROW LEVEL SECURITY;
 
-DO $
+DO $$
 DECLARE
     pol RECORD;
 BEGIN
@@ -173,7 +173,7 @@ BEGIN
     LOOP
         EXECUTE format('DROP POLICY IF EXISTS %I ON public.workspace_groups', pol.policyname);
     END LOOP;
-END $;
+END $$;
 
 DROP POLICY IF EXISTS "Allow groups read access" ON public.workspace_groups;
 DROP POLICY IF EXISTS "Allow workspace groups update access" ON public.workspace_groups;
@@ -196,7 +196,7 @@ REVOKE ALL ON public.workspace_groups FROM authenticated;
 -- ==============================================================================
 -- 6. workspace_settings & workspace_security_settings Tabloları — PostgREST İzolasyonu
 -- ==============================================================================
-DO $
+DO $$
 DECLARE
     pol RECORD;
 BEGIN
@@ -252,7 +252,7 @@ BEGIN
         REVOKE ALL ON public.workspace_security_settings FROM anon;
         REVOKE ALL ON public.workspace_security_settings FROM authenticated;
     END IF;
-END $;
+END $$;
 
 
 -- ==============================================================================
