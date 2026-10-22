@@ -524,16 +524,28 @@ BEGIN
         END;
         $f$;';
     END IF;
+
+    -- RPC Tetikleyici Fonksiyonları Dışarıdan Çalıştırmayı Engelle (Linter 0028 & 0029)
+    REVOKE EXECUTE ON FUNCTION public.handle_workspace_event_updated() FROM PUBLIC, anon, authenticated;
+
+    IF EXISTS (SELECT 1 FROM pg_proc JOIN pg_namespace ON pg_proc.pronamespace = pg_namespace.oid WHERE proname = 'update_updated_at_column' AND nspname = 'public') THEN
+        REVOKE EXECUTE ON FUNCTION public.update_updated_at_column() FROM PUBLIC, anon, authenticated;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM pg_proc JOIN pg_namespace ON pg_proc.pronamespace = pg_namespace.oid WHERE proname = 'handle_updated_at' AND nspname = 'public') THEN
+        REVOKE EXECUTE ON FUNCTION public.handle_updated_at() FROM PUBLIC, anon, authenticated;
+    END IF;
 END $$;
 
 
 -- ==============================================================================
--- 12. Storage (Depolama) Erişim Politikaları — uploads & workspace-files (P1)
+-- 12. Storage (Depolama) Erişim Politikaları — uploads & workspace-files (P1 & Linter 0025)
 -- ==============================================================================
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'storage' AND table_name = 'objects') THEN
         -- Bilinen tüm eski/gevşek depolama politikalarını temizle
+        DROP POLICY IF EXISTS "Public Access" ON storage.objects;
         DROP POLICY IF EXISTS "Public uploads access" ON storage.objects;
         DROP POLICY IF EXISTS "Allow public read on uploads bucket" ON storage.objects;
         DROP POLICY IF EXISTS "Allow authenticated uploads" ON storage.objects;
@@ -549,13 +561,11 @@ BEGIN
         DROP POLICY IF EXISTS "Allow authenticated upload workspace files" ON storage.objects;
         DROP POLICY IF EXISTS "Allow service_role full storage access" ON storage.objects;
 
-        -- 12.1 uploads bucket: Herkes okuyabilir (galeri, logolar), fakat yükleme/silme yalnızca admin veya service_role
-        CREATE POLICY "Allow public read on uploads bucket"
-            ON storage.objects
-            FOR SELECT
-            TO anon, authenticated
-            USING (bucket_id = 'uploads');
-
+        -- 12.1 uploads bucket:
+        -- NOT: uploads bucket'ı storage.buckets tablosunda zaten public=true olarak tanımlıdır.
+        -- Dosya indirmeleri doğrudan public URL üzerinden çalışır. storage.objects üzerinde geniş SELECT
+        -- politikası açılması tüm dosya listesinin taranmasına (0025_public_bucket_allows_listing) yol açar.
+        -- Bu nedenle genel SELECT politikası kaldırılmış, yalnızca yöneticilere ve service_role'a yetki verilmiştir.
         CREATE POLICY "Allow admin users manage uploads"
             ON storage.objects
             FOR ALL
