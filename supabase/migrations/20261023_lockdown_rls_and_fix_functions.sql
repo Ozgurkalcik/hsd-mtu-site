@@ -256,13 +256,25 @@ END $$;
 
 
 -- ==============================================================================
--- 7. popup_settings (Ana Sayfa Açılır Duyuru Modalı)
+-- 7. popup_settings (Ana Sayfa Açılır Duyuru Modalı) — P0 Lockdown
 -- ==============================================================================
 DO $$
+DECLARE
+    pol RECORD;
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'popup_settings') THEN
         ALTER TABLE public.popup_settings ENABLE ROW LEVEL SECURITY;
 
+        -- Dinamik temizlik: popup_settings_auth_write dahil TÜM eski/artık politikaları sıfırla
+        FOR pol IN 
+            SELECT policyname 
+            FROM pg_policies 
+            WHERE tablename = 'popup_settings' AND schemaname = 'public'
+        LOOP
+            EXECUTE format('DROP POLICY IF EXISTS %I ON public.popup_settings', pol.policyname);
+        END LOOP;
+
+        DROP POLICY IF EXISTS "popup_settings_auth_write" ON public.popup_settings;
         DROP POLICY IF EXISTS "Allow public read popup_settings" ON public.popup_settings;
         DROP POLICY IF EXISTS "Allow service_role full access on popup_settings" ON public.popup_settings;
         DROP POLICY IF EXISTS "Allow admin users update popup_settings" ON public.popup_settings;
@@ -283,7 +295,7 @@ BEGIN
             USING (true)
             WITH CHECK (true);
 
-        -- Admin panelinde (/admin/popup) oturum açmış yetkili yöneticiler güncelleyebilir
+        -- Admin panelinde (/admin/popup) oturum açmış yetkili yöneticiler (admin_users) güncelleyebilir
         CREATE POLICY "Allow admin users update popup_settings"
             ON public.popup_settings
             FOR UPDATE
@@ -298,6 +310,7 @@ BEGIN
             WITH CHECK (EXISTS (SELECT 1 FROM public.admin_users WHERE auth_id = auth.uid()));
 
         REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.popup_settings FROM anon;
+        REVOKE DELETE, TRUNCATE ON public.popup_settings FROM authenticated;
     END IF;
 END $$;
 
@@ -399,6 +412,65 @@ REVOKE ALL ON public.workspace_notification_reads FROM authenticated;
 
 
 -- ==============================================================================
+-- 10.1. workspace_active_sessions ve workspace_event_files Tabloları — Tam Tecrit (P1)
+-- ==============================================================================
+DO $$
+DECLARE
+    pol RECORD;
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'workspace_active_sessions') THEN
+        ALTER TABLE public.workspace_active_sessions ENABLE ROW LEVEL SECURITY;
+
+        FOR pol IN 
+            SELECT policyname 
+            FROM pg_policies 
+            WHERE tablename = 'workspace_active_sessions' AND schemaname = 'public'
+        LOOP
+            EXECUTE format('DROP POLICY IF EXISTS %I ON public.workspace_active_sessions', pol.policyname);
+        END LOOP;
+
+        DROP POLICY IF EXISTS "Allow full access for service_role on sessions" ON public.workspace_active_sessions;
+
+        CREATE POLICY "Allow service_role full access on workspace_active_sessions"
+            ON public.workspace_active_sessions
+            FOR ALL
+            TO service_role
+            USING (true)
+            WITH CHECK (true);
+
+        REVOKE ALL ON public.workspace_active_sessions FROM anon;
+        REVOKE ALL ON public.workspace_active_sessions FROM authenticated;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'workspace_event_files') THEN
+        ALTER TABLE public.workspace_event_files ENABLE ROW LEVEL SECURITY;
+
+        FOR pol IN 
+            SELECT policyname 
+            FROM pg_policies 
+            WHERE tablename = 'workspace_event_files' AND schemaname = 'public'
+        LOOP
+            EXECUTE format('DROP POLICY IF EXISTS %I ON public.workspace_event_files', pol.policyname);
+        END LOOP;
+
+        DROP POLICY IF EXISTS "Allow files read access" ON public.workspace_event_files;
+        DROP POLICY IF EXISTS "Allow authenticated read workspace files metadata" ON public.workspace_event_files;
+        DROP POLICY IF EXISTS "Allow full access for service_role on files" ON public.workspace_event_files;
+
+        CREATE POLICY "Allow service_role full access on workspace_event_files"
+            ON public.workspace_event_files
+            FOR ALL
+            TO service_role
+            USING (true)
+            WITH CHECK (true);
+
+        REVOKE ALL ON public.workspace_event_files FROM anon;
+        REVOKE ALL ON public.workspace_event_files FROM authenticated;
+    END IF;
+END $$;
+
+
+-- ==============================================================================
 -- 11. PostgreSQL Tetikleyici Fonksiyonları search_path Sertleştirmesi
 -- ==============================================================================
 CREATE OR REPLACE FUNCTION public.handle_workspace_event_updated()
@@ -456,26 +528,140 @@ END $$;
 
 
 -- ==============================================================================
--- 12. Storage (Depolama) Erişim Politikaları
+-- 12. Storage (Depolama) Erişim Politikaları — uploads & workspace-files (P1)
 -- ==============================================================================
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'storage' AND table_name = 'objects') THEN
+        -- Bilinen tüm eski/gevşek depolama politikalarını temizle
         DROP POLICY IF EXISTS "Public uploads access" ON storage.objects;
         DROP POLICY IF EXISTS "Allow public read on uploads bucket" ON storage.objects;
+        DROP POLICY IF EXISTS "Allow authenticated uploads" ON storage.objects;
+        DROP POLICY IF EXISTS "Allow authenticated upload uploads" ON storage.objects;
+        DROP POLICY IF EXISTS "Allow authenticated update uploads" ON storage.objects;
+        DROP POLICY IF EXISTS "Allow authenticated delete uploads" ON storage.objects;
+        DROP POLICY IF EXISTS "Allow admin users manage uploads" ON storage.objects;
+        DROP POLICY IF EXISTS "Allow service_role full uploads" ON storage.objects;
+
+        DROP POLICY IF EXISTS "Public workspace-files access" ON storage.objects;
+        DROP POLICY IF EXISTS "Allow service_role on workspace-files" ON storage.objects;
+        DROP POLICY IF EXISTS "Allow authenticated read workspace files" ON storage.objects;
+        DROP POLICY IF EXISTS "Allow authenticated upload workspace files" ON storage.objects;
+        DROP POLICY IF EXISTS "Allow service_role full storage access" ON storage.objects;
+
+        -- 12.1 uploads bucket: Herkes okuyabilir (galeri, logolar), fakat yükleme/silme yalnızca admin veya service_role
         CREATE POLICY "Allow public read on uploads bucket"
             ON storage.objects
             FOR SELECT
             TO anon, authenticated
             USING (bucket_id = 'uploads');
 
-        DROP POLICY IF EXISTS "Public workspace-files access" ON storage.objects;
-        DROP POLICY IF EXISTS "Allow service_role on workspace-files" ON storage.objects;
+        CREATE POLICY "Allow admin users manage uploads"
+            ON storage.objects
+            FOR ALL
+            TO authenticated
+            USING (bucket_id = 'uploads' AND EXISTS (SELECT 1 FROM public.admin_users WHERE auth_id = auth.uid()))
+            WITH CHECK (bucket_id = 'uploads' AND EXISTS (SELECT 1 FROM public.admin_users WHERE auth_id = auth.uid()));
+
+        CREATE POLICY "Allow service_role full uploads"
+            ON storage.objects
+            FOR ALL
+            TO service_role
+            USING (bucket_id = 'uploads')
+            WITH CHECK (bucket_id = 'uploads');
+
+        -- 12.2 workspace-files bucket: ÖZEL BUCKET (Private). anon ve authenticated doğrudan erişemez!
+        -- Dosyalar yalnızca Next.js API Route /api/workspace/files/download/[token] üzerinden service_role ile indirilir.
         CREATE POLICY "Allow service_role on workspace-files"
             ON storage.objects
             FOR ALL
             TO service_role
             USING (bucket_id = 'workspace-files')
             WITH CHECK (bucket_id = 'workspace-files');
+    END IF;
+END $$;
+
+
+-- ==============================================================================
+-- 13. contact_emails ve custom_pages — Admin Yetki Doğrulaması (P0)
+-- ==============================================================================
+DO $$
+DECLARE
+    pol RECORD;
+BEGIN
+    -- 13.1 contact_emails: İletişim Formu E-posta Hedefleri (Kritik Admin Tablosu)
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'contact_emails') THEN
+        ALTER TABLE public.contact_emails ENABLE ROW LEVEL SECURITY;
+
+        FOR pol IN 
+            SELECT policyname 
+            FROM pg_policies 
+            WHERE tablename = 'contact_emails' AND schemaname = 'public'
+        LOOP
+            EXECUTE format('DROP POLICY IF EXISTS %I ON public.contact_emails', pol.policyname);
+        END LOOP;
+
+        DROP POLICY IF EXISTS "Allow contact emails read" ON public.contact_emails;
+        DROP POLICY IF EXISTS "Allow contact emails write" ON public.contact_emails;
+        DROP POLICY IF EXISTS "Allow authenticated read contact_emails" ON public.contact_emails;
+        DROP POLICY IF EXISTS "Allow authenticated manage contact_emails" ON public.contact_emails;
+
+        CREATE POLICY "Allow service_role full access on contact_emails"
+            ON public.contact_emails
+            FOR ALL
+            TO service_role
+            USING (true)
+            WITH CHECK (true);
+
+        -- Yalnızca admin_users tablosundaki doğrulanmış panel yöneticileri yönetebilir
+        CREATE POLICY "Allow admin users manage contact_emails"
+            ON public.contact_emails
+            FOR ALL
+            TO authenticated
+            USING (EXISTS (SELECT 1 FROM public.admin_users WHERE auth_id = auth.uid()))
+            WITH CHECK (EXISTS (SELECT 1 FROM public.admin_users WHERE auth_id = auth.uid()));
+
+        REVOKE ALL ON public.contact_emails FROM anon;
+    END IF;
+
+    -- 13.2 custom_pages: Dinamik Sayfalar (Kritik Admin Tablosu - XSS / Defacement Koruması)
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'custom_pages') THEN
+        ALTER TABLE public.custom_pages ENABLE ROW LEVEL SECURITY;
+
+        FOR pol IN 
+            SELECT policyname 
+            FROM pg_policies 
+            WHERE tablename = 'custom_pages' AND schemaname = 'public'
+        LOOP
+            EXECUTE format('DROP POLICY IF EXISTS %I ON public.custom_pages', pol.policyname);
+        END LOOP;
+
+        DROP POLICY IF EXISTS "Allow custom pages read" ON public.custom_pages;
+        DROP POLICY IF EXISTS "Allow custom pages write" ON public.custom_pages;
+        DROP POLICY IF EXISTS "Allow authenticated manage custom_pages" ON public.custom_pages;
+
+        -- Ziyaretçiler yalnızca yayında olan sayfaları okuyabilir
+        CREATE POLICY "Allow public read active custom_pages"
+            ON public.custom_pages
+            FOR SELECT
+            TO anon, authenticated
+            USING (is_active = true);
+
+        CREATE POLICY "Allow service_role full access on custom_pages"
+            ON public.custom_pages
+            FOR ALL
+            TO service_role
+            USING (true)
+            WITH CHECK (true);
+
+        -- Yalnızca admin_users tablosundaki doğrulanmış panel yöneticileri sayfa ekleyebilir, güncelleyebilir veya silebilir
+        CREATE POLICY "Allow admin users manage custom_pages"
+            ON public.custom_pages
+            FOR ALL
+            TO authenticated
+            USING (EXISTS (SELECT 1 FROM public.admin_users WHERE auth_id = auth.uid()))
+            WITH CHECK (EXISTS (SELECT 1 FROM public.admin_users WHERE auth_id = auth.uid()));
+
+        REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.custom_pages FROM anon;
     END IF;
 END $$;

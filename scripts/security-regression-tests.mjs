@@ -682,6 +682,42 @@ if (migrationExists) {
         sql.includes("SET search_path = ''"),
         'search_path = \'\' güvenliği doğrulandı'
     );
+
+    assertTest(
+        'popup_settings Tablosunda popup_settings_auth_write Açıkça Temizlenmeli ve Admin Kontrolüne Bağlanmalı (P0)',
+        'SQL/RLS',
+        sql.includes('DROP POLICY IF EXISTS "popup_settings_auth_write" ON public.popup_settings;') &&
+        sql.includes('EXISTS (SELECT 1 FROM public.admin_users WHERE auth_id = auth.uid())'),
+        'popup_settings permissiveness açığı kapatıldı, yazma yalnızca admin_users'
+    );
+
+    assertTest(
+        'contact_emails ve custom_pages Tablolarında Yazma Yetkisi admin_users Tablosuna Bağlanmalı (P0)',
+        'SQL/RLS',
+        sql.includes('CREATE POLICY "Allow admin users manage contact_emails"') &&
+        sql.includes('CREATE POLICY "Allow admin users manage custom_pages"') &&
+        sql.includes('REVOKE ALL ON public.contact_emails FROM anon;'),
+        'contact_emails ve custom_pages sıradan authenticated kullanıcılara kapatıldı'
+    );
+
+    assertTest(
+        'workspace_active_sessions ve workspace_event_files Tabloları PostgREST İstemcilerinden Tamamen İptal Edilmeli (P1)',
+        'SQL/RLS',
+        sql.includes('REVOKE ALL ON public.workspace_active_sessions FROM anon;') &&
+        sql.includes('REVOKE ALL ON public.workspace_active_sessions FROM authenticated;') &&
+        sql.includes('REVOKE ALL ON public.workspace_event_files FROM anon;') &&
+        sql.includes('REVOKE ALL ON public.workspace_event_files FROM authenticated;'),
+        'Aktif oturumlar ve dosya metaverileri PostgREST erişimine tamamen kapatıldı'
+    );
+
+    assertTest(
+        'storage.objects Üzerinde uploads Yazması Adminlere Kısıtlanmalı, workspace-files Yalnızca service_role Olmalı (P1)',
+        'SQL/RLS',
+        sql.includes('CREATE POLICY "Allow admin users manage uploads"') &&
+        sql.includes('CREATE POLICY "Allow service_role on workspace-files"') &&
+        !sql.includes('CREATE POLICY "Allow authenticated read workspace files"'),
+        'Depolama erişimleri kilitlendi, özel dosyalar sadece service_role'
+    );
 }
 
 // ==============================================================================
