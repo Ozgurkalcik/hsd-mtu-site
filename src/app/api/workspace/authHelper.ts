@@ -13,27 +13,23 @@ export interface AuthenticatedUserSession {
     sessionId: string;
 }
 
+/**
+ * Yalnızca gerçek sistem yöneticisi rollerini doğrular.
+ * Komite liderleri (lead) bir unvandır; super_admin veya workspace_admin değildir.
+ */
 export function isUserAdminRole(role?: string): boolean {
     if (!role) return false;
     const r = role.toLowerCase().trim();
-    return (
-        r === 'super_admin' ||
-        r === 'workspace_admin' ||
-        r === 'admin' ||
-        r.includes('admin') ||
-        r.includes('yonetici') ||
-        r.includes('lead')
-    );
+    return r === 'super_admin' || r === 'workspace_admin';
 }
 
 /**
  * Aktif oturumu doğrular.
  * 1. Çerezden `hsd_workspace_session` token'ını alır.
  *    - Durumsuz imzalı HMAC token (Serverless / Vercel uyumlu) ise doğrular.
- *    - Veritabanı / aktif oturum listesinde kayıtlıysa doğrular.
+ *    - Veritabanında kayıtlı ve aktif bir üye ile eşleşiyorsa kabul eder (Sentetik sahte üye oluşturulmaz).
  * 2. Eğer workspace çerezi yoksa, Supabase SSR oturum çerezlerini kontrol eder.
- *    - Admin panelinde (`/admin`) giriş yapmış bir yönetici ise otomatik olarak `super_admin` yetkisiyle tanır.
- * Bu sayede hem Vercel sunucusuz mimarisinde oturumlar kopmaz hem de admin paneli ve takvim tam entegre çalışır.
+ *    - Yalnızca `admin_users` tablosunda kayıtlı gerçek yöneticiler sisteme admin olarak kabul edilir.
  */
 export async function getWorkspaceSession(): Promise<AuthenticatedUserSession | null> {
     const cookieStore = await cookies();
@@ -45,30 +41,21 @@ export async function getWorkspaceSession(): Promise<AuthenticatedUserSession | 
 
         // İptal edilmiş oturum kontrolü
         if (!WorkspaceRepository.isSessionRevoked(token)) {
-            // 1.A: Kriptografik Olarak İmzalı Stateless Token (Serverless Uyumu)
+            // 1.A: Kriptografik Olarak İmzalı Stateless Token
             const signedPayload = verifySignedSessionToken(token);
             if (signedPayload) {
+                // Sentetik kullanıcı fallback'i kaldırıldı: Kullanıcı mutlaka DB'de kayıtlı olmalı
                 const member = (await WorkspaceRepository.getMemberById(signedPayload.userId)) ||
-                    (await WorkspaceRepository.getMemberByEmail(signedPayload.email)) || {
-                    id: signedPayload.userId,
-                    email: signedPayload.email,
-                    username: signedPayload.email.split('@')[0],
-                    display_name: signedPayload.displayName,
-                    role: signedPayload.role as WorkspaceRole,
-                    status: 'active' as const,
-                    mfa_enabled: false,
-                    last_active_at: new Date().toISOString(),
-                    created_at: new Date(signedPayload.createdAt).toISOString()
-                };
+                    (await WorkspaceRepository.getMemberByEmail(signedPayload.email));
 
-                if (member.status === 'active') {
+                if (member && member.status === 'active') {
                     await WorkspaceRepository.resolveMemberAvatar(member);
                     const permissions = await WorkspaceRepository.getPermissionsForRole(member.role);
                     return { member, permissions, sessionId: token };
                 }
             }
 
-            // 1.B: Geriye Dönük Veritabanı / Bellek Oturum Listesi Kontrolü
+            // 1.B: Veritabanı / Bellek Oturum Listesi Kontrolü
             const activeSessions = await WorkspaceRepository.getActiveSessions();
             const foundSession = activeSessions.find(s => s.id === token);
 
@@ -84,7 +71,7 @@ export async function getWorkspaceSession(): Promise<AuthenticatedUserSession | 
         }
     }
 
-    // 2. Admin Paneli Supabase Auth Entegrasyonu (SSO Fallback)
+    // 2. Admin Paneli Supabase Auth Entegrasyonu (Yalnızca admin_users tablosunda kayıtlıysa)
     try {
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
         const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -102,46 +89,42 @@ export async function getWorkspaceSession(): Promise<AuthenticatedUserSession | 
             const { data: { user } } = await supabase.auth.getUser();
 
             if (user) {
-                // Admin tablosunda kontrol et
+                // Admin tablosunda yetkili yönetici kaydını ara
                 const { data: adminUser } = await supabase
                     .from('admin_users')
                     .select('id, role, display_name')
                     .eq('auth_id', user.id)
                     .maybeSingle();
 
-                const permissions: RolePermissions = {
-                    role: 'super_admin',
-                    can_view: true,
-                    can_create: true,
-                    can_edit: true,
-                    can_delete: true,
-                    can_upload: true,
-                    can_share: true
-                };
+                // KRİTİK KONTROL: adminUser kaydı bulunmayan hiçbir Supabase kullanıcısına admin yetkisi verilmez
+                if (adminUser) {
+                    const effectiveRole = (adminUser.role === 'super_admin' ? 'super_admin' : 'workspace_admin') as WorkspaceRole;
+                    const permissions = await WorkspaceRepository.getPermissionsForRole(effectiveRole);
 
-                const member: WorkspaceMember = {
-                    id: adminUser?.id || `admin_${user.id}`,
-                    email: user.email || 'admin@hsdmtu.site',
-                    username: (user.email || 'admin').split('@')[0],
-                    display_name: adminUser?.display_name || user.email || 'HSD Admin',
-                    role: 'super_admin',
-                    status: 'active',
-                    mfa_enabled: false,
-                    last_active_at: new Date().toISOString(),
-                    created_at: new Date().toISOString()
-                };
+                    const member: WorkspaceMember = {
+                        id: adminUser.id || `admin_${user.id}`,
+                        email: user.email || 'admin@hsdmtu.site',
+                        username: (user.email || 'admin').split('@')[0],
+                        display_name: adminUser.display_name || user.email || 'HSD Admin',
+                        role: effectiveRole,
+                        status: 'active',
+                        mfa_enabled: false,
+                        last_active_at: new Date().toISOString(),
+                        created_at: new Date().toISOString()
+                    };
 
-                await WorkspaceRepository.resolveMemberAvatar(member);
+                    await WorkspaceRepository.resolveMemberAvatar(member);
 
-                return {
-                    member,
-                    permissions,
-                    sessionId: `sb_admin_${user.id}`
-                };
+                    return {
+                        member,
+                        permissions,
+                        sessionId: `sb_admin_${user.id}`
+                    };
+                }
             }
         }
     } catch {
-        // Supabase kontrol hatası durumunda sessizce devam et
+        // Supabase kontrol hatası durumunda güvenli şekilde null dön
     }
 
     return null;
@@ -186,7 +169,7 @@ export async function requirePermission(
 }
 
 /**
- * Admin rotaları için yönetici yetkisini zorunlu kılan filtre.
+ * Admin rotaları için yönetici yetkisini (super_admin veya workspace_admin) zorunlu kılan filtre.
  * Oturum yoksa 401, yetki yetersizse 403 Forbidden döner.
  */
 export async function verifyAdmin(): Promise<{ errorResponse?: NextResponse; session?: AuthenticatedUserSession }> {
@@ -198,7 +181,7 @@ export async function verifyAdmin(): Promise<{ errorResponse?: NextResponse; ses
         return { session };
     }
 
-    // Ekstra güvence: Supabase admin oturumu var mı kontrol et
+    // Ekstra güvence: Supabase admin_users kaydı var mı kontrol et
     try {
         const cookieStore = await cookies();
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -214,21 +197,23 @@ export async function verifyAdmin(): Promise<{ errorResponse?: NextResponse; ses
             });
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                return {
-                    session: {
-                        member: { ...member, role: 'super_admin' },
-                        permissions: {
-                            role: 'super_admin',
-                            can_view: true,
-                            can_create: true,
-                            can_edit: true,
-                            can_delete: true,
-                            can_upload: true,
-                            can_share: true
-                        },
-                        sessionId: session.sessionId
-                    }
-                };
+                const { data: adminUser } = await supabase
+                    .from('admin_users')
+                    .select('id, role, display_name')
+                    .eq('auth_id', user.id)
+                    .maybeSingle();
+
+                if (adminUser) {
+                    const effectiveRole = (adminUser.role === 'super_admin' ? 'super_admin' : 'workspace_admin') as WorkspaceRole;
+                    const permissions = await WorkspaceRepository.getPermissionsForRole(effectiveRole);
+                    return {
+                        session: {
+                            member: { ...member, role: effectiveRole },
+                            permissions,
+                            sessionId: session.sessionId
+                        }
+                    };
+                }
             }
         }
     } catch {}
@@ -242,15 +227,16 @@ export async function verifyAdmin(): Promise<{ errorResponse?: NextResponse; ses
 }
 
 /**
- * Sadece super_admin rolünü zorunlu kılan kritik yönetim filtresi.
- * Rol izinlerini değiştirme veya güvenlik ayarları gibi işlemler için kullanılır.
+ * Sadece ve yalnızca super_admin rolünü zorunlu kılan kritik yönetim filtresi.
+ * Rol izinlerini değiştirme veya güvenlik ayarları gibi sistem seviyesi işlemler için kullanılır.
  */
 export async function verifySuperAdmin(): Promise<{ errorResponse?: NextResponse; session?: AuthenticatedUserSession }> {
     const { errorResponse, session } = await requireAuth();
     if (errorResponse || !session) return { errorResponse };
 
     const { member } = session;
-    if (isUserAdminRole(member.role)) {
+    // Yalnızca tam super_admin rolü kabul edilir
+    if (member.role === 'super_admin') {
         return { session };
     }
 

@@ -67,12 +67,9 @@ export function validateFileUpload(
  * Path traversal (`../`, `..\`) ve tehlikeli karakterleri temizler.
  */
 export function sanitizeFileName(fileName: string): string {
-    // Path traversal temizleme
     let clean = fileName.replace(/^.*[\\\/]/, '');
     clean = clean.replace(/\.\.+/g, '.');
-    // Özel ve tehlikeli karakterleri güvenli hale getirme
     clean = clean.replace(/[^a-zA-Z0-9._\-]/g, '_');
-    // Baştaki noktaları temizle
     clean = clean.replace(/^\.+/, '');
     return clean || 'unnamed_file';
 }
@@ -90,7 +87,6 @@ export function generateSecureToken(length: number = 32): string {
             .slice(0, length);
     }
 
-    // Fallback
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let token = '';
     for (let i = 0; i < length; i++) {
@@ -114,7 +110,7 @@ export function hashPassword(password: string): string {
 export function verifyPassword(password: string, storedHash: string): boolean {
     if (!storedHash || !password) return false;
 
-    // Eğer hash formatında ise: salt:hash
+    // Eğer hash formatında ise: salt:hash (PBKDF2 SHA-512)
     const parts = storedHash.split(':');
     if (parts.length === 2 && parts[0].length === 32) {
         const [salt, originalHash] = parts;
@@ -125,8 +121,10 @@ export function verifyPassword(password: string, storedHash: string): boolean {
         return crypto.timingSafeEqual(originalBuf, testBuf);
     }
 
-    // Geriye dönük uyumluluk (legacy seed şifreler için sabit zamanlı kontrol)
-    return password === storedHash;
+    // Sabit zamanlı (timing-safe) SHA-256 karşılaştırma
+    const passBuf = crypto.createHash('sha256').update(password).digest();
+    const storedBuf = crypto.createHash('sha256').update(storedHash).digest();
+    return crypto.timingSafeEqual(passBuf, storedBuf);
 }
 
 /**
@@ -147,7 +145,6 @@ export function checkRateLimit(
     const now = Date.now();
     const entry = rateLimitMap.get(key);
 
-    // Süresi dolmuş eski kayıtları temizle (bellek sızıntısı koruması)
     if (rateLimitMap.size > 500) {
         for (const [k, v] of rateLimitMap.entries()) {
             if (now > v.resetAt) rateLimitMap.delete(k);
@@ -184,18 +181,35 @@ export interface SignedSessionPayload {
     expiresAt: number;
 }
 
-function getSessionSignSecret(): string {
-    const secret =
-        process.env.WORKSPACE_SESSION_SECRET ||
-        process.env.SUPABASE_SERVICE_ROLE_KEY;
+export class MissingSessionSecretConfigurationError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'MissingSessionSecretConfigurationError';
+    }
+}
 
-    if (secret && secret.trim().length >= 16) {
+/**
+ * Oturum İmzalama Anahtarı (Fail-Closed)
+ * - Üretimde (production) WORKSPACE_SESSION_SECRET zorunludur ve en az 32 karakter olmalıdır.
+ * - SUPABASE_SERVICE_ROLE_KEY asla oturum anahtarı olarak kullanılmaz; iki sır tamamen ayrıdır.
+ * - Üretimde eksik/yetersiz secret durumunda geçici bellek içi anahtar türetilmez; açıkça hata fırlatılır (fail-closed).
+ */
+export function getSessionSignSecret(): string {
+    const secret = process.env.WORKSPACE_SESSION_SECRET;
+
+    if (secret && secret.trim().length >= 32) {
         return secret.trim();
     }
 
-    // Sunucu tarafı izole hash türetimi (Asla istemciye açık NEXT_PUBLIC_ anahtarı kullanılmaz)
-    const seed = process.env.DATABASE_URL || process.env.NODE_ENV || 'hsd_mtu_workspace_secure_core_secret_v2';
-    return crypto.createHash('sha256').update(`hsd_session_${seed}`).digest('hex');
+    // Üretim ortamında kesinlikle fail-closed
+    if (process.env.NODE_ENV === 'production') {
+        throw new MissingSessionSecretConfigurationError(
+            '[SECURITY CONFIGURATION ERROR] WORKSPACE_SESSION_SECRET is missing, empty, or shorter than 32 characters in production. Configure WORKSPACE_SESSION_SECRET in your production environment variables.'
+        );
+    }
+
+    // Yalnızca yerel geliştirme ve test ortamı için sabit anahtar (üretimde asla çalışmaz)
+    return 'hsd_mtu_dev_test_session_secret_32bytes_minimum_length_for_local!';
 }
 
 export function createSignedSessionToken(
@@ -238,4 +252,3 @@ export function verifySignedSessionToken(token: string): SignedSessionPayload | 
         return null;
     }
 }
-

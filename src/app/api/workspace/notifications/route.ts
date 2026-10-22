@@ -7,19 +7,23 @@ const ADMIN_ROLES = ['super_admin', 'workspace_admin', 'editor'];
 export async function GET(req: Request) {
     try {
         const session = await getWorkspaceSession();
+        if (!session) {
+            return NextResponse.json({ error: 'Bildirimleri görüntülemek için giriş yapmalısınız.' }, { status: 401 });
+        }
+
         const url = new URL(req.url);
         const scope = url.searchParams.get('scope');
 
         // Admin Scope: Tüm aktif ve pasif bildirimleri getirir
         if (scope === 'admin') {
-            if (!session || !ADMIN_ROLES.includes(session.member.role)) {
+            if (!ADMIN_ROLES.includes(session.member.role)) {
                 return NextResponse.json({ error: 'Bu veriyi görüntüleme yetkiniz yok.' }, { status: 403 });
             }
             const notifications = await WorkspaceRepository.getAllNotificationsAdmin();
             return NextResponse.json({ notifications });
         }
 
-        const userId = session?.member.id || 'all';
+        const userId = session.member.id;
         const notifications = await WorkspaceRepository.getNotifications(userId);
 
         return NextResponse.json({ notifications });

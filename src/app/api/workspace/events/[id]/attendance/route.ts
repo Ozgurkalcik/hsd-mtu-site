@@ -8,6 +8,14 @@ interface RouteParams {
 
 export async function GET(req: Request, context: RouteParams) {
     try {
+        const session = await getWorkspaceSession();
+        if (!session) {
+            return NextResponse.json(
+                { error: 'Yetkisiz erişim: Katılım listesini görüntülemek için oturum açmalısınız.' },
+                { status: 401 }
+            );
+        }
+
         const { id } = await context.params;
         const attendees = await WorkspaceRepository.getMemberAttendance(id);
         return NextResponse.json({ attendees: attendees || [] });

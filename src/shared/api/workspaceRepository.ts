@@ -69,6 +69,61 @@ export class WorkspaceRepository {
     // ETKİNLİKLER (Events & Concurrency Locking)
     // ==========================================
 
+    public static canMemberViewEvent(e: WorkspaceEvent, viewerMember?: WorkspaceMember | null): boolean {
+        const vis = e.visibility || 'public';
+        if (vis === 'public') return true;
+
+        const isViewerAdmin = viewerMember?.role === 'super_admin' ||
+            viewerMember?.role === 'workspace_admin' ||
+            viewerMember?.role === 'editor';
+
+        if (vis === 'admin_only') return Boolean(isViewerAdmin);
+        if (vis === 'private') {
+            return Boolean(viewerMember && (e.created_by === viewerMember.id || viewerMember.role === 'super_admin'));
+        }
+        if (vis === 'committee') {
+            if (!viewerMember) return false;
+            if (viewerMember.role === 'super_admin' || viewerMember.role === 'workspace_admin' || viewerMember.role === 'editor' || e.created_by === viewerMember.id) return true;
+            const allowed = (e as any).allowed_committee_ids || [];
+            if (!Array.isArray(allowed) || allowed.length === 0) return false;
+            if (allowed.includes('cal_core') || allowed.includes('all')) return true;
+            if (viewerMember.group_id && allowed.includes(viewerMember.group_id)) return true;
+            const calToGroupMap: Record<string, string> = {
+                cal_proj: 'grp_project',
+                cal_event: 'grp_event_sponsor',
+                cal_social: 'grp_social_design',
+                cal_medium: 'grp_medium',
+                cal_mgmt: 'grp_mgmt',
+                cal_ai: 'grp_ai'
+            };
+            const groupToCalMap: Record<string, string> = {
+                grp_project: 'cal_proj',
+                grp_event_sponsor: 'cal_event',
+                grp_social_design: 'cal_social',
+                grp_medium: 'cal_medium',
+                grp_mgmt: 'cal_mgmt',
+                grp_ai: 'cal_ai'
+            };
+            if (viewerMember.group_id && groupToCalMap[viewerMember.group_id] && allowed.includes(groupToCalMap[viewerMember.group_id])) {
+                return true;
+            }
+            for (const cId of allowed) {
+                if (calToGroupMap[cId] && viewerMember.group_id === calToGroupMap[cId]) return true;
+            }
+            if (Array.isArray(e.assignees) && (e.assignees.includes(viewerMember.id) || e.assignees.includes(viewerMember.username))) {
+                return true;
+            }
+            return false;
+        }
+        if (vis === 'custom') {
+            if (!viewerMember) return false;
+            if (viewerMember.role === 'super_admin' || e.created_by === viewerMember.id) return true;
+            const allowed = (e as any).allowed_member_ids || e.assignees || [];
+            return allowed.includes(viewerMember.id) || allowed.includes(viewerMember.username);
+        }
+        return false;
+    }
+
     public static async getEvents(calendarId?: string, viewerMember?: WorkspaceMember | null): Promise<WorkspaceEvent[]> {
         this.ensureDatabaseConfigured();
         if (this.isSupabaseConfigured()) {
@@ -97,59 +152,7 @@ export class WorkspaceRepository {
                     })) as WorkspaceEvent[];
 
                     // Görünürlük (Visibility) Filtreleme
-                    const isViewerAdmin = viewerMember?.role === 'super_admin' ||
-                        viewerMember?.role === 'workspace_admin' ||
-                        viewerMember?.role === 'editor';
-
-                    enriched = enriched.filter(e => {
-                        const vis = e.visibility || 'public';
-                        if (vis === 'public') return true;
-                        if (vis === 'admin_only') return isViewerAdmin;
-                        if (vis === 'private') {
-                            return viewerMember && (e.created_by === viewerMember.id || viewerMember.role === 'super_admin');
-                        }
-                        if (vis === 'committee') {
-                            if (!viewerMember) return false;
-                            if (viewerMember.role === 'super_admin' || viewerMember.role === 'workspace_admin' || viewerMember.role === 'editor' || e.created_by === viewerMember.id) return true;
-                            const allowed = (e as any).allowed_committee_ids || [];
-                            if (!Array.isArray(allowed) || allowed.length === 0) return false;
-                            if (allowed.includes('cal_core') || allowed.includes('all')) return true;
-                            if (viewerMember.group_id && allowed.includes(viewerMember.group_id)) return true;
-                            const calToGroupMap: Record<string, string> = {
-                                cal_proj: 'grp_project',
-                                cal_event: 'grp_event_sponsor',
-                                cal_social: 'grp_social_design',
-                                cal_medium: 'grp_medium',
-                                cal_mgmt: 'grp_mgmt',
-                                cal_ai: 'grp_ai'
-                            };
-                            const groupToCalMap: Record<string, string> = {
-                                grp_project: 'cal_proj',
-                                grp_event_sponsor: 'cal_event',
-                                grp_social_design: 'cal_social',
-                                grp_medium: 'cal_medium',
-                                grp_mgmt: 'cal_mgmt',
-                                grp_ai: 'cal_ai'
-                            };
-                            if (viewerMember.group_id && groupToCalMap[viewerMember.group_id] && allowed.includes(groupToCalMap[viewerMember.group_id])) {
-                                return true;
-                            }
-                            for (const cId of allowed) {
-                                if (calToGroupMap[cId] && viewerMember.group_id === calToGroupMap[cId]) return true;
-                            }
-                            if (Array.isArray(e.assignees) && (e.assignees.includes(viewerMember.id) || e.assignees.includes(viewerMember.username))) {
-                                return true;
-                            }
-                            return false;
-                        }
-                        if (vis === 'custom') {
-                            if (!viewerMember) return false;
-                            if (viewerMember.role === 'super_admin' || e.created_by === viewerMember.id) return true;
-                            const allowed = (e as any).allowed_member_ids || e.assignees || [];
-                            return allowed.includes(viewerMember.id) || allowed.includes(viewerMember.username);
-                        }
-                        return true;
-                    });
+                    enriched = enriched.filter(e => this.canMemberViewEvent(e, viewerMember));
 
                     return enriched;
                 } else if (!error && data && data.length === 0) {
@@ -162,13 +165,18 @@ export class WorkspaceRepository {
         return WorkspaceStoreManager.getInstance().getEvents(calendarId, viewerMember);
     }
 
-    public static async getEventById(id: string): Promise<WorkspaceEvent | null> {
+    public static async getEventById(id: string, viewerMember?: WorkspaceMember | null): Promise<WorkspaceEvent | null> {
         this.ensureDatabaseConfigured();
         if (this.isSupabaseConfigured()) {
             try {
                 const supabase = this.getSupabaseClient();
                 const { data, error } = await supabase.from('workspace_events').select('*').eq('id', id).single();
                 if (!error && data) {
+                    if (viewerMember !== undefined && viewerMember !== null) {
+                        if (!this.canMemberViewEvent(data, viewerMember)) {
+                            return null;
+                        }
+                    }
                     const [comRes, subRes] = await Promise.all([
                         supabase.from('workspace_event_comments').select('*').eq('event_id', id),
                         supabase.from('workspace_event_subtasks').select('*').eq('event_id', id)
@@ -714,13 +722,44 @@ export class WorkspaceRepository {
             .replace(/[^a-z0-9]/g, '');
     }
 
-    public static sanitizeMember(member: WorkspaceMember | null): WorkspaceMember | null {
+    public static sanitizeMember(member: WorkspaceMember | null, keepAdminFields: boolean = false): WorkspaceMember | null {
         if (!member) return null;
-        const sanitized = { ...member };
-        if ('password_hash' in sanitized) {
-            delete (sanitized as any).password_hash;
+
+        // Katı Alan Bazlı İzin Listesi (Strict Allowlist)
+        // password_hash ASLA hiçbir allowlist'e dahil edilmez!
+        const baseAllowed: string[] = [
+            'id',
+            'email',
+            'username',
+            'display_name',
+            'full_name',
+            'role',
+            'status',
+            'mfa_enabled',
+            'last_active_at',
+            'created_at',
+            'avatar_url',
+            'group_id',
+            'must_change_password',
+            'member_notes'
+        ];
+
+        const adminExtraAllowed: string[] = [
+            'admin_notes',
+            'failed_login_attempts',
+            'locked_until'
+        ];
+
+        const allowedKeys = keepAdminFields ? [...baseAllowed, ...adminExtraAllowed] : baseAllowed;
+        const sanitized: Record<string, any> = {};
+
+        for (const key of allowedKeys) {
+            if (key in (member as any) && (member as any)[key] !== undefined) {
+                sanitized[key] = (member as any)[key];
+            }
         }
-        return sanitized;
+
+        return sanitized as WorkspaceMember;
     }
 
     public static async resolveMemberAvatar(member: WorkspaceMember | null): Promise<WorkspaceMember | null> {
@@ -765,7 +804,7 @@ export class WorkspaceRepository {
         return this.sanitizeMember(member);
     }
 
-    public static async getMembers(): Promise<WorkspaceMember[]> {
+    public static async getMembers(isCallerAdmin: boolean = false): Promise<WorkspaceMember[]> {
         this.ensureDatabaseConfigured();
         let members: WorkspaceMember[] = [];
         if (this.isSupabaseConfigured()) {
@@ -822,7 +861,7 @@ export class WorkspaceRepository {
                 }
             }
         }
-        return members.map(m => this.sanitizeMember(m)!);
+        return members.map(m => this.sanitizeMember(m, isCallerAdmin)!);
     }
 
     public static async getMemberById(id: string): Promise<WorkspaceMember | null> {
@@ -1067,8 +1106,8 @@ export class WorkspaceRepository {
 
     public static async verifyMemberPassword(identifier: string, password: string): Promise<boolean> {
         this.ensureDatabaseConfigured();
-        const storeValid = WorkspaceStoreManager.getInstance().verifyMemberPassword(identifier, password);
-        if (storeValid) return true;
+        // Supabase veritabanı öncelikli kontrol
+
 
         if (this.isSupabaseConfigured()) {
             try {
@@ -1089,7 +1128,7 @@ export class WorkspaceRepository {
             }
         }
 
-        return false;
+        return WorkspaceStoreManager.getInstance().verifyMemberPassword(identifier, password);
     }
 
     // ==========================================
@@ -1452,6 +1491,8 @@ export class WorkspaceRepository {
                     .limit(50);
                 if (userId && userId !== 'all') {
                     query = query.or(`user_id.eq.all,user_id.eq.${userId}`);
+                } else if (userId === 'all') {
+                    query = query.eq('user_id', 'all');
                 }
                 const { data, error } = await query;
                 if (!error && data && data.length > 0) {

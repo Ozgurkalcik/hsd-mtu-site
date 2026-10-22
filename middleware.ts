@@ -39,6 +39,50 @@ export function clearLoginAttempts(ip: string) {
     loginAttempts.delete(ip)
 }
 
+/**
+ * Web Crypto (SubtleCrypto) ile Edge uyumlu Workspace Oturum Doğrulaması.
+ * Basit string length kontrolleri yerine tam kriptografik HMAC-SHA256 ve rol denetimi yapar.
+ */
+async function isValidWorkspaceAdminSession(token?: string): Promise<boolean> {
+    if (!token || typeof token !== 'string') return false
+    const secretStr = process.env.WORKSPACE_SESSION_SECRET || (process.env.NODE_ENV !== 'production' ? 'hsd_mtu_dev_test_session_secret_32bytes_minimum_length_for_local!' : undefined);
+    if (!secretStr || secretStr.trim().length < 32) return false
+
+    try {
+        const [dataStr, signature] = token.split('.')
+        if (!dataStr || !signature || signature.length !== 64) return false
+
+        const enc = new TextEncoder()
+        const key = await crypto.subtle.importKey(
+            'raw',
+            enc.encode(secretStr.trim()),
+            { name: 'HMAC', hash: 'SHA-256' },
+            false,
+            ['verify']
+        )
+
+        const sigBytes = new Uint8Array(signature.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || [])
+        const isValidSig = await crypto.subtle.verify('HMAC', key, sigBytes, enc.encode(dataStr))
+        if (!isValidSig) return false
+
+        let base64 = dataStr.replace(/-/g, '+').replace(/_/g, '/')
+        while (base64.length % 4) base64 += '='
+        const jsonStr = atob(base64)
+        const payload = JSON.parse(jsonStr)
+
+        // Süre kontrolü
+        if (typeof payload.expiresAt === 'number' && Date.now() > payload.expiresAt) {
+            return false
+        }
+
+        // Yalnızca resmi Workspace Admin yetkisine sahip roller /admin alanına geçebilir
+        const role = String(payload.role || '').toLowerCase()
+        return role === 'super_admin' || role === 'workspace_admin'
+    } catch {
+        return false
+    }
+}
+
 // ============================================
 // Middleware
 // ============================================
@@ -109,9 +153,9 @@ export async function middleware(request: NextRequest) {
             }
         }
 
-        // Eğer workspace session varsa dashboard'a yönlendir
+        // Eğer geçerli kriptografik imzalı workspace admin oturumu varsa yönlendir
         const wsSession = request.cookies.get('hsd_workspace_session')?.value
-        if (wsSession && wsSession.length > 20) {
+        if (await isValidWorkspaceAdminSession(wsSession)) {
             return NextResponse.redirect(new URL('/admin', request.url))
         }
 
@@ -121,12 +165,13 @@ export async function middleware(request: NextRequest) {
     // /admin/* (login hariç) → Auth kontrolü
     const response = NextResponse.next()
 
-    // 1. Workspace Session çerezi varsa doğrudan izin ver (AdminAuthGuard yetkiyi detaylı kontrol eder)
+    // 1. Kriptografik Olarak Doğrulanmış Workspace Admin Oturumu Kontrolü
     const wsSession = request.cookies.get('hsd_workspace_session')?.value
-    if (wsSession && wsSession.length > 20) {
+    if (await isValidWorkspaceAdminSession(wsSession)) {
         return response
     }
 
+    // 2. Supabase Auth Kontrolü
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -161,7 +206,7 @@ export async function middleware(request: NextRequest) {
         .single()
 
     if (!adminUser) {
-        // Auth var ama admin değil → logout ve login'e gönder
+        // Auth var ama admin tablosunda yok → çıkış yap ve login'e gönder
         await supabase.auth.signOut()
         return NextResponse.redirect(new URL('/admin/login', request.url))
     }

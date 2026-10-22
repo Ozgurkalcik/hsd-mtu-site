@@ -7,7 +7,7 @@ export async function GET() {
     const { errorResponse } = await verifyAdmin();
     if (errorResponse) return errorResponse;
 
-    const members = await WorkspaceRepository.getMembers();
+    const members = await WorkspaceRepository.getMembers(true);
 
     return NextResponse.json({ members });
 }
